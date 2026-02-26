@@ -1,0 +1,1 @@
+- should contextVersion be pushed into chart registry and tracked there? Implications: contextVersion becomes implicit on a chart and is tracked internally
