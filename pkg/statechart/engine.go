@@ -307,6 +307,12 @@ func (e *Engine) executeTransition(runtime *ChartRuntime, fromPath, toPath strin
 	// Execute entry actions for new state (errors don't block transition)
 	_ = e.executeEntryActions(runtime, finalPath, ev)
 
+	// Check if we entered a parallel state and initialize it
+	targetNode := e.findNode(runtime.definition.Root, finalPath)
+	if targetNode != nil && targetNode.NodeType() == NodeTypeParallel {
+		runtime.enterParallelState(finalPath)
+	}
+
 	return nil
 }
 
