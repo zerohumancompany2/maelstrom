@@ -30,6 +30,31 @@ type Event struct {
 	TargetPath    string // optional: "region:foo", "child:bar", etc.
 }
 
+// System event types for parallel region coordination.
+const (
+	// Parent → Region: Lifecycle control
+	SysEnter  = "sys:enter"
+	SysExit   = "sys:exit"
+	SysPause  = "sys:pause"
+	SysResume = "sys:resume"
+
+	// Region → Parent: Coordination signals
+	SysDone       = "sys:done"
+	SysTransition = "sys:transition"
+	SysPanic      = "sys:panic"
+	SysBackpressure = "sys:backpressure"
+)
+
+// IsSystem returns true if the event is a system event (has "sys:" prefix).
+func (e Event) IsSystem() bool {
+	return len(e.Type) > 4 && e.Type[:4] == "sys:"
+}
+
+// IsUser returns true if the event is a user/domain event.
+func (e Event) IsUser() bool {
+	return !e.IsSystem()
+}
+
 // RuntimeContext provides read-only context about a running chart.
 type RuntimeContext struct {
 	ChartID      string

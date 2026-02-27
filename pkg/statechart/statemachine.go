@@ -75,10 +75,15 @@ func (sm *StateMachine) executeTransition(fromPath, toPath string, ev Event, tra
 	// Execute entry actions for new state
 	_ = sm.executeEntryActions(toPath, ev)
 
+	// Check if new state is final (atomic with no transitions)
+	targetNode := sm.findNode(sm.definition.Root, toPath)
+	isFinal := targetNode != nil && targetNode.NodeType() == NodeTypeAtomic && len(targetNode.Transitions) == 0
+
 	return EventResult{
 		Transitioned: true,
 		FromState:    fromPath,
 		ToState:      toPath,
+		IsFinalState: isFinal,
 	}
 }
 
