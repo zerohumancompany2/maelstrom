@@ -2,6 +2,7 @@ package statechart
 
 import (
 	"errors"
+	"strings"
 	"sync"
 	"time"
 )
@@ -162,5 +163,59 @@ func (cr *ChartRuntime) AwaitQuiescence(timeout time.Duration) error {
 				return nil
 			}
 		}
+	}
+}
+
+// ReclassifyState dynamically changes a state's classification at runtime.
+// This implements arch-v1.md Section 2.2 dynamic reclassification.
+// Pass nil children to make atomic, single child for compound, multiple for parallel.
+func (cr *ChartRuntime) ReclassifyState(statePath string, children interface{}) {
+	var needsParallelInit bool
+
+	cr.mu.Lock()
+
+	node := cr.findNode(cr.definition.Root, statePath)
+	if node == nil {
+		cr.mu.Unlock()
+		return
+	}
+
+	switch v := children.(type) {
+	case nil:
+		// Atomic: remove all children
+		node.Children = nil
+	case *Node:
+		// Compound: single child
+		node.Children = map[string]*Node{v.ID: v}
+	case map[string]*Node:
+		// Parallel: multiple children
+		node.Children = v
+		// Check if we need to initialize parallel regions
+		needsParallelInit = (cr.activeState == statePath || strings.HasPrefix(cr.activeState, statePath+"/")) && len(v) >= 2
+	}
+
+	// Update active state based on new node type
+	// Check if activeState is this state or a descendant (starts with statePath)
+	if cr.activeState == statePath || strings.HasPrefix(cr.activeState, statePath+"/") {
+		switch node.NodeType() {
+		case NodeTypeCompound:
+			// Find initial child
+			for _, child := range node.Children {
+				if child.IsInitial {
+					cr.activeState = statePath + "/" + child.ID
+					break
+				}
+			}
+		case NodeTypeAtomic:
+			// Strip any child suffix
+			cr.activeState = statePath
+		}
+	}
+
+	cr.mu.Unlock()
+
+	// Initialize parallel regions after releasing lock
+	if needsParallelInit {
+		cr.enterParallelState(statePath)
 	}
 }
