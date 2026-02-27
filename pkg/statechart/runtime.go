@@ -1,8 +1,13 @@
 package statechart
 
 import (
+	"errors"
 	"sync"
+	"time"
 )
+
+// ErrQuiescenceTimeout is returned when awaiting quiescence times out.
+var ErrQuiescenceTimeout = errors.New("timeout awaiting quiescence")
 
 // ChartRuntime represents a live instance of a ChartDefinition.
 type ChartRuntime struct {
@@ -118,3 +123,44 @@ func (cr *ChartRuntime) findNode(root *Node, path string) *Node {
 	return current
 }
 
+// IsQuiescent returns true if the runtime is in a stable state for snapshot.
+// Quiescence requires: empty event queue, no active parallel regions processing.
+func (cr *ChartRuntime) IsQuiescent() bool {
+	cr.mu.RLock()
+	defer cr.mu.RUnlock()
+
+	// Check event queue is empty
+	if len(cr.eventQueue) > 0 {
+		return false
+	}
+
+	// Check parallel regions are idle
+	if cr.isParallel && cr.eventRouter != nil {
+		// TODO: Check if regions have pending work
+		// For now, parallel state is considered non-quiescent
+		return false
+	}
+
+	return true
+}
+
+// AwaitQuiescence blocks until the runtime becomes quiescent or timeout.
+// Returns error if timeout expires before quiescence.
+func (cr *ChartRuntime) AwaitQuiescence(timeout time.Duration) error {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timer.C:
+			return ErrQuiescenceTimeout
+		case <-ticker.C:
+			if cr.IsQuiescent() {
+				return nil
+			}
+		}
+	}
+}
