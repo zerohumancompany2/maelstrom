@@ -98,6 +98,32 @@ func (e *Engine) Spawn(def ChartDefinition, initialAppCtx ApplicationContext) (R
 	return runtime.id, nil
 }
 
+// SpawnTransient creates a sub-chart with lifecycle binding to parent.
+// When parent stops, all transient children are automatically stopped.
+func (e *Engine) SpawnTransient(def ChartDefinition, appCtx ApplicationContext, parentID RuntimeID) (RuntimeID, error) {
+	// Verify parent exists
+	e.runtimeMu.RLock()
+	parent, exists := e.runtimes[parentID]
+	e.runtimeMu.RUnlock()
+
+	if !exists {
+		return "", fmt.Errorf("%w: parent %s", ErrRuntimeNotFound, parentID)
+	}
+
+	// Create child runtime
+	childID, err := e.Spawn(def, appCtx)
+	if err != nil {
+		return "", err
+	}
+
+	// Register child with parent
+	parent.mu.Lock()
+	parent.children = append(parent.children, childID)
+	parent.mu.Unlock()
+
+	return childID, nil
+}
+
 // ReplaceDefinition hot-reloads a new chart definition into an existing runtime.
 // Preserves runtime state and context where possible.
 func (e *Engine) ReplaceDefinition(id RuntimeID, newDef ChartDefinition) error {
@@ -214,6 +240,10 @@ func (e *Engine) stopRuntime(runtime *ChartRuntime) error {
 		return fmt.Errorf("%w: already stopped", ErrInvalidState)
 	}
 
+	// Stop all transient children first
+	children := make([]RuntimeID, len(runtime.children))
+	copy(children, runtime.children)
+
 	// Execute exit actions for current state
 	if err := e.executeExitActions(runtime, runtime.activeState, Event{}); err != nil {
 		// Log error but continue with stop
@@ -223,6 +253,13 @@ func (e *Engine) stopRuntime(runtime *ChartRuntime) error {
 	runtime.state = RuntimeStateStopped
 	runtime.eventQueue = nil
 	runtime.mu.Unlock()
+
+	// Stop children after unlocking to avoid deadlock
+	for _, childID := range children {
+		if child, exists := e.runtimes[childID]; exists {
+			e.stopRuntime(child)
+		}
+	}
 
 	// Remove runtime from engine after unlocking
 	e.runtimeMu.Lock()

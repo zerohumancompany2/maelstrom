@@ -29,6 +29,9 @@ type ChartRuntime struct {
 	// Parallel state support
 	eventRouter *EventRouter // Active when in parallel state
 	isParallel  bool         // Whether currently in parallel state
+
+	// Transient sub-chart support (lifecycle binding to parent)
+	children []RuntimeID // IDs of child runtimes spawned via SpawnTransient
 }
 
 // ID returns the runtime's unique identifier.
