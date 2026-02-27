@@ -120,3 +120,63 @@ func TestStateMachine_EntryExitActions(t *testing.T) {
 		}
 	}
 }
+
+// TestStateMachine_GuardBlocking verifies guards can block transitions.
+func TestStateMachine_GuardBlocking(t *testing.T) {
+	def := ChartDefinition{
+		ID:      "test-guard",
+		Version: "1.0.0",
+		Root: &Node{
+			ID:       "idle",
+			Children: nil,
+			Transitions: []Transition{
+				{Event: "go", Target: "active", Guard: "canTransition"},
+			},
+		},
+		InitialState: "idle",
+	}
+
+	mockCtx := testutil.NewMockApplicationContext()
+
+	// Test 1: Guard returns false - transition blocked
+	smBlocked := &StateMachine{
+		definition:  def,
+		activeState: def.InitialState,
+		actions:     make(map[string]ActionFn),
+		guards: map[string]GuardFn{
+			"canTransition": func(ac ApplicationContext, ev Event) bool {
+				return false
+			},
+		},
+		appCtx: mockCtx,
+	}
+
+	result := smBlocked.ProcessEvent(Event{Type: "go"})
+	if result.Transitioned {
+		t.Error("Expected transition to be blocked by guard")
+	}
+	if smBlocked.activeState != "idle" {
+		t.Errorf("Expected to stay in 'idle', got '%s'", smBlocked.activeState)
+	}
+
+	// Test 2: Guard returns true - transition allowed
+	smAllowed := &StateMachine{
+		definition:  def,
+		activeState: def.InitialState,
+		actions:     make(map[string]ActionFn),
+		guards: map[string]GuardFn{
+			"canTransition": func(ac ApplicationContext, ev Event) bool {
+				return true
+			},
+		},
+		appCtx: mockCtx,
+	}
+
+	result = smAllowed.ProcessEvent(Event{Type: "go"})
+	if !result.Transitioned {
+		t.Error("Expected transition to occur")
+	}
+	if smAllowed.activeState != "active" {
+		t.Errorf("Expected to transition to 'active', got '%s'", smAllowed.activeState)
+	}
+}
