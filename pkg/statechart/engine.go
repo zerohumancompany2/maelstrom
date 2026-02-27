@@ -363,8 +363,17 @@ func (e *Engine) processEvent(runtime *ChartRuntime, ev Event) error {
 // executeTransition performs a state transition with entry/exit actions.
 // Transition completes even if actions fail - errors are logged but don't block.
 func (e *Engine) executeTransition(runtime *ChartRuntime, fromPath, toPath string, ev Event, actions []string) error {
-	// Execute exit actions for current state (errors don't block transition)
-	_ = e.executeExitActions(runtime, fromPath, ev)
+	// Find source node for exit actions
+	fromNode := e.findNode(runtime.definition.Root, fromPath)
+
+	// If exiting a parallel state, execute parallel exit actions
+	if fromNode != nil && fromNode.NodeType() == NodeTypeParallel {
+		runtime.exitParallelState()
+		_ = e.executeExitActions(runtime, fromPath, ev)
+	} else {
+		// Execute exit actions for current state (errors don't block transition)
+		_ = e.executeExitActions(runtime, fromPath, ev)
+	}
 
 	// Execute transition actions (errors don't block transition)
 	for _, actionName := range actions {
@@ -542,6 +551,12 @@ func (e *Engine) Snapshot(id RuntimeID) (Snapshot, error) {
 	queueCopy := make([]Event, len(runtime.eventQueue))
 	copy(queueCopy, runtime.eventQueue)
 
+	// Copy region states for parallel state
+	regionStatesCopy := make(map[string]string, len(runtime.regionStates))
+	for k, v := range runtime.regionStates {
+		regionStatesCopy[k] = v
+	}
+
 	return Snapshot{
 		RuntimeID:        runtime.id,
 		DefinitionID:     runtime.definition.ID,
@@ -549,20 +564,39 @@ func (e *Engine) Snapshot(id RuntimeID) (Snapshot, error) {
 		EventQueue:       queueCopy,
 		RuntimeContext:   runtime.runtimeCtx,
 		ApplicationState: nil, // Would be populated by serializing appCtx
+		RegionStates:     regionStatesCopy,
+		IsParallel:       runtime.isParallel,
 	}, nil
 }
 
 // Restore creates a new ChartRuntime from a snapshot.
-func (e *Engine) Restore(snap Snapshot) (RuntimeID, error) {
+func (e *Engine) Restore(snap Snapshot, def ChartDefinition, appCtx ApplicationContext) (RuntimeID, error) {
 	// Create a new runtime with restored state
 	newRuntime := &ChartRuntime{
 		id:           e.generateID(),
+		definition:   def,
 		state:        RuntimeStateCreated,
 		activeState:  snap.ActiveStates[0],
-		regionStates: make(map[string]string),
+		regionStates: snap.RegionStates,
 		eventQueue:   snap.EventQueue,
+		appCtx:       appCtx,
 		runtimeCtx:   snap.RuntimeContext,
+		actions:      make(map[string]ActionFn),
+		guards:       make(map[string]GuardFn),
+		isParallel:   snap.IsParallel,
 	}
+
+	// Copy action/guard registries from engine
+	e.actionMu.RLock()
+	e.guardMu.RLock()
+	for k, v := range e.actions {
+		newRuntime.actions[k] = v
+	}
+	for k, v := range e.guards {
+		newRuntime.guards[k] = v
+	}
+	e.guardMu.RUnlock()
+	e.actionMu.RUnlock()
 
 	newRuntime.runtimeCtx.RuntimeID = string(newRuntime.id)
 

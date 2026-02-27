@@ -51,7 +51,7 @@ type Library interface {
 
 	// Restore creates a new ChartRuntime from a previously captured snapshot.
 	// Returns the new RuntimeID (different from the original).
-	Restore(snap Snapshot) (RuntimeID, error)
+	Restore(snap Snapshot, def ChartDefinition, appCtx ApplicationContext) (RuntimeID, error)
 }
 
 // TraceCallback is called by the library on lifecycle events for observability.

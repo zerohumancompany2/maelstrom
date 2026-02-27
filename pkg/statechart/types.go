@@ -74,6 +74,14 @@ type Snapshot struct {
 	EventQueue       []Event
 	RuntimeContext   RuntimeContext
 	ApplicationState map[string]any // serialized app context
+	RegionStates     map[string]string // Current state per region for parallel states
+	IsParallel       bool              // Whether in parallel state at snapshot time
+}
+
+// RestoreOptions provides the definition and other required data for Restore.
+type RestoreOptions struct {
+	Definition ChartDefinition
+	AppCtx     ApplicationContext
 }
 
 // NodeType classifies the runtime behavior of a Node based on its children.
@@ -120,6 +128,10 @@ type Node struct {
 
 // NodeType derives the runtime type from the node's structure.
 func (n *Node) NodeType() NodeType {
+	// RegionNames explicitly indicates a parallel state
+	if n.RegionNames != nil {
+		return NodeTypeParallel
+	}
 	switch len(n.Children) {
 	case 0:
 		return NodeTypeAtomic

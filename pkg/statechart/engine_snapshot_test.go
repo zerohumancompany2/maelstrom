@@ -64,8 +64,8 @@ func TestRestore_CreatesEquivalentRuntime(t *testing.T) {
 		t.Fatalf("Snapshot failed: %v", err)
 	}
 
-	// Restore
-	newID, err := engine.Restore(snap)
+	// Restore with definition and context
+	newID, err := engine.Restore(snap, def, mockCtx)
 	if err != nil {
 		t.Fatalf("Restore failed: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestRestore_NewIDDifferentFromOriginal(t *testing.T) {
 		t.Fatalf("Snapshot failed: %v", err)
 	}
 
-	newID, err := engine.Restore(snap)
+	newID, err := engine.Restore(snap, def, mockCtx)
 	if err != nil {
 		t.Fatalf("Restore failed: %v", err)
 	}
