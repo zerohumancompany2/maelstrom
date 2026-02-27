@@ -98,6 +98,26 @@ func (e *Engine) Spawn(def ChartDefinition, initialAppCtx ApplicationContext) (R
 	return runtime.id, nil
 }
 
+// ReplaceDefinition hot-reloads a new chart definition into an existing runtime.
+// Preserves runtime state and context where possible.
+func (e *Engine) ReplaceDefinition(id RuntimeID, newDef ChartDefinition) error {
+	e.runtimeMu.RLock()
+	runtime, exists := e.runtimes[id]
+	e.runtimeMu.RUnlock()
+
+	if !exists {
+		return fmt.Errorf("%w: %s", ErrRuntimeNotFound, id)
+	}
+
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+
+	// Update definition
+	runtime.definition = newDef
+
+	return nil
+}
+
 // Control sends a lifecycle command to a ChartRuntime.
 func (e *Engine) Control(id RuntimeID, cmd ControlCmd) error {
 	e.runtimeMu.RLock()
