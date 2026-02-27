@@ -3,12 +3,13 @@ package statechart
 // StateMachine executes statechart logic for a single region.
 // Used by both top-level ChartRuntime and parallel RegionRuntime.
 type StateMachine struct {
-	definition   ChartDefinition
-	activeState  string
-	actions      map[string]ActionFn
-	guards       map[string]GuardFn
-	appCtx       ApplicationContext
-	runtimeCtx   RuntimeContext
+	definition    ChartDefinition
+	activeState   string
+	actions       map[string]ActionFn
+	guards        map[string]GuardFn
+	appCtx        ApplicationContext
+	runtimeCtx    RuntimeContext
+	TraceCallback TraceCallback // Optional observability hook
 }
 
 // EventResult contains the outcome of processing an event.
@@ -24,6 +25,11 @@ type EventResult struct {
 // ProcessEvent evaluates a single event against the current state.
 // Returns EventResult for parent coordination.
 func (sm *StateMachine) ProcessEvent(ev Event) EventResult {
+	// Fire trace callback for event dispatch
+	if sm.TraceCallback != nil {
+		sm.TraceCallback.OnEventDispatch(RuntimeID(sm.runtimeCtx.RuntimeID), ev)
+	}
+
 	// Find the current node
 	node := sm.findNode(sm.definition.Root, sm.activeState)
 	if node == nil {
@@ -57,6 +63,11 @@ func (sm *StateMachine) ProcessEvent(ev Event) EventResult {
 
 // executeTransition performs a state transition with entry/exit actions.
 func (sm *StateMachine) executeTransition(fromPath, toPath string, ev Event, transitionActions []string) EventResult {
+	// Fire trace callback for state exit
+	if sm.TraceCallback != nil {
+		sm.TraceCallback.OnStateExit(RuntimeID(sm.runtimeCtx.RuntimeID), fromPath, ev)
+	}
+
 	// Execute exit actions for current state
 	_ = sm.executeExitActions(fromPath, ev)
 
@@ -71,6 +82,16 @@ func (sm *StateMachine) executeTransition(fromPath, toPath string, ev Event, tra
 
 	// Update active state
 	sm.activeState = toPath
+
+	// Fire trace callback for transition
+	if sm.TraceCallback != nil {
+		sm.TraceCallback.OnTransition(RuntimeID(sm.runtimeCtx.RuntimeID), fromPath, toPath, ev)
+	}
+
+	// Fire trace callback for state entry
+	if sm.TraceCallback != nil {
+		sm.TraceCallback.OnStateEntry(RuntimeID(sm.runtimeCtx.RuntimeID), toPath, ev)
+	}
 
 	// Execute entry actions for new state
 	_ = sm.executeEntryActions(toPath, ev)
