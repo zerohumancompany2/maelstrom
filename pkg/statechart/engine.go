@@ -153,6 +153,14 @@ func (e *Engine) pauseRuntime(runtime *ChartRuntime) error {
 	}
 
 	runtime.state = RuntimeStatePaused
+
+	// Broadcast pause to parallel regions
+	if runtime.isParallel && runtime.eventRouter != nil {
+		for _, region := range runtime.eventRouter.regions {
+			region.inputChan <- Event{Type: SysPause}
+		}
+	}
+
 	return nil
 }
 
@@ -165,6 +173,14 @@ func (e *Engine) resumeRuntime(runtime *ChartRuntime) error {
 	}
 
 	runtime.state = RuntimeStateRunning
+
+	// Broadcast resume to parallel regions
+	if runtime.isParallel && runtime.eventRouter != nil {
+		for _, region := range runtime.eventRouter.regions {
+			region.inputChan <- Event{Type: SysResume}
+		}
+	}
+
 	// Process any queued events
 	go e.processEventQueue(runtime)
 	return nil
@@ -256,7 +272,7 @@ func (e *Engine) processEvent(runtime *ChartRuntime, ev Event) error {
 		return fmt.Errorf("current state node not found: %s", currentPath)
 	}
 
-	// Find matching transition
+	// Find matching transition on current node
 	for _, trans := range node.Transitions {
 		if trans.Event != ev.Type {
 			continue
@@ -277,7 +293,13 @@ func (e *Engine) processEvent(runtime *ChartRuntime, ev Event) error {
 		return e.executeTransition(runtime, currentPath, trans.Target, ev, trans.Actions)
 	}
 
-	// No matching transition - this is valid (no-op)
+	// No matching transition on current node
+	// If in parallel state, route to parallel regions
+	if node.NodeType() == NodeTypeParallel {
+		runtime.processParallelEvent(ev)
+		return nil
+	}
+
 	return nil
 }
 
