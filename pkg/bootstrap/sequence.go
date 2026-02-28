@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 )
 
 // Sequence orchestrates the bootstrap state machine.
 type Sequence struct {
+	mu           sync.RWMutex
 	currentState string
 	services     map[string]bool // Track loaded services
 	onStateEnter func(state string) error
@@ -42,7 +44,11 @@ func (s *Sequence) Start(ctx context.Context) error {
 
 // HandleEvent processes an event and transitions if valid.
 func (s *Sequence) HandleEvent(ctx context.Context, event string) error {
-	log.Printf("[bootstrap] Received event: %s in state: %s", event, s.currentState)
+	s.mu.RLock()
+	current := s.currentState
+	s.mu.RUnlock()
+
+	log.Printf("[bootstrap] Received event: %s in state: %s", event, current)
 
 	// State machine transitions
 	transitions := map[string]map[string]string{
@@ -53,36 +59,46 @@ func (s *Sequence) HandleEvent(ctx context.Context, event string) error {
 		"handoff":       {"KERNEL_READY": "complete"},
 	}
 
-	stateTrans, ok := transitions[s.currentState]
+	stateTrans, ok := transitions[current]
 	if !ok {
-		return fmt.Errorf("no transitions defined for state: %s", s.currentState)
+		return fmt.Errorf("no transitions defined for state: %s", current)
 	}
 
 	nextState, ok := stateTrans[event]
 	if !ok {
-		return fmt.Errorf("event %s not valid in state %s", event, s.currentState)
+		return fmt.Errorf("event %s not valid in state %s", event, current)
 	}
 
 	return s.transition(ctx, nextState)
 }
 
 func (s *Sequence) transition(ctx context.Context, nextState string) error {
-	log.Printf("[bootstrap] Transitioning: %s -> %s", s.currentState, nextState)
+	s.mu.RLock()
+	prev := s.currentState
+	onStateEnter := s.onStateEnter
+	onComplete := s.onComplete
+	s.mu.RUnlock()
+
+	log.Printf("[bootstrap] Transitioning: %s -> %s", prev, nextState)
+
+	// Update state BEFORE calling handler to avoid race
+	s.mu.Lock()
+	s.currentState = nextState
+	isComplete := nextState == "complete"
+	s.mu.Unlock()
 
 	// Execute entry action for next state
-	if s.onStateEnter != nil {
-		if err := s.onStateEnter(nextState); err != nil {
+	if onStateEnter != nil {
+		if err := onStateEnter(nextState); err != nil {
 			return fmt.Errorf("failed to enter state %s: %w", nextState, err)
 		}
 	}
 
-	s.currentState = nextState
-
 	// Check if complete
-	if nextState == "complete" {
+	if isComplete {
 		log.Println("[bootstrap] Bootstrap complete")
-		if s.onComplete != nil {
-			s.onComplete()
+		if onComplete != nil {
+			onComplete()
 		}
 	}
 
@@ -91,10 +107,14 @@ func (s *Sequence) transition(ctx context.Context, nextState string) error {
 
 // CurrentState returns the current bootstrap state.
 func (s *Sequence) CurrentState() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return s.currentState
 }
 
 // IsComplete returns true if bootstrap has finished.
 func (s *Sequence) IsComplete() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return s.currentState == "complete"
 }
