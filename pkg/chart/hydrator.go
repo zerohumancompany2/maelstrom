@@ -59,6 +59,7 @@ func validateChart(def ChartDefinition) error {
 }
 
 // envSubstitute replaces ${VAR} and ${VAR:-default} patterns.
+// Returns error if required variable (no default) is missing.
 func envSubstitute(input []byte) ([]byte, error) {
 	result := string(input)
 
@@ -76,15 +77,20 @@ func envSubstitute(input []byte) ([]byte, error) {
 
 		varExpr := result[start+2 : end]
 		defaultValue := ""
+		hasDefault := false
 
 		// Check for ${VAR:-default} syntax
 		if idx := strings.Index(varExpr, ":-"); idx != -1 {
 			defaultValue = varExpr[idx+2:]
 			varExpr = varExpr[:idx]
+			hasDefault = true
 		}
 
 		value := os.Getenv(varExpr)
 		if value == "" {
+			if !hasDefault {
+				return nil, fmt.Errorf("required environment variable %s is not set", varExpr)
+			}
 			value = defaultValue
 		}
 
