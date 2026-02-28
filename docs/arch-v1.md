@@ -1,13 +1,14 @@
-# Maelstrom Architecture v1.1
+# Maelstrom Architecture v1.2
 
 A zero-human, statechart-native agentic runtime. This document specifies the complete technical architecture including design decisions, semantics, behaviors, and API contracts.
 
 # Change History
 
-| Version | Date       | Changes                          | Change Originators           |
-| ------- | ---------- | -------------------------------- | ---------------------------- |
-| 1.0     | 2025-02-24 | Initial Creation                 | A. Latham, Grok.ai           |
-| 1.1     | 2025-02-25 | Add glossary, security appendix. | A. Latham, Grok.ai, Kimi 2.5 |
+| Version | Date       | Changes                                                | Change Originators                |
+| ------- | ---------- | ------------------------------------------------------ | --------------------------------- |
+| 1.0     | 2025-02-24 | Initial Creation                                       | A. Latham, Grok.ai                |
+| 1.1     | 2025-02-25 | Add glossary, security appendix.                       | A. Latham, Grok.ai, Kimi 2.5      |
+| 1.2     | 2025-02-28 | Add Registry infrastructure and Source abstraction.    | A. Latham, Claude Code            |
 
 ---
 
@@ -319,6 +320,14 @@ This is the precise boundary between the reusable, pure statechart library and t
 
 The Library never calls Maelstrom code except through registered actions/guards or the two context bags. Maelstrom never touches Library internals. The boundary is airtight and reusable.
 
+**Registry Infrastructure**: The ChartRegistry is a separate infrastructure component that uses the Statechart Library, not part of the Library itself. It provides:
+- YAML loading with environment variable substitution and Go template execution
+- File watching with debounced change detection (Source abstraction)
+- Versioned storage with hot-reload capability
+- Directory-partitioned sources (charts/, agents/, services/)
+
+Registry events flow through Source interfaces and are orchestrated by Service layers, keeping the core Registry decoupled from the runtime. The Source abstraction is designed for reuse in event ingestion pipelines.
+
 ### 5.2 Pure Statechart Library API
 
 ```go
@@ -448,7 +457,7 @@ These are compiled into the binary and started by the Kernel during bootstrap:
 
 ### 7.2 Hot-Reloadable Services (YAML-Defined)
 
-Loaded by ChartRegistry after `kernel_ready`:
+Loaded by ChartRegistry after `kernel_ready` with full hot-reload support:
 
 - **sys:gateway** — Channel adapters (HTTP/SSE/WS/Email/Slack/etc.), OpenAPI generation, 2FA enforcement
 - **sys:admin** — k9s-style terminal/web console for debugging (outer-only, 2FA-gated)
@@ -652,6 +661,8 @@ The Gateway System Service (`sys:gateway`) normalizes all external I/O through p
 - `slack`, `whatsapp`, `telegram` - Messaging platforms
 - `internal_grpc` - Internal service mesh
 
+**Future Extension**: The `Source` abstraction from the ChartRegistry (see Section 12 - Bootstrap) is designed for reuse in event ingestion pipelines. Applications requiring custom streaming data sources (logs, metrics, external feeds) can implement the `Source` interface to feed data into Agents without modifying Gateway internals.
+
 Each adapter normalizes inbound traffic to a standard `mail_received` Message and normalizes outbound `mail_send` to the channel's format.
 
 ### 10.2 Streaming Path (End-to-End)
@@ -799,12 +810,13 @@ Because Platform Services are themselves Charts, we need a tiny hard-coded Kerne
      - `communicationBootstrap`
      - `observabilityBootstrap`
 
-2. **Kernel loads & spawns Bootstrap Chart** (single special YAML file: `bootstrap.yaml`)
-   - This Chart is compound with sequential regions:
+2. **Kernel loads & spawns Bootstrap Chart** (single special YAML file: `bootstrap.yaml`, hard-coded and compiled into binary)
+   - This Chart is a **sequential compound state** (regions execute in sequence, not parallel):
      - Region 1: Security & Boundary Service (inner/DMZ/outer + tainting + namespaces)
      - Region 2: Communication Layer (mail pub/sub backbone)
      - Region 3: Observability + Persistence
      - Region 4: Lifecycle + Tools Registry
+   - Each region's entry action spawns the corresponding core service and registers its `handleMail` handler
    - Kernel manually starts this one Chart (the only time it ever touches the Library directly)
 
 3. **Bootstrap Chart runs** (now fully inside the Library)
@@ -1126,6 +1138,53 @@ persistence:
   compression: gzip
   encryption: aes256
 ```
+
+### 13.9 ChartRegistry Configuration
+
+The ChartRegistry loads YAML definitions from directory-partitioned sources and provides hot-reload capability.
+
+**Directory Structure**:
+```
+/var/maelstrom/
+├── charts/           # ChartDefinition files (*.yaml)
+├── agents/           # AgentSpec files (*.yaml)
+└── services/         # PlatformService files (*.yaml)
+```
+
+**Hot-Reload Protocol**:
+```
+1. File change detected by Source (debounced)
+2. ChartRegistry loads and hydrates new definition
+3. Signal current ChartRuntime: prepareForReload
+4. Attempt quiescence (empty queue, no active regions, no inflight tools)
+5. IF quiescence reached:
+   - Stop current runtime
+   - Spawn new runtime with history preservation
+   - Apply contextTransform if version changed
+6. IF timeout expires:
+   - Force-stop current runtime
+   - cleanStart (no history preserved)
+```
+
+**Migration Policies**:
+- `shallowHistory`: Restore to parent state's default sub-state
+- `deepHistory`: Restore to specific sub-state (if still exists)
+- `cleanStart`: No history preserved, fresh runtime
+
+**Source Abstraction**:
+The Registry uses a Source interface for event streaming, decoupled from file system specifics. Sources emit events when files change:
+```go
+type Source interface {
+    Events() <-chan SourceEvent  // Created, Updated, Deleted
+    Err() error
+}
+```
+
+This abstraction enables:
+- File watching via fsnotify (FileSystemSource)
+- HTTP polling for remote configs (HTTPSource)
+- Message queue integration (QueueSource)
+- Testing with mock sources (MockSource)
 
 ---
 
@@ -1688,6 +1747,25 @@ Initial specification for Maelstrom v1.0 MVP.
 - **Added**: `apiVersion: maelstrom.dev/v1` requirement for all YAML
 - **Added**: Unified Node primitive (0/1/≥2 children = atomic/compound/parallel)
 - **Added**: `contextVersion` field for independent context shape versioning
+
+---
+
+### v1.1.0 (2026-02-28)
+
+#### Registry Infrastructure
+- **Added**: ChartRegistry as separate infrastructure component using Statechart Library (Section 5.1)
+- **Added**: Directory-partitioned sources (charts/, agents/, services/) with hot-reload (Section 13.9)
+- **Added**: Source abstraction interface for event streaming, decoupled from file system
+- **Added**: Hot-reload protocol with quiescence detection and migration policies (shallow/deep/clean)
+
+#### Bootstrap & Core Services
+- **Clarified**: Bootstrap Chart is hard-coded YAML compiled into binary (Section 12.1)
+- **Clarified**: Sequential compound state (not parallel) with handleMail registration per region
+- **Emphasized**: Hot-reloadable services loaded by ChartRegistry after `kernel_ready` (Section 7.2)
+
+#### Event Ingestion
+- **Added**: Source abstraction reuse for event ingestion pipelines (Section 10.1)
+- **Enabled**: File watching, HTTP polling, message queues via common Source interface
 
 ---
 
