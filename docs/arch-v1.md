@@ -1,14 +1,15 @@
-# Maelstrom Architecture v1.2
+# Maelstrom Architecture v1.3
 
 A zero-human, statechart-native agentic runtime. This document specifies the complete technical architecture including design decisions, semantics, behaviors, and API contracts.
 
 # Change History
 
-| Version | Date       | Changes                                                | Change Originators                |
-| ------- | ---------- | ------------------------------------------------------ | --------------------------------- |
-| 1.0     | 2025-02-24 | Initial Creation                                       | A. Latham, Grok.ai                |
-| 1.1     | 2025-02-25 | Add glossary, security appendix.                       | A. Latham, Grok.ai, Kimi 2.5      |
-| 1.2     | 2025-02-28 | Add Registry infrastructure and Source abstraction.    | A. Latham, Claude Code            |
+| Version | Date       | Changes                                                    | Change Originators                |
+| ------- | ---------- | ---------------------------------------------------------- | --------------------------------- |
+| 1.0     | 2025-02-24 | Initial Creation                                           | A. Latham, Grok.ai                |
+| 1.1     | 2025-02-25 | Add glossary, security appendix.                           | A. Latham, Grok.ai, Kimi 2.5      |
+| 1.2     | 2025-02-28 | Add Registry infrastructure and Source abstraction.        | A. Latham, Claude Code            |
+| 1.3     | 2025-02-28 | Finalize ChartRegistry API with directory-based design.    | A. Latham, Claude Code            |
 
 ---
 
@@ -1222,21 +1223,76 @@ type Library interface {
 
 #### ChartRegistry
 
+**Construction**:
 ```go
-type ChartRegistry interface {
-    Load(defPath string, hydration HydrationContext) (ChartDefinition, error)
-    Reload(id string) (ChartDefinition, error)
-    Get(id string) (ChartDefinition, error)
-    List() []ChartDefinition
-    Watch(source Source) error
+func NewChartRegistry(dir string, hydrator HydratorFunc) (*ChartRegistry, error)
+```
+
+**Lifecycle**:
+```go
+func (r *ChartRegistry) Start(ctx context.Context) error  // Blocks until ctx cancel
+func (r *ChartRegistry) Stop() error
+```
+
+**Access**:
+```go
+func (r *ChartRegistry) Get(name string) (ChartDefinition, error)
+func (r *ChartRegistry) GetVersion(name, versionID string) (ChartDefinition, error)
+func (r *ChartRegistry) ListVersions(name string) []RegistryItem
+```
+
+**Change Notification**:
+```go
+func (r *ChartRegistry) OnChange(fn func(key string, def ChartDefinition))
+```
+
+**Supporting Types**:
+```go
+type HydratorFunc func(raw []byte) (any, error)
+
+type RegistryItem struct {
+    VersionID string
+    Raw       []byte      // Original YAML
+    Content   any         // Hydrated ChartDefinition
+    Timestamp time.Time
 }
 ```
 
 **SHALL**:
-- SHALL watch sources, hydrate (env+appVars+templates), cache versioned definitions
+- SHALL watch directory sources, hydrate (env+appVars+templates), cache versioned definitions
+- SHALL emit change notifications via OnChange callbacks
 - SHALL call `Library.replaceDefinition` on hot-reload
 - SHALL reject hot-reload of immutable core charts
 - SHALL enforce SHA-256 checksum verification if configured
+
+#### Source (Event Streaming)
+
+```go
+type Source interface {
+    Events() <-chan SourceEvent  // Created, Updated, Deleted
+    Err() error
+}
+
+type SourceEvent struct {
+    Key       string
+    Content   []byte
+    Type      EventType  // Created, Updated, Deleted
+    Timestamp time.Time
+}
+
+type EventType int
+const (
+    Created EventType = iota
+    Updated
+    Deleted
+)
+```
+
+**SHALL**:
+- SHALL emit events when files change (Created, Updated, Deleted)
+- SHALL debounce rapid changes to avoid event storms
+- SHALL gracefully shutdown on context cancel, returning Err() after channel close
+- SHALL support FileSystemSource, HTTPSource, QueueSource, MockSource implementations
 
 #### Security & Boundary + Tainting + DataSources
 
@@ -1747,6 +1803,16 @@ Initial specification for Maelstrom v1.0 MVP.
 - **Added**: `apiVersion: maelstrom.dev/v1` requirement for all YAML
 - **Added**: Unified Node primitive (0/1/≥2 children = atomic/compound/parallel)
 - **Added**: `contextVersion` field for independent context shape versioning
+
+---
+
+### v1.3.0 (2026-02-28)
+
+#### API Finalization
+- **Updated**: ChartRegistry API from method-based to directory-based design (Section 14.2)
+- **Added**: Source interface formalized with Events() channel and graceful shutdown (Section 14.2)
+- **Added**: RegistryItem struct with versioned storage (Raw + Content)
+- **Added**: OnChange callback for change notifications
 
 ---
 
