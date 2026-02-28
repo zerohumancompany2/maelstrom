@@ -18,6 +18,11 @@ type ChartDefinition struct {
 	Spec    map[string]interface{}
 }
 
+// GetID returns the chart ID (implements HasID interface).
+func (c ChartDefinition) GetID() string {
+	return c.ID
+}
+
 // DefaultHydrator provides env substitution and template execution.
 func DefaultHydrator() HydratorFunc {
 	return func(content []byte) (ChartDefinition, error) {
