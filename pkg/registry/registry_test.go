@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -128,20 +129,122 @@ func TestRegistry_CloneUnderLock(t *testing.T) {
 
 // TestRegistry_PreLoadHooks verifies pre-load hook execution.
 func TestRegistry_PreLoadHooks(t *testing.T) {
-	// TODO: implement after basic registry tests pass
+	r := New()
+
+	// Track hook execution
+	var hookCalled bool
+	hook := func(key string, content []byte) ([]byte, error) {
+		hookCalled = true
+		// Add prefix to content
+		return []byte("prefix:" + string(content)), nil
+	}
+	r.AddPreLoadHook(hook)
+
+	hydrator := func(content []byte) (interface{}, error) {
+		return string(content), nil
+	}
+
+	err := r.SetWithHooks("test", []byte("value"), hydrator)
+	if err != nil {
+		t.Fatalf("SetWithHooks failed: %v", err)
+	}
+
+	if !hookCalled {
+		t.Error("pre-load hook was not called")
+	}
+
+	val, _ := r.Get("test")
+	if val != "prefix:value" {
+		t.Errorf("expected transformed content 'prefix:value', got %v", val)
+	}
 }
 
 // TestRegistry_PreLoadHookError verifies errors propagate from pre-load hooks.
 func TestRegistry_PreLoadHookError(t *testing.T) {
-	// TODO: implement after PreLoadHooks passes
+	r := New()
+
+	hookErr := errors.New("pre-load error")
+	hook := func(key string, content []byte) ([]byte, error) {
+		return nil, hookErr
+	}
+	r.AddPreLoadHook(hook)
+
+	hydrator := func(content []byte) (interface{}, error) {
+		return string(content), nil
+	}
+
+	err := r.SetWithHooks("test", []byte("value"), hydrator)
+	if err != hookErr {
+		t.Errorf("expected hook error, got: %v", err)
+	}
+
+	// Value should not be stored on error
+	_, err = r.Get("test")
+	if err != ErrNotFound {
+		t.Error("value should not be stored when hook fails")
+	}
 }
 
 // TestRegistry_PostLoadHooks verifies post-load hook execution.
 func TestRegistry_PostLoadHooks(t *testing.T) {
-	// TODO: implement after PreLoadHooks passes
+	r := New()
+
+	var hookCalled bool
+	hook := func(key string, value interface{}) error {
+		hookCalled = true
+		// Validate value
+		if value != "hydrated" {
+			return errors.New("invalid value")
+		}
+		return nil
+	}
+	r.AddPostLoadHook(hook)
+
+	hydrator := func(content []byte) (interface{}, error) {
+		return "hydrated", nil
+	}
+
+	err := r.SetWithHooks("test", []byte("raw"), hydrator)
+	if err != nil {
+		t.Fatalf("SetWithHooks failed: %v", err)
+	}
+
+	if !hookCalled {
+		t.Error("post-load hook was not called")
+	}
 }
 
 // TestRegistry_PostLoadHookMultiple verifies multiple post-load hooks execute.
 func TestRegistry_PostLoadHookMultiple(t *testing.T) {
-	// TODO: implement after PostLoadHooks passes
+	r := New()
+
+	var hookOrder []string
+
+	hook1 := func(key string, value interface{}) error {
+		hookOrder = append(hookOrder, "hook1")
+		return nil
+	}
+	hook2 := func(key string, value interface{}) error {
+		hookOrder = append(hookOrder, "hook2")
+		return nil
+	}
+
+	r.AddPostLoadHook(hook1)
+	r.AddPostLoadHook(hook2)
+
+	hydrator := func(content []byte) (interface{}, error) {
+		return "value", nil
+	}
+
+	err := r.SetWithHooks("test", []byte("raw"), hydrator)
+	if err != nil {
+		t.Fatalf("SetWithHooks failed: %v", err)
+	}
+
+	if len(hookOrder) != 2 {
+		t.Fatalf("expected 2 hooks to run, got %d", len(hookOrder))
+	}
+	if hookOrder[0] != "hook1" || hookOrder[1] != "hook2" {
+		t.Errorf("hooks executed in wrong order: %v", hookOrder)
+	}
 }
