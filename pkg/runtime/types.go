@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"time"
-
-	"github.com/maelstrom/v3/pkg/statechart"
 )
 
 // ChartRuntime represents an instantiated, running chart.
@@ -15,9 +13,6 @@ type ChartRuntime struct {
 	def     interface{}
 	events  chan Event
 	done    chan struct{}
-	// Statechart integration (Phase 2)
-	engine     interface{ Dispatch(id string, ev statechart.Event) error }
-	runtimeID  string
 }
 
 // RuntimeContext provides read-only access to chart runtime information.
@@ -76,20 +71,7 @@ func NewChartRuntime(id string, def interface{}) (*ChartRuntime, error) {
 }
 
 // SendEvent dispatches an event to the runtime (non-blocking).
-// If connected to a statechart engine, forwards to the engine.
 func (r *ChartRuntime) SendEvent(evt Event) error {
-	// If connected to statechart engine, forward there
-	if r.engine != nil && r.runtimeID != "" {
-		statechartEvt := statechart.Event{
-			Type:          evt.Type,
-			Payload:       evt.Payload,
-			CorrelationID: evt.CorrelationID,
-			Source:        evt.Source,
-		}
-		return r.engine.Dispatch(r.runtimeID, statechartEvt)
-	}
-
-	// Otherwise, use internal event queue
 	select {
 	case r.events <- evt:
 		return nil
