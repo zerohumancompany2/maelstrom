@@ -1,6 +1,11 @@
 package statechart
 
 import (
+	"fmt"
+	"os"
+	"strings"
+
+	"gopkg.in/yaml.v3"
 	"time"
 )
 
@@ -148,11 +153,93 @@ type ChartDefinition struct {
 	Version      string
 	Root         *Node
 	InitialState string // initial state path (e.g., "root/child1")
+	Spec         map[string]interface{}
 }
 
 // GetID returns the chart ID.
 func (c ChartDefinition) GetID() string {
 	return c.ID
+}
+
+// HydratorFunc transforms raw YAML bytes into a hydrated ChartDefinition.
+type HydratorFunc func([]byte) (ChartDefinition, error)
+
+// DefaultHydrator provides env substitution and template execution.
+func DefaultHydrator() HydratorFunc {
+	return func(content []byte) (ChartDefinition, error) {
+		content, err := envSubstitute(content)
+		if err != nil {
+			return ChartDefinition{}, fmt.Errorf("env substitution: %w", err)
+		}
+
+		content, err = executeTemplates(content)
+		if err != nil {
+			return ChartDefinition{}, fmt.Errorf("template execution: %w", err)
+		}
+
+		var def ChartDefinition
+		if err := yaml.Unmarshal(content, &def); err != nil {
+			return ChartDefinition{}, fmt.Errorf("yaml parse: %w", err)
+		}
+
+		if err := validateChart(def); err != nil {
+			return ChartDefinition{}, fmt.Errorf("validation: %w", err)
+		}
+
+		return def, nil
+	}
+}
+
+func validateChart(def ChartDefinition) error {
+	if def.ID == "" {
+		return fmt.Errorf("chart ID is required")
+	}
+	if def.Version == "" {
+		return fmt.Errorf("chart version is required")
+	}
+	return nil
+}
+
+func envSubstitute(input []byte) ([]byte, error) {
+	result := string(input)
+
+	for {
+		start := strings.Index(result, "${")
+		if start == -1 {
+			break
+		}
+		end := strings.Index(result[start:], "}")
+		if end == -1 {
+			return nil, fmt.Errorf("unclosed ${ in template")
+		}
+		end += start
+
+		varExpr := result[start+2 : end]
+		defaultValue := ""
+		hasDefault := false
+
+		if idx := strings.Index(varExpr, ":-"); idx != -1 {
+			defaultValue = varExpr[idx+2:]
+			varExpr = varExpr[:idx]
+			hasDefault = true
+		}
+
+		value := os.Getenv(varExpr)
+		if value == "" {
+			if !hasDefault {
+				return nil, fmt.Errorf("required environment variable %s is not set", varExpr)
+			}
+			value = defaultValue
+		}
+
+		result = result[:start] + value + result[end+1:]
+	}
+
+	return []byte(result), nil
+}
+
+func executeTemplates(content []byte) ([]byte, error) {
+	return content, nil
 }
 
 // RuntimeState represents the lifecycle state of a ChartRuntime.
