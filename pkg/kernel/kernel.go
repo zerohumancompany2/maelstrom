@@ -7,23 +7,20 @@ import (
 	"sync"
 
 	"github.com/maelstrom/v3/pkg/bootstrap"
-	"github.com/maelstrom/v3/pkg/chart"
 	"github.com/maelstrom/v3/pkg/runtime"
 )
 
 // Kernel orchestrates bootstrap and hands off to ChartRegistry.
 type Kernel struct {
-	chartReg *chart.ChartRegistry
 	factory  *runtime.Factory
 	sequence *bootstrap.Sequence
 	runtimes map[string]*runtime.ChartRuntime
 	mu       sync.RWMutex
 }
 
-// New creates a new Kernel with the given ChartRegistry.
-func New(chartReg *chart.ChartRegistry) *Kernel {
+// New creates a new Kernel.
+func New() *Kernel {
 	return &Kernel{
-		chartReg: chartReg,
 		runtimes: make(map[string]*runtime.ChartRuntime),
 	}
 }
