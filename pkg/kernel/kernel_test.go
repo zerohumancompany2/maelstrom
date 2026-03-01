@@ -65,3 +65,23 @@ func TestKernel_BootstrapCompletes(t *testing.T) {
 		t.Fatal("timeout waiting for kernel")
 	}
 }
+
+func TestKernel_SpawnsAllServices(t *testing.T) {
+	// Placeholder for future integration test
+	// Verifies all 4 services spawn during bootstrap
+}
+
+func TestKernel_ServicesReady(t *testing.T) {
+	// Placeholder for future integration test
+	// Verifies all services emit ready events immediately
+}
+
+func TestKernel_KernelReadyEvent(t *testing.T) {
+	// Placeholder for future integration test
+	// Verifies KERNEL_READY emitted after all services ready
+}
+
+func TestKernel_MailSystemRequired(t *testing.T) {
+	// Placeholder for future integration test
+	// Verifies mail system exists before services spawn
+}
