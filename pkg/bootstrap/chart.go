@@ -3,8 +3,14 @@ package bootstrap
 import (
 	"fmt"
 
-	"github.com/maelstrom/v3/pkg/chart"
+	"github.com/maelstrom/v3/pkg/statechart"
 )
+
+type ChartDefinition = statechart.ChartDefinition
+
+func DefaultHydrator() statechart.HydratorFunc {
+	return statechart.DefaultHydrator()
+}
 
 // BootstrapChartYAML is the hard-coded bootstrap chart that loads 4 core services.
 // This is compiled into the binary and executed first on startup.
@@ -77,11 +83,11 @@ var CoreServices = []struct {
 }
 
 // LoadBootstrapChart parses the hard-coded YAML into a ChartDefinition.
-func LoadBootstrapChart() (chart.ChartDefinition, error) {
-	hydrator := chart.DefaultHydrator()
+func LoadBootstrapChart() (statechart.ChartDefinition, error) {
+	hydrator := statechart.DefaultHydrator()
 	def, err := hydrator([]byte(BootstrapChartYAML))
 	if err != nil {
-		return chart.ChartDefinition{}, fmt.Errorf("failed to hydrate bootstrap chart: %w", err)
+		return statechart.ChartDefinition{}, fmt.Errorf("failed to hydrate bootstrap chart: %w", err)
 	}
 	return def, nil
 }
