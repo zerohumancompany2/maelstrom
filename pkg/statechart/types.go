@@ -39,9 +39,9 @@ const (
 	SysResume = "sys:resume"
 
 	// Region → Parent: Coordination signals
-	SysDone       = "sys:done"
-	SysTransition = "sys:transition"
-	SysPanic      = "sys:panic"
+	SysDone         = "sys:done"
+	SysTransition   = "sys:transition"
+	SysPanic        = "sys:panic"
 	SysBackpressure = "sys:backpressure"
 )
 
@@ -73,7 +73,7 @@ type Snapshot struct {
 	ActiveStates     []string
 	EventQueue       []Event
 	RuntimeContext   RuntimeContext
-	ApplicationState map[string]any // serialized app context
+	ApplicationState map[string]any    // serialized app context
 	RegionStates     map[string]string // Current state per region for parallel states
 	IsParallel       bool              // Whether in parallel state at snapshot time
 }
@@ -117,13 +117,13 @@ type Transition struct {
 
 // Node is the unified state primitive.
 type Node struct {
-	ID            string
-	Children      map[string]*Node
-	RegionNames   []string // for parallel nodes: names of regions
-	Transitions   []Transition
-	EntryActions  []string
-	ExitActions   []string
-	IsInitial     bool // default child for compound states
+	ID           string
+	Children     map[string]*Node
+	RegionNames  []string // for parallel nodes: names of regions
+	Transitions  []Transition
+	EntryActions []string
+	ExitActions  []string
+	IsInitial    bool // default child for compound states
 }
 
 // NodeType derives the runtime type from the node's structure.
@@ -148,6 +148,11 @@ type ChartDefinition struct {
 	Version      string
 	Root         *Node
 	InitialState string // initial state path (e.g., "root/child1")
+}
+
+// GetID returns the chart ID.
+func (c ChartDefinition) GetID() string {
+	return c.ID
 }
 
 // RuntimeState represents the lifecycle state of a ChartRuntime.
