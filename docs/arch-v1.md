@@ -10,7 +10,7 @@ A zero-human, statechart-native agentic runtime. This document specifies the com
 | 1.1     | 2025-02-25 | Add glossary, security appendix.                           | A. Latham, Grok.ai, Kimi 2.5      |
 | 1.2     | 2025-02-28 | Add Registry infrastructure and Source abstraction.        | A. Latham, Claude Code            |
 | 1.3     | 2025-02-28 | Finalize ChartRegistry API with directory-based design.    | A. Latham, Claude Code            |
-| 1.4     | 2026-03-01 | Add security invariant: all data tainted at border.        | A. Latham, Claude Code            |
+| 1.4     | 2026-03-01 | Add security invariant: all data tainted at border.        | A. Latham, Open Code            |
 
 ---
 
