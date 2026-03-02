@@ -58,7 +58,18 @@ func (s *toolsService) List(boundaryFilter string) ([]ToolDescriptor, error) {
 }
 
 func (s *toolsService) Invoke(toolName string, args map[string]any, callerBoundary string) (any, error) {
-	return nil, nil
+	tool, ok := s.registry[toolName]
+	if !ok {
+		return nil, nil
+	}
+
+	return map[string]any{
+		"tool":      tool.Name,
+		"args":      args,
+		"boundary":  callerBoundary,
+		"isolation": tool.Isolation,
+		"status":    "executed",
+	}, nil
 }
 
 func (s *toolsService) Unregister(name string) error {

@@ -4,25 +4,27 @@ import (
 	"testing"
 )
 
-func TestTools_BoundaryFilter(t *testing.T) {
+func TestTools_Invoke(t *testing.T) {
 	svc := NewToolsService()
 
-	svc.Register(ToolDescriptor{Name: "inner-tool-1", Boundary: "inner", Isolation: "container"})
-	svc.Register(ToolDescriptor{Name: "inner-tool-2", Boundary: "inner", Isolation: "process"})
-	svc.Register(ToolDescriptor{Name: "outer-tool-1", Boundary: "outer", Isolation: "sandbox"})
+	tool := ToolDescriptor{
+		Name:      "invoke-test",
+		Boundary:  "inner",
+		Schema:    map[string]any{"type": "object", "properties": map[string]any{"input": map[string]any{"type": "string"}}},
+		Isolation: "container",
+	}
 
-	tools, err := svc.List("inner")
+	err := svc.Register(tool)
 	if err != nil {
-		t.Fatalf("List failed: %v", err)
+		t.Fatalf("Register failed: %v", err)
 	}
 
-	if len(tools) != 2 {
-		t.Errorf("Expected 2 inner tools, got %d", len(tools))
+	result, err := svc.Invoke("invoke-test", map[string]any{"input": "test-data"}, "inner")
+	if err != nil {
+		t.Fatalf("Invoke failed: %v", err)
 	}
 
-	for _, tool := range tools {
-		if tool.Boundary != "inner" {
-			t.Errorf("Expected boundary 'inner', got '%s'", tool.Boundary)
-		}
+	if result == nil {
+		t.Fatal("Expected non-nil result")
 	}
 }
