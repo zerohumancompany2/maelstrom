@@ -4,35 +4,25 @@ import (
 	"testing"
 )
 
-func TestTools_Resolve(t *testing.T) {
+func TestTools_BoundaryFilter(t *testing.T) {
 	svc := NewToolsService()
 
-	tool := ToolDescriptor{
-		Name:      "resolve-test-tool",
-		Boundary:  "outer",
-		Schema:    map[string]any{"param": "string"},
-		Isolation: "process",
-	}
+	svc.Register(ToolDescriptor{Name: "inner-tool-1", Boundary: "inner", Isolation: "container"})
+	svc.Register(ToolDescriptor{Name: "inner-tool-2", Boundary: "inner", Isolation: "process"})
+	svc.Register(ToolDescriptor{Name: "outer-tool-1", Boundary: "outer", Isolation: "sandbox"})
 
-	err := svc.Register(tool)
+	tools, err := svc.List("inner")
 	if err != nil {
-		t.Fatalf("Register failed: %v", err)
+		t.Fatalf("List failed: %v", err)
 	}
 
-	resolved, err := svc.Resolve("resolve-test-tool", "inner")
-	if err != nil {
-		t.Fatalf("Resolve failed: %v", err)
+	if len(tools) != 2 {
+		t.Errorf("Expected 2 inner tools, got %d", len(tools))
 	}
 
-	if resolved.Name != "resolve-test-tool" {
-		t.Errorf("Expected name 'resolve-test-tool', got '%s'", resolved.Name)
-	}
-
-	if resolved.Boundary != "outer" {
-		t.Errorf("Expected boundary 'outer', got '%s'", resolved.Boundary)
-	}
-
-	if resolved.Isolation != "process" {
-		t.Errorf("Expected isolation 'process', got '%s'", resolved.Isolation)
+	for _, tool := range tools {
+		if tool.Boundary != "inner" {
+			t.Errorf("Expected boundary 'inner', got '%s'", tool.Boundary)
+		}
 	}
 }

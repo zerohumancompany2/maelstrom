@@ -40,7 +40,21 @@ func (s *toolsService) Resolve(name string, callerBoundary string) (ToolDescript
 }
 
 func (s *toolsService) List(boundaryFilter string) ([]ToolDescriptor, error) {
-	return nil, nil
+	if boundaryFilter == "" {
+		result := make([]ToolDescriptor, 0, len(s.registry))
+		for _, tool := range s.registry {
+			result = append(result, tool)
+		}
+		return result, nil
+	}
+
+	var result []ToolDescriptor
+	for _, tool := range s.registry {
+		if tool.Boundary == boundaryFilter {
+			result = append(result, tool)
+		}
+	}
+	return result, nil
 }
 
 func (s *toolsService) Invoke(toolName string, args map[string]any, callerBoundary string) (any, error) {
