@@ -86,11 +86,34 @@ func (s *persistenceService) Restore(snapshotId string, def statechart.ChartDefi
 }
 
 func (s *persistenceService) AppendEvent(runtimeId string, event statechart.Event) error {
-	panic("Not implemented")
+	id := runtimeId + "-evt-" + time.Now().Format("20060102150405")
+	ev := Event{
+		ID:            id,
+		RuntimeID:     runtimeId,
+		Type:          event.Type,
+		Payload:       event.Payload,
+		CorrelationID: event.CorrelationID,
+		Source:        event.Source,
+		Timestamp:     time.Now(),
+	}
+	s.events[runtimeId] = append(s.events[runtimeId], ev)
+	return nil
 }
 
 func (s *persistenceService) GetEvents(runtimeId string, since string) ([]Event, error) {
-	panic("Not implemented")
+	events, ok := s.events[runtimeId]
+	if !ok {
+		return []Event{}, nil
+	}
+	if since == "" {
+		return events, nil
+	}
+	for i, ev := range events {
+		if ev.ID == since {
+			return events[i+1:], nil
+		}
+	}
+	return []Event{}, nil
 }
 
 func (s *persistenceService) Migrate(runtimeId string, newDef statechart.ChartDefinition, policy MigrationPolicy) error {
