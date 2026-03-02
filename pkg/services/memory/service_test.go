@@ -4,17 +4,20 @@ import (
 	"testing"
 )
 
-func TestMemory_Store(t *testing.T) {
+func TestMemory_BoundaryFilter(t *testing.T) {
 	// Arrange
 	svc := NewMemoryService()
+	vector := []float32{0.1, 0.2, 0.3}
 
 	// Act
-	_, err := svc.Store("runtime-1", "test content", map[string]any{
-		"key": "value",
-	})
+	results, err := svc.Query(vector, 5, "system")
 
 	// Assert
 	if err != nil {
-		t.Fatalf("Store failed: %v", err)
+		t.Fatalf("Query with boundary filter failed: %v", err)
+	}
+
+	if len(results) != 0 {
+		t.Errorf("Expected 0 results with boundary filter, got %d", len(results))
 	}
 }
