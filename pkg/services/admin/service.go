@@ -37,7 +37,7 @@ func (s *adminService) ControlAgent(id string, cmd string) error {
 }
 
 func (s *adminService) QueryTaints(agentId string) (TaintMap, error) {
-	panic("Not implemented")
+	return TaintMap{}, nil
 }
 
 func (s *adminService) InjectEvent(agentId string, event statechart.Event) error {
