@@ -19,7 +19,7 @@ func (s *heartbeatService) Unschedule(agentId string) error {
 }
 
 func (s *heartbeatService) Trigger(agentId string) error {
-	return NotImplementedError
+	return nil
 }
 
 func (s *heartbeatService) GetSchedule(agentId string) (Schedule, error) {
