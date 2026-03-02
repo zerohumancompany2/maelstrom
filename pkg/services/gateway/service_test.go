@@ -1,0 +1,67 @@
+package gateway
+
+import (
+	"testing"
+)
+
+func TestGateway_RegisterAdapter(t *testing.T) {
+	// Test: Register webhook, websocket, sse, smtp adapters
+	svc := NewGatewayService()
+
+	// Register webhook adapter
+	webhook := &WebhookAdapter{}
+	if err := svc.RegisterAdapter("webhook", webhook); err != nil {
+		t.Fatalf("Failed to register webhook adapter: %v", err)
+	}
+
+	// Register websocket adapter
+	ws := &WebSocketAdapter{}
+	if err := svc.RegisterAdapter("websocket", ws); err != nil {
+		t.Fatalf("Failed to register websocket adapter: %v", err)
+	}
+
+	// Register sse adapter
+	sse := &SSEAdapter{}
+	if err := svc.RegisterAdapter("sse", sse); err != nil {
+		t.Fatalf("Failed to register sse adapter: %v", err)
+	}
+
+	// Register smtp adapter
+	smtp := &SMTPAdapter{}
+	if err := svc.RegisterAdapter("smtp", smtp); err != nil {
+		t.Fatalf("Failed to register smtp adapter: %v", err)
+	}
+
+	// Verify all adapters are registered
+	adapt, ok := svc.GetAdapter("webhook")
+	if !ok {
+		t.Fatal("webhook adapter not registered")
+	}
+	if adapt.Name() != "webhook" {
+		t.Errorf("Expected webhook adapter name 'webhook', got '%s'", adapt.Name())
+	}
+
+	adapt, ok = svc.GetAdapter("websocket")
+	if !ok {
+		t.Fatal("websocket adapter not registered")
+	}
+	if adapt.Name() != "websocket" {
+		t.Errorf("Expected websocket adapter name 'websocket', got '%s'", adapt.Name())
+	}
+
+	adapt, ok = svc.GetAdapter("sse")
+	if !ok {
+		t.Fatal("sse adapter not registered")
+	}
+	if adapt.Name() != "sse" {
+		t.Errorf("Expected sse adapter name 'sse', got '%s'", adapt.Name())
+	}
+
+	adapt, ok = svc.GetAdapter("smtp")
+	if !ok {
+		t.Fatal("smtp adapter not registered")
+	}
+	if adapt.Name() != "smtp" {
+		t.Errorf("Expected smtp adapter name 'smtp', got '%s'", adapt.Name())
+	}
+}
