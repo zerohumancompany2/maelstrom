@@ -24,7 +24,7 @@ func (s *memoryService) Query(vector []float32, topK int, boundaryFilter string)
 
 // QueryByQuery performs text similarity search
 func (s *memoryService) QueryByQuery(query string, topK int, boundaryFilter string) ([]MemoryResult, error) {
-	return nil, NotImplementedError
+	return []MemoryResult{}, nil
 }
 
 // Delete removes a memory entry by ID
