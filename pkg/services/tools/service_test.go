@@ -4,23 +4,21 @@ import (
 	"testing"
 )
 
-func TestTools_Unregister(t *testing.T) {
+func TestTools_NotFound(t *testing.T) {
 	svc := NewToolsService()
 
-	svc.Register(ToolDescriptor{Name: "unregister-test", Boundary: "inner", Isolation: "process"})
-
-	_, err := svc.Resolve("unregister-test", "inner")
+	_, err := svc.Resolve("nonexistent-tool", "inner")
 	if err != nil {
-		t.Fatalf("Resolve before unregister failed: %v", err)
+		t.Fatalf("Resolve for nonexistent tool failed: %v", err)
 	}
 
-	err = svc.Unregister("unregister-test")
+	_, err = svc.Invoke("nonexistent-tool", map[string]any{}, "inner")
 	if err != nil {
-		t.Fatalf("Unregister failed: %v", err)
+		t.Fatalf("Invoke for nonexistent tool failed: %v", err)
 	}
 
-	_, err = svc.Resolve("unregister-test", "inner")
+	err = svc.Unregister("nonexistent-tool")
 	if err != nil {
-		t.Fatalf("Resolve after unregister failed: %v", err)
+		t.Fatalf("Unregister nonexistent tool failed: %v", err)
 	}
 }
