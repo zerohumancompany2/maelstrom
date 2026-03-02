@@ -30,7 +30,10 @@ func (s *heartbeatService) Schedule(agentId string, cron string, template string
 }
 
 func (s *heartbeatService) Unschedule(agentId string) error {
-	return NotImplementedError
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.schedules, agentId)
+	return nil
 }
 
 func (s *heartbeatService) Trigger(agentId string) error {
