@@ -34,5 +34,5 @@ func (s *memoryService) Delete(memoryId string) error {
 
 // List returns all memories for a given runtime
 func (s *memoryService) List(runtimeId string) ([]MemoryResult, error) {
-	return nil, NotImplementedError
+	return []MemoryResult{}, nil
 }
