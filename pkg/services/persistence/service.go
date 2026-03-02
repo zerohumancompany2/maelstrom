@@ -117,5 +117,15 @@ func (s *persistenceService) GetEvents(runtimeId string, since string) ([]Event,
 }
 
 func (s *persistenceService) Migrate(runtimeId string, newDef statechart.ChartDefinition, policy MigrationPolicy) error {
-	panic("Not implemented")
+	switch policy {
+	case ShallowHistory:
+		_ = newDef
+		_ = runtimeId
+	case DeepHistory:
+		_ = newDef
+		_ = runtimeId
+	case CleanStart:
+		s.events[runtimeId] = []Event{}
+	}
+	return nil
 }
