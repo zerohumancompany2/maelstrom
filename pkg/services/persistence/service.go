@@ -86,7 +86,7 @@ func (s *persistenceService) Restore(snapshotId string, def statechart.ChartDefi
 }
 
 func (s *persistenceService) AppendEvent(runtimeId string, event statechart.Event) error {
-	id := runtimeId + "-evt-" + time.Now().Format("20060102150405")
+	id := runtimeId + "-evt-" + time.Now().Format("20060102150405") + "-" + fmt.Sprintf("%d", len(s.events[runtimeId]))
 	ev := Event{
 		ID:            id,
 		RuntimeID:     runtimeId,
