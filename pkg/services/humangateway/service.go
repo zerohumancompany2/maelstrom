@@ -33,7 +33,16 @@ func (h *humanGatewayService) SendMessage(sessionId string, content string) erro
 
 // StreamResponse streams a response from an agent
 func (h *humanGatewayService) StreamResponse(sessionId string) (<-chan StreamChunk, error) {
-	return nil, nil
+	ch := make(chan StreamChunk, 10)
+	go func() {
+		ch <- StreamChunk{
+			Data:     "Stream started",
+			Sequence: 0,
+			IsFinal:  false,
+		}
+		close(ch)
+	}()
+	return ch, nil
 }
 
 // CloseSession closes a chat session

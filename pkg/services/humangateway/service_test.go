@@ -47,3 +47,29 @@ func TestHumanGateway_SendMessage(t *testing.T) {
 		t.Error("Session should still exist after sending message")
 	}
 }
+
+func TestHumanGateway_StreamResponse(t *testing.T) {
+	// Test: Stream agent response
+	svc := NewHumanGatewayService()
+
+	// Open a session
+	sessionID, err := svc.OpenSession("agent-003")
+	if err != nil {
+		t.Fatalf("Failed to open session: %v", err)
+	}
+
+	// Stream response
+	ch, err := svc.StreamResponse(string(sessionID))
+	if err != nil {
+		t.Fatalf("Failed to stream response: %v", err)
+	}
+
+	if ch == nil {
+		t.Fatal("Stream channel should not be nil")
+	}
+
+	// Verify session still exists
+	if !svc.SessionExists(sessionID) {
+		t.Error("Session should exist during streaming")
+	}
+}
