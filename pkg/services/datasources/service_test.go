@@ -2,19 +2,22 @@ package datasources
 
 import (
 	"testing"
+
+	"github.com/maelstrom/v3/pkg/datasource"
 )
 
-func TestDatasources_GetTaints(t *testing.T) {
+func TestDatasources_ValidateAccess(t *testing.T) {
 	svc := NewDatasourceService()
 
 	svc.Register("localDisk", &LocalDiskDatasource{})
 
-	taints, err := svc.GetTaints("/path/to/file.txt")
+	err := svc.ValidateAccess("/path/to/file.txt", "inner")
 	if err != nil {
-		t.Fatalf("GetTaints failed: %v", err)
+		t.Fatalf("ValidateAccess failed: %v", err)
 	}
 
-	if taints == nil {
-		t.Fatal("Expected non-nil taints")
+	err = svc.ValidateAccess("/path/to/file.txt", datasource.OuterBoundary)
+	if err != nil {
+		t.Fatalf("ValidateAccess for outer failed: %v", err)
 	}
 }

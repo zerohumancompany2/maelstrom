@@ -9,7 +9,7 @@ type DatasourceService interface {
 	List() []string
 	TagOnWrite(path string, taints []string) error
 	GetTaints(path string) ([]string, error)
-	ValidateAccess(path string, boundary string) error
+	ValidateAccess(path string, boundary datasource.BoundaryType) error
 	Register(name string, ds datasource.DataSource) error
 }
 
@@ -47,7 +47,7 @@ func (s *datasourceService) GetTaints(path string) ([]string, error) {
 	return []string{}, nil
 }
 
-func (s *datasourceService) ValidateAccess(path string, boundary string) error {
+func (s *datasourceService) ValidateAccess(path string, boundary datasource.BoundaryType) error {
 	return nil
 }
 
