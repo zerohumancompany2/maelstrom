@@ -33,12 +33,14 @@ type GatewayService interface {
 // gatewayService implements GatewayService
 type gatewayService struct {
 	adapters map[string]ChannelAdapter
+	mailChan chan Mail
 }
 
 // NewGatewayService creates a new gateway service instance
 func NewGatewayService() GatewayService {
 	return &gatewayService{
 		adapters: make(map[string]ChannelAdapter),
+		mailChan: make(chan Mail, 100),
 	}
 }
 
@@ -50,12 +52,16 @@ func (g *gatewayService) RegisterAdapter(name string, adapter ChannelAdapter) er
 
 // Publish publishes a mail message
 func (g *gatewayService) Publish(mail Mail) (Ack, error) {
-	return Ack{}, nil
+	g.mailChan <- mail
+	return Ack{
+		MessageID: mail.Subject,
+		Status:    "published",
+	}, nil
 }
 
 // Subscribe subscribes to messages at an address
 func (g *gatewayService) Subscribe(address string) (<-chan Mail, error) {
-	return nil, nil
+	return g.mailChan, nil
 }
 
 // Unsubscribe unsubscribes from an address
