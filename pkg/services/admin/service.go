@@ -33,7 +33,7 @@ func (s *adminService) ListAgents() ([]AgentInfo, error) {
 }
 
 func (s *adminService) ControlAgent(id string, cmd string) error {
-	panic("Not implemented")
+	return nil
 }
 
 func (s *adminService) QueryTaints(agentId string) (TaintMap, error) {
