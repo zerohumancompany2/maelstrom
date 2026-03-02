@@ -7,6 +7,7 @@ type HumanGatewayService interface {
 	StreamResponse(sessionId string) (<-chan StreamChunk, error)
 	CloseSession(sessionId string) error
 	SessionExists(sessionID SessionID) bool
+	SessionActive(sessionID SessionID) bool
 }
 
 // humanGatewayService implements HumanGatewayService
@@ -47,10 +48,20 @@ func (h *humanGatewayService) StreamResponse(sessionId string) (<-chan StreamChu
 
 // CloseSession closes a chat session
 func (h *humanGatewayService) CloseSession(sessionId string) error {
+	h.sessionMgr.CloseSession(SessionID(sessionId))
 	return nil
 }
 
 // SessionExists checks if a session exists
 func (h *humanGatewayService) SessionExists(sessionID SessionID) bool {
 	return h.sessionMgr.SessionExists(sessionID)
+}
+
+// SessionActive checks if a session is active
+func (h *humanGatewayService) SessionActive(sessionID SessionID) bool {
+	session, ok := h.sessionMgr.GetSession(sessionID)
+	if !ok {
+		return false
+	}
+	return session.Active
 }

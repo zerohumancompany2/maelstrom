@@ -73,3 +73,40 @@ func TestHumanGateway_StreamResponse(t *testing.T) {
 		t.Error("Session should exist during streaming")
 	}
 }
+
+func TestHumanGateway_BoundaryOuter(t *testing.T) {
+	// Test: Human gateway only accessible from outer
+	svc := NewHumanGatewayService()
+
+	// Open session (outer boundary operation)
+	sessionID, err := svc.OpenSession("agent-004")
+	if err != nil {
+		t.Fatalf("Failed to open session: %v", err)
+	}
+
+	// Send message (outer boundary operation)
+	err = svc.SendMessage(string(sessionID), "Hello from outer")
+	if err != nil {
+		t.Fatalf("Failed to send message: %v", err)
+	}
+
+	// Stream response (outer boundary operation)
+	ch, err := svc.StreamResponse(string(sessionID))
+	if err != nil {
+		t.Fatalf("Failed to stream: %v", err)
+	}
+
+	// Verify we can receive from stream
+	<-ch
+
+	// Close session (outer boundary operation)
+	err = svc.CloseSession(string(sessionID))
+	if err != nil {
+		t.Fatalf("Failed to close session: %v", err)
+	}
+
+	// Session should be closed (not active)
+	if svc.SessionActive(sessionID) {
+		t.Error("Session should be closed after CloseSession")
+	}
+}

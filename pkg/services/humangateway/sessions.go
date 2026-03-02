@@ -38,3 +38,12 @@ func (m *sessionManager) SessionExists(sessionID SessionID) bool {
 	_, ok := m.sessions[sessionID]
 	return ok
 }
+
+// CloseSession marks a session as closed
+func (m *sessionManager) CloseSession(sessionID SessionID) bool {
+	session, ok := m.sessions[sessionID]
+	if ok {
+		session.Active = false
+	}
+	return ok
+}
