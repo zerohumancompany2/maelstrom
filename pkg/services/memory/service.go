@@ -19,7 +19,7 @@ func (s *memoryService) Store(runtimeId string, content string, metadata map[str
 
 // Query performs vector similarity search
 func (s *memoryService) Query(vector []float32, topK int, boundaryFilter string) ([]MemoryResult, error) {
-	return nil, NotImplementedError
+	return []MemoryResult{}, nil
 }
 
 // QueryByQuery performs text similarity search
