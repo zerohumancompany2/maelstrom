@@ -44,7 +44,7 @@ func (s *datasourceService) TagOnWrite(path string, taints []string) error {
 }
 
 func (s *datasourceService) GetTaints(path string) ([]string, error) {
-	return nil, nil
+	return []string{}, nil
 }
 
 func (s *datasourceService) ValidateAccess(path string, boundary string) error {

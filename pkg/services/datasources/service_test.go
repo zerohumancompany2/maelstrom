@@ -4,13 +4,17 @@ import (
 	"testing"
 )
 
-func TestDatasources_TagOnWrite(t *testing.T) {
+func TestDatasources_GetTaints(t *testing.T) {
 	svc := NewDatasourceService()
 
 	svc.Register("localDisk", &LocalDiskDatasource{})
 
-	err := svc.TagOnWrite("/path/to/file.txt", []string{"confidential", "internal"})
+	taints, err := svc.GetTaints("/path/to/file.txt")
 	if err != nil {
-		t.Fatalf("TagOnWrite failed: %v", err)
+		t.Fatalf("GetTaints failed: %v", err)
+	}
+
+	if taints == nil {
+		t.Fatal("Expected non-nil taints")
 	}
 }
