@@ -71,7 +71,14 @@ func (g *gatewayService) Unsubscribe(address string, ch <-chan Mail) error {
 
 // GetOpenAPI returns the OpenAPI specification
 func (g *gatewayService) GetOpenAPI() (*openapi.Spec, error) {
-	return nil, nil
+	return &openapi.Spec{
+		Version: "3.0.0",
+		Info: openapi.Info{
+			Title:   "Gateway Service API",
+			Version: "1.0.0",
+		},
+		Paths: make(map[string]interface{}),
+	}, nil
 }
 
 // GetAdapter returns a registered adapter by name
