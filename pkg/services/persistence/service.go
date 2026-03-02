@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/maelstrom/v3/pkg/statechart"
@@ -53,16 +54,35 @@ func NewPersistenceService() PersistenceService {
 
 func (s *persistenceService) Snapshot(runtimeId string) (Snapshot, error) {
 	id := runtimeId + "-snap-" + time.Now().Format("20060102150405")
-	return Snapshot{
+	snap := Snapshot{
 		ID:        id,
 		RuntimeID: runtimeId,
 		State:     make(map[string]any),
 		Timestamp: time.Now(),
-	}, nil
+	}
+	s.snapshots[id] = snap
+	return snap, nil
 }
 
 func (s *persistenceService) Restore(snapshotId string, def statechart.ChartDefinition) (statechart.RuntimeID, error) {
-	panic("Not implemented")
+	snap, ok := s.snapshots[snapshotId]
+	if !ok {
+		return "", fmt.Errorf("snapshot not found")
+	}
+	newID := statechart.RuntimeID(snapshotId + "-restored-" + time.Now().Format("20060102150405"))
+	s.snapshots[snapshotId] = Snapshot{
+		ID:        snapshotId,
+		RuntimeID: snap.RuntimeID,
+		State:     snap.State,
+		Timestamp: time.Now(),
+	}
+	s.snapshots[string(newID)] = Snapshot{
+		ID:        string(newID),
+		RuntimeID: snap.RuntimeID,
+		State:     snap.State,
+		Timestamp: time.Now(),
+	}
+	return newID, nil
 }
 
 func (s *persistenceService) AppendEvent(runtimeId string, event statechart.Event) error {
