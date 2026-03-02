@@ -23,5 +23,5 @@ func (s *heartbeatService) Trigger(agentId string) error {
 }
 
 func (s *heartbeatService) GetSchedule(agentId string) (Schedule, error) {
-	return Schedule{}, NotImplementedError
+	return Schedule{}, nil
 }
