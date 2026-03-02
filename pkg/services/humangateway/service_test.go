@@ -24,3 +24,26 @@ func TestHumanGateway_OpenSession(t *testing.T) {
 		t.Error("Session should exist after opening")
 	}
 }
+
+func TestHumanGateway_SendMessage(t *testing.T) {
+	// Test: Send message to agent
+	svc := NewHumanGatewayService()
+
+	// Open a session
+	sessionID, err := svc.OpenSession("agent-002")
+	if err != nil {
+		t.Fatalf("Failed to open session: %v", err)
+	}
+
+	// Send a message
+	content := "Hello, agent!"
+	err = svc.SendMessage(string(sessionID), content)
+	if err != nil {
+		t.Fatalf("Failed to send message: %v", err)
+	}
+
+	// Verify session exists
+	if !svc.SessionExists(sessionID) {
+		t.Error("Session should still exist after sending message")
+	}
+}
