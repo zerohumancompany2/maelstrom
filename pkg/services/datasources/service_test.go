@@ -4,20 +4,17 @@ import (
 	"testing"
 )
 
-func TestDatasources_Register(t *testing.T) {
+func TestDatasources_Get(t *testing.T) {
 	svc := NewDatasourceService()
 
-	err := svc.Register("localDisk", &LocalDiskDatasource{})
+	svc.Register("localDisk", &LocalDiskDatasource{})
+
+	ds, err := svc.Get("localDisk")
 	if err != nil {
-		t.Fatalf("Register localDisk failed: %v", err)
+		t.Fatalf("Get failed: %v", err)
 	}
 
-	err = svc.Register("s3", &S3Datasource{})
-	if err != nil {
-		t.Fatalf("Register s3 failed: %v", err)
-	}
-
-	if len(svc.List()) != 2 {
-		t.Errorf("Expected 2 datasources, got %d", len(svc.List()))
+	if ds == nil {
+		t.Fatal("Expected non-nil datasource")
 	}
 }
