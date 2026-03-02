@@ -4,14 +4,14 @@ import (
 	"testing"
 )
 
-func TestTools_Register(t *testing.T) {
+func TestTools_Resolve(t *testing.T) {
 	svc := NewToolsService()
 
 	tool := ToolDescriptor{
-		Name:      "test-tool",
-		Boundary:  "inner",
-		Schema:    map[string]any{"type": "object"},
-		Isolation: "container",
+		Name:      "resolve-test-tool",
+		Boundary:  "outer",
+		Schema:    map[string]any{"param": "string"},
+		Isolation: "process",
 	}
 
 	err := svc.Register(tool)
@@ -19,17 +19,20 @@ func TestTools_Register(t *testing.T) {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	// Verify tool was registered by resolving it
-	resolved, err := svc.Resolve("test-tool", "inner")
+	resolved, err := svc.Resolve("resolve-test-tool", "inner")
 	if err != nil {
 		t.Fatalf("Resolve failed: %v", err)
 	}
 
-	if resolved.Name != "test-tool" {
-		t.Errorf("Expected name 'test-tool', got '%s'", resolved.Name)
+	if resolved.Name != "resolve-test-tool" {
+		t.Errorf("Expected name 'resolve-test-tool', got '%s'", resolved.Name)
 	}
 
-	if resolved.Boundary != "inner" {
-		t.Errorf("Expected boundary 'inner', got '%s'", resolved.Boundary)
+	if resolved.Boundary != "outer" {
+		t.Errorf("Expected boundary 'outer', got '%s'", resolved.Boundary)
+	}
+
+	if resolved.Isolation != "process" {
+		t.Errorf("Expected isolation 'process', got '%s'", resolved.Isolation)
 	}
 }
