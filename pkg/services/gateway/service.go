@@ -24,6 +24,7 @@ type Mail struct {
 type GatewayService interface {
 	RegisterAdapter(name string, adapter ChannelAdapter) error
 	Publish(mail Mail) (Ack, error)
+	PublishTo(mail Mail) error
 	Subscribe(address string) (<-chan Mail, error)
 	Unsubscribe(address string, ch <-chan Mail) error
 	GetOpenAPI() (*openapi.Spec, error)
@@ -62,6 +63,12 @@ func (g *gatewayService) Publish(mail Mail) (Ack, error) {
 // Subscribe subscribes to messages at an address
 func (g *gatewayService) Subscribe(address string) (<-chan Mail, error) {
 	return g.mailChan, nil
+}
+
+// PublishTo publishes a mail to a specific channel
+func (g *gatewayService) PublishTo(mail Mail) error {
+	g.mailChan <- mail
+	return nil
 }
 
 // Unsubscribe unsubscribes from an address
