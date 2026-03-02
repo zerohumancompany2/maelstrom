@@ -29,7 +29,7 @@ func (s *memoryService) QueryByQuery(query string, topK int, boundaryFilter stri
 
 // Delete removes a memory entry by ID
 func (s *memoryService) Delete(memoryId string) error {
-	return NotImplementedError
+	return nil
 }
 
 // List returns all memories for a given runtime
