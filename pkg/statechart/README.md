@@ -917,6 +917,160 @@ def := statechart.ChartDefinition{
 }
 ```
 
+## Auto-Transitions
+
+Auto-transitions fire automatically after entry actions complete, without requiring an external event. They use a synthetic event (`event: ""`) that flows through the normal event processing path, ensuring guards, actions, and trace callbacks work exactly like regular transitions.
+
+### YAML Syntax
+
+```yaml
+states:
+  setup:
+    entry:
+      - initializeConnection
+      - loadConfig
+    transitions:
+      - event: ""  # Auto-transition (empty string)
+        target: running
+        guard: isConfigValid
+        actions:
+          - logStartup
+  running:
+    # Normal state with event-driven transitions
+    transitions:
+      - event: stop
+        target: stopped
+```
+
+### Go API
+
+```go
+def := statechart.ChartDefinition{
+    Root: &statechart.Node{
+        ID: "root",
+        Children: map[string]*statechart.Node{
+            "setup": {
+                ID: "setup",
+                EntryActions: []string{"initialize", "configure"},
+                Transitions: []statechart.Transition{
+                    {
+                        Event:  statechart.SyntheticAutoTransition, // Empty string ""
+                        Target: "root/running",
+                        Guard:  "isReady",
+                        Actions: []string{"logTransition"},
+                    },
+                },
+            },
+            "running": {
+                ID: "running",
+            },
+        },
+    },
+    InitialState: "root/setup",
+}
+```
+
+### Behavior
+
+1. **Entry actions execute first**: All entry actions for the source state complete
+2. **Synthetic event emitted**: Library emits `Event{Type: "", Source: "system:auto"}`
+3. **Normal transition processing**: Guard evaluated, transition actions execute, target entry actions run
+4. **Chained auto-transitions supported**: Multiple consecutive auto-transitions execute in sequence
+
+### Use Cases
+
+**State Delegation Pattern**: Setup state that immediately delegates to execution state:
+
+```yaml
+states:
+  bootstrap:
+    entry:
+      - spawnWorkerPool
+      - initializeMetrics
+    transitions:
+      - event: ""
+        target: executing
+        guard: workersReady
+
+  executing:
+    # Actual work happens here
+    transitions:
+      - event: complete
+        target: done
+```
+
+**Validation Gate**: Validate conditions before proceeding:
+
+```yaml
+states:
+  validating:
+    entry:
+      - checkPrerequisites
+    transitions:
+      - event: ""
+        target: processing
+        guard: allChecksPassed
+      - event: ""
+        target: error
+        guard: checksFailed  # Fallback if first guard fails
+```
+
+**Chained Initialization**: Multi-step setup without external triggers:
+
+```yaml
+states:
+  init1:
+    entry:
+      - stepOne
+    transitions:
+      - event: ""
+        target: init2
+
+  init2:
+    entry:
+      - stepTwo
+    transitions:
+      - event: ""
+        target: init3
+
+  init3:
+    entry:
+      - stepThree
+    transitions:
+      - event: ""
+        target: ready
+```
+
+### Guard Behavior
+
+Auto-transitions respect guards exactly like regular transitions:
+
+- If guard returns `false`, auto-transition is blocked
+- State remains in current state (no infinite loop)
+- Multiple auto-transitions with different guards are evaluated in order
+
+```yaml
+states:
+  setup:
+    entry:
+      - prepare
+    transitions:
+      - event: ""
+        target: fastTrack
+        guard: isPremiumUser
+      - event: ""
+        target: standardTrack  # Fallback
+        guard: isRegularUser
+```
+
+### Important Notes
+
+- **Constant**: Use `statechart.SyntheticAutoTransition` (equals `""`)
+- **No special handling**: Auto-transitions work through normal `processEvent` path
+- **Correlation ID**: Synthetic events have `Source: "system:auto"`, no correlation ID
+- **Exit actions**: Execute normally when leaving a state via auto-transition
+- **No schema changes**: Uses existing `Transition` structure with empty `Event` field
+
 ## Chart Definition (YAML)
 
 Charts are typically defined in YAML and hydrated via `DefaultHydrator()`:
