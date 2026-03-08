@@ -1,6 +1,7 @@
 package datasource
 
 import (
+	"github.com/maelstrom/v3/pkg/security"
 	"testing"
 )
 
@@ -76,17 +77,17 @@ func TestDataSource_ValidateAccess(t *testing.T) {
 
 	source, _ := registry.Get("localDisk", map[string]any{"path": "/tmp/test-ds"})
 
-	err := source.ValidateAccess(InnerBoundary)
+	err := source.ValidateAccess(security.InnerBoundary)
 	if err != nil {
 		t.Errorf("Expected no error for inner, got %v", err)
 	}
 
-	err = source.ValidateAccess(DMZBoundary)
+	err = source.ValidateAccess(security.DMZBoundary)
 	if err != nil {
 		t.Errorf("Expected no error for dmz, got %v", err)
 	}
 
-	err = source.ValidateAccess(OuterBoundary)
+	err = source.ValidateAccess(security.OuterBoundary)
 	if err != nil {
 		t.Errorf("Expected no error for outer, got %v", err)
 	}

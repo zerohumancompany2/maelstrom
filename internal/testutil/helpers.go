@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	"github.com/maelstrom/v3/pkg/mail"
 	"testing"
 	"time"
 )
@@ -40,14 +41,14 @@ func WaitForCondition(t *testing.T, cond func() bool, timeout time.Duration) boo
 }
 
 // WaitForChannel waits for a channel to receive a value with timeout.
-func WaitForChannel(t *testing.T, ch <-chan Mail, timeout time.Duration) (Mail, bool) {
+func WaitForChannel(t *testing.T, ch <-chan mail.Mail, timeout time.Duration) (mail.Mail, bool) {
 	t.Helper()
 
 	select {
-	case mail := <-ch:
-		return mail, true
+	case m := <-ch:
+		return m, true
 	case <-time.After(timeout):
-		return Mail{}, false
+		return mail.Mail{}, false
 	}
 }
 
@@ -69,12 +70,12 @@ func WaitForGoroutines(t *testing.T, doneChans []chan struct{}, timeout time.Dur
 }
 
 // MustReceiveMail receives mail from channel or fails test.
-func MustReceiveMail(t *testing.T, ch <-chan Mail, timeout time.Duration) Mail {
+func MustReceiveMail(t *testing.T, ch <-chan mail.Mail, timeout time.Duration) mail.Mail {
 	t.Helper()
 
-	mail, ok := WaitForChannel(t, ch, timeout)
+	m, ok := WaitForChannel(t, ch, timeout)
 	if !ok {
 		t.Fatalf("timeout waiting for mail")
 	}
-	return mail
+	return m
 }

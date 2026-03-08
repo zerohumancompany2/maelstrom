@@ -21,7 +21,7 @@ func TestGateway_WebhookIngress(t *testing.T) {
 			return
 		}
 
-		var mail Mail
+		var mail GatewayMail
 		if err := json.NewDecoder(r.Body).Decode(&mail); err != nil {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
 			return
@@ -38,7 +38,7 @@ func TestGateway_WebhookIngress(t *testing.T) {
 	})
 
 	// Create test request
-	reqBody := Mail{
+	reqBody := GatewayMail{
 		From:    "sender@example.com",
 		To:      []string{"recipient@example.com"},
 		Subject: "Test message",

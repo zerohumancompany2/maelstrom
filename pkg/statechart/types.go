@@ -48,6 +48,9 @@ const (
 	SysTransition   = "sys:transition"
 	SysPanic        = "sys:panic"
 	SysBackpressure = "sys:backpressure"
+
+	// Synthetic event for auto-transitions (fires after entry actions)
+	SyntheticAutoTransition = ""
 )
 
 // IsSystem returns true if the event is a system event (has "sys:" prefix).

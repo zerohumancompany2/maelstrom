@@ -4,7 +4,6 @@ package runtime
 
 import (
 	"errors"
-	"sync"
 	"time"
 )
 

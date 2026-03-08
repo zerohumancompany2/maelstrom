@@ -14,44 +14,6 @@ var ErrDuplicateMail = errors.New("mail with correlationId already processed")
 // ErrNotFound is returned when a subscriber address is not found.
 var ErrNotFound = errors.New("subscriber not found")
 
-// MailType represents the type of mail.
-type MailType string
-
-const (
-	MailTypeUnknown      MailType = "UNKNOWN"
-	MailTypeCommand      MailType = "COMMAND"
-	MailTypeEvent        MailType = "EVENT"
-	MailTypeResponse     MailType = "RESPONSE"
-	MailTypeNotification MailType = "NOTIFICATION"
-)
-
-// MailMetadata contains additional information about the mail.
-type MailMetadata struct {
-	Priority     int
-	RetryCount   int
-	Deadline     time.Time
-	BoundaryType BoundaryType
-}
-
-// BoundaryType represents the security boundary of the mail.
-type BoundaryType string
-
-const (
-	BoundaryInner BoundaryType = "INNER"
-	BoundaryOuter BoundaryType = "OUTER"
-	BoundaryDMZ   BoundaryType = "DMZ"
-	BoundaryUnset BoundaryType = "UNSET"
-)
-
-// Ack represents an acknowledgment from the mail system.
-type Ack struct {
-	MailID        string
-	CorrelationID string
-	DeliveredAt   time.Time
-	Success       bool
-	ErrorMessage  string
-}
-
 // MailSystem provides publisher/subscriber coordination.
 type MailSystem struct {
 	subscribers map[string]chan Mail

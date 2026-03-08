@@ -22,7 +22,7 @@ func TestGateway_WebSocketBidir(t *testing.T) {
 
 		// Simulate bidirectional communication
 		if r.Method == http.MethodPost {
-			var mail Mail
+			var mail GatewayMail
 			if err := json.NewDecoder(r.Body).Decode(&mail); err != nil {
 				http.Error(w, "Invalid JSON", http.StatusBadRequest)
 				return
@@ -43,7 +43,7 @@ func TestGateway_WebSocketBidir(t *testing.T) {
 	// Simulate bidirectional communication
 	client := &http.Client{Timeout: 5 * time.Second}
 
-	mail := Mail{
+	mail := GatewayMail{
 		From:    "client@example.com",
 		To:      []string{"server@example.com"},
 		Subject: "WS test",

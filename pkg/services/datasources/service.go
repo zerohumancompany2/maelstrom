@@ -2,6 +2,7 @@ package datasources
 
 import (
 	"github.com/maelstrom/v3/pkg/datasource"
+	"github.com/maelstrom/v3/pkg/security"
 )
 
 type DatasourceService interface {
@@ -9,7 +10,7 @@ type DatasourceService interface {
 	List() []string
 	TagOnWrite(path string, taints []string) error
 	GetTaints(path string) ([]string, error)
-	ValidateAccess(path string, boundary datasource.BoundaryType) error
+	ValidateAccess(path string, boundary security.BoundaryType) error
 	Register(name string, ds datasource.DataSource) error
 }
 
@@ -47,7 +48,7 @@ func (s *datasourceService) GetTaints(path string) ([]string, error) {
 	return []string{}, nil
 }
 
-func (s *datasourceService) ValidateAccess(path string, boundary datasource.BoundaryType) error {
+func (s *datasourceService) ValidateAccess(path string, boundary security.BoundaryType) error {
 	return nil
 }
 
@@ -66,7 +67,7 @@ func (d *LocalDiskDatasource) GetTaints(path string) ([]string, error) {
 	return nil, nil
 }
 
-func (d *LocalDiskDatasource) ValidateAccess(boundary datasource.BoundaryType) error {
+func (d *LocalDiskDatasource) ValidateAccess(boundary security.BoundaryType) error {
 	return nil
 }
 
@@ -80,6 +81,6 @@ func (d *S3Datasource) GetTaints(path string) ([]string, error) {
 	return nil, nil
 }
 
-func (d *S3Datasource) ValidateAccess(boundary datasource.BoundaryType) error {
+func (d *S3Datasource) ValidateAccess(boundary security.BoundaryType) error {
 	return nil
 }

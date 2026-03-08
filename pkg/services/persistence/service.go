@@ -7,14 +7,14 @@ import (
 	"github.com/maelstrom/v3/pkg/statechart"
 )
 
-type Snapshot struct {
+type SnapshotRecord struct {
 	ID        string
 	RuntimeID string
 	State     map[string]any
 	Timestamp time.Time
 }
 
-type Event struct {
+type EventLogEntry struct {
 	ID            string
 	RuntimeID     string
 	Type          string
@@ -33,28 +33,28 @@ const (
 )
 
 type PersistenceService interface {
-	Snapshot(runtimeId string) (Snapshot, error)
+	Snapshot(runtimeId string) (SnapshotRecord, error)
 	Restore(snapshotId string, def statechart.ChartDefinition) (statechart.RuntimeID, error)
 	AppendEvent(runtimeId string, event statechart.Event) error
-	GetEvents(runtimeId string, since string) ([]Event, error)
+	GetEvents(runtimeId string, since string) ([]EventLogEntry, error)
 	Migrate(runtimeId string, newDef statechart.ChartDefinition, policy MigrationPolicy) error
 }
 
 type persistenceService struct {
-	snapshots map[string]Snapshot
-	events    map[string][]Event
+	snapshots map[string]SnapshotRecord
+	events    map[string][]EventLogEntry
 }
 
 func NewPersistenceService() PersistenceService {
 	return &persistenceService{
-		snapshots: make(map[string]Snapshot),
-		events:    make(map[string][]Event),
+		snapshots: make(map[string]SnapshotRecord),
+		events:    make(map[string][]EventLogEntry),
 	}
 }
 
-func (s *persistenceService) Snapshot(runtimeId string) (Snapshot, error) {
+func (s *persistenceService) Snapshot(runtimeId string) (SnapshotRecord, error) {
 	id := runtimeId + "-snap-" + time.Now().Format("20060102150405")
-	snap := Snapshot{
+	snap := SnapshotRecord{
 		ID:        id,
 		RuntimeID: runtimeId,
 		State:     make(map[string]any),
@@ -70,13 +70,13 @@ func (s *persistenceService) Restore(snapshotId string, def statechart.ChartDefi
 		return "", fmt.Errorf("snapshot not found")
 	}
 	newID := statechart.RuntimeID(snapshotId + "-restored-" + time.Now().Format("20060102150405"))
-	s.snapshots[snapshotId] = Snapshot{
+	s.snapshots[snapshotId] = SnapshotRecord{
 		ID:        snapshotId,
 		RuntimeID: snap.RuntimeID,
 		State:     snap.State,
 		Timestamp: time.Now(),
 	}
-	s.snapshots[string(newID)] = Snapshot{
+	s.snapshots[string(newID)] = SnapshotRecord{
 		ID:        string(newID),
 		RuntimeID: snap.RuntimeID,
 		State:     snap.State,
@@ -87,7 +87,7 @@ func (s *persistenceService) Restore(snapshotId string, def statechart.ChartDefi
 
 func (s *persistenceService) AppendEvent(runtimeId string, event statechart.Event) error {
 	id := runtimeId + "-evt-" + time.Now().Format("20060102150405") + "-" + fmt.Sprintf("%d", len(s.events[runtimeId]))
-	ev := Event{
+	ev := EventLogEntry{
 		ID:            id,
 		RuntimeID:     runtimeId,
 		Type:          event.Type,
@@ -100,10 +100,10 @@ func (s *persistenceService) AppendEvent(runtimeId string, event statechart.Even
 	return nil
 }
 
-func (s *persistenceService) GetEvents(runtimeId string, since string) ([]Event, error) {
+func (s *persistenceService) GetEvents(runtimeId string, since string) ([]EventLogEntry, error) {
 	events, ok := s.events[runtimeId]
 	if !ok {
-		return []Event{}, nil
+		return []EventLogEntry{}, nil
 	}
 	if since == "" {
 		return events, nil
@@ -113,7 +113,7 @@ func (s *persistenceService) GetEvents(runtimeId string, since string) ([]Event,
 			return events[i+1:], nil
 		}
 	}
-	return []Event{}, nil
+	return []EventLogEntry{}, nil
 }
 
 func (s *persistenceService) Migrate(runtimeId string, newDef statechart.ChartDefinition, policy MigrationPolicy) error {
@@ -125,7 +125,7 @@ func (s *persistenceService) Migrate(runtimeId string, newDef statechart.ChartDe
 		_ = newDef
 		_ = runtimeId
 	case CleanStart:
-		s.events[runtimeId] = []Event{}
+		s.events[runtimeId] = []EventLogEntry{}
 	}
 	return nil
 }

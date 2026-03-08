@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"fmt"
+	"github.com/maelstrom/v3/pkg/mail"
 	"time"
 )
 
@@ -16,15 +17,15 @@ func GenerateCorrelationID(index int) string {
 }
 
 // GenerateMail creates a mail with deterministic values.
-func GenerateMail(index int) Mail {
-	return Mail{
+func GenerateMail(index int) mail.Mail {
+	return mail.Mail{
 		ID:            GenerateMailID(index),
-		Type:          "COMMAND",
-		From:          fmt.Sprintf("agent-%d", index%3),
-		To:            fmt.Sprintf("agent-%d", (index+1)%3),
-		Content:       []byte(fmt.Sprintf("content-%d", index)),
 		CorrelationID: GenerateCorrelationID(index),
-		Timestamp:     time.Now(),
+		Type:          mail.Heartbeat,
+		Source:        fmt.Sprintf("agent-%d", index%3),
+		Target:        fmt.Sprintf("agent-%d", (index+1)%3),
+		Content:       []byte(fmt.Sprintf("content-%d", index)),
+		CreatedAt:     time.Now(),
 	}
 }
 

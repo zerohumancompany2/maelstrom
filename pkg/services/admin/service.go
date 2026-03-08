@@ -1,6 +1,9 @@
 package admin
 
-import "github.com/maelstrom/v3/pkg/statechart"
+import (
+	"github.com/maelstrom/v3/pkg/security"
+	"github.com/maelstrom/v3/pkg/statechart"
+)
 
 type AgentInfo struct {
 	ID           string
@@ -9,12 +12,10 @@ type AgentInfo struct {
 	Boundary     string
 }
 
-type TaintMap map[string][]string
-
 type AdminService interface {
 	ListAgents() ([]AgentInfo, error)
 	ControlAgent(id string, cmd string) error
-	QueryTaints(agentId string) (TaintMap, error)
+	QueryTaints(agentId string) (security.TaintMap, error)
 	InjectEvent(agentId string, event statechart.Event) error
 }
 
@@ -36,8 +37,8 @@ func (s *adminService) ControlAgent(id string, cmd string) error {
 	return nil
 }
 
-func (s *adminService) QueryTaints(agentId string) (TaintMap, error) {
-	return TaintMap{}, nil
+func (s *adminService) QueryTaints(agentId string) (security.TaintMap, error) {
+	return security.TaintMap{}, nil
 }
 
 func (s *adminService) InjectEvent(agentId string, event statechart.Event) error {

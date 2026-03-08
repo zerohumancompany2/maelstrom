@@ -12,7 +12,7 @@ func TestGateway_BoundaryOuter(t *testing.T) {
 	svc.RegisterAdapter("webhook", &WebhookAdapter{})
 
 	// Simulate outer boundary mail (from external source)
-	outerMail := Mail{
+	outerMail := GatewayMail{
 		From:    "external@example.com",
 		To:      []string{"gateway@maelstrom.io"},
 		Subject: "Outer boundary message",

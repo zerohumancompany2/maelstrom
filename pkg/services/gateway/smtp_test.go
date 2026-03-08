@@ -21,7 +21,7 @@ func TestGateway_SMTPIngress(t *testing.T) {
 			return
 		}
 
-		var mail Mail
+		var mail GatewayMail
 		if err := json.NewDecoder(r.Body).Decode(&mail); err != nil {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
 			return
@@ -42,7 +42,7 @@ func TestGateway_SMTPIngress(t *testing.T) {
 	defer server.Close()
 
 	// Simulate email ingress with POST request containing mail data
-	mail := Mail{
+	mail := GatewayMail{
 		From:    "sender@external.com",
 		To:      []string{"agent@internal.com"},
 		Subject: "Email from external",

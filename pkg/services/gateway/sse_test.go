@@ -28,7 +28,7 @@ func TestGateway_SSEStreaming(t *testing.T) {
 
 		// Stream multiple chunks
 		for i := 0; i < 3; i++ {
-			mail := Mail{
+			mail := GatewayMail{
 				From:    "stream@example.com",
 				To:      []string{"client@example.com"},
 				Subject: fmt.Sprintf("Chunk %d", i),

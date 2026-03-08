@@ -47,6 +47,14 @@ const (
 	OuterBoundary BoundaryType = "outer"
 )
 
+type Ack struct {
+	MailID        string
+	CorrelationID string
+	DeliveredAt   time.Time
+	Success       bool
+	ErrorMessage  string
+}
+
 func isValidAddress(address string) bool {
 	if address == "" {
 		return false

@@ -1,21 +1,14 @@
 package datasource
 
 import (
+	"github.com/maelstrom/v3/pkg/security"
 	"sync"
-)
-
-type BoundaryType string
-
-const (
-	InnerBoundary BoundaryType = "inner"
-	DMZBoundary   BoundaryType = "dmz"
-	OuterBoundary BoundaryType = "outer"
 )
 
 type DataSource interface {
 	TagOnWrite(path string, taints []string) error
 	GetTaints(path string) ([]string, error)
-	ValidateAccess(boundary BoundaryType) error
+	ValidateAccess(boundary security.BoundaryType) error
 }
 
 type Registry struct {

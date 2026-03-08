@@ -30,13 +30,13 @@ var (
 
 // Engine implements the Library interface.
 type Engine struct {
-	runtimes    map[RuntimeID]*ChartRuntime
-	runtimeMu   sync.RWMutex
-	actions     map[string]ActionFn
-	guards      map[string]GuardFn
-	actionMu    sync.RWMutex
-	guardMu     sync.RWMutex
-	idCounter   uint64
+	runtimes  map[RuntimeID]*ChartRuntime
+	runtimeMu sync.RWMutex
+	actions   map[string]ActionFn
+	guards    map[string]GuardFn
+	actionMu  sync.RWMutex
+	guardMu   sync.RWMutex
+	idCounter uint64
 }
 
 // NewEngine creates a new statechart engine.
@@ -65,8 +65,8 @@ func (e *Engine) Spawn(def ChartDefinition, initialAppCtx ApplicationContext) (R
 		eventQueue:   make([]Event, 0),
 		appCtx:       initialAppCtx,
 		runtimeCtx: RuntimeContext{
-			ChartID:   def.ID,
-			RuntimeID: "", // set below
+			ChartID:      def.ID,
+			RuntimeID:    "", // set below
 			ActiveStates: []string{def.InitialState},
 			StartTime:    time.Time{}, // set on Start
 			Metrics:      make(map[string]float64),
@@ -183,8 +183,19 @@ func (e *Engine) startRuntime(runtime *ChartRuntime) error {
 	runtime.runtimeCtx.StartTime = time.Now()
 
 	// Execute entry actions for initial state
-	if err := e.executeEntryActions(runtime, runtime.activeState, Event{}); err != nil {
+	_, err := e.executeEntryActions(runtime, runtime.activeState, Event{})
+	if err != nil {
 		return err
+	}
+
+	// Process any queued auto-transition events synchronously during start
+	for len(runtime.eventQueue) > 0 {
+		ev := runtime.eventQueue[0]
+		runtime.eventQueue = runtime.eventQueue[1:]
+		if err := e.processEvent(runtime, ev); err != nil {
+			// Error handling: log and continue
+			_ = err
+		}
 	}
 
 	return nil
@@ -393,12 +404,17 @@ func (e *Engine) executeTransition(runtime *ChartRuntime, fromPath, toPath strin
 	runtime.runtimeCtx.ActiveStates = []string{finalPath}
 
 	// Execute entry actions for new state (errors don't block transition)
-	_ = e.executeEntryActions(runtime, finalPath, ev)
+	queuedAutoTrans, _ := e.executeEntryActions(runtime, finalPath, ev)
 
 	// Check if we entered a parallel state and initialize it
 	targetNode := e.findNode(runtime.definition.Root, finalPath)
 	if targetNode != nil && targetNode.NodeType() == NodeTypeParallel {
 		runtime.enterParallelState(finalPath)
+	}
+
+	// If auto-transition was queued, start async processing
+	if queuedAutoTrans {
+		go e.processEventQueue(runtime)
 	}
 
 	return nil
@@ -431,23 +447,33 @@ func (e *Engine) resolveTargetState(runtime *ChartRuntime, targetPath string) st
 }
 
 // executeEntryActions runs all entry actions for a state.
-func (e *Engine) executeEntryActions(runtime *ChartRuntime, statePath string, ev Event) error {
+// Returns true if an auto-transition was queued.
+func (e *Engine) executeEntryActions(runtime *ChartRuntime, statePath string, ev Event) (bool, error) {
 	node := e.findNode(runtime.definition.Root, statePath)
 	if node == nil {
-		return nil
+		return false, nil
 	}
 
 	for _, actionName := range node.EntryActions {
 		action, exists := runtime.actions[actionName]
 		if !exists {
-			return fmt.Errorf("%w: %s", ErrActionNotFound, actionName)
+			return false, fmt.Errorf("%w: %s", ErrActionNotFound, actionName)
 		}
 		if err := action(runtime.runtimeCtx, runtime.appCtx, ev); err != nil {
-			return err
+			return false, err
 		}
 	}
 
-	return nil
+	// Check for auto-transition and emit synthetic event
+	if hasAutoTransition(node) {
+		runtime.eventQueue = append(runtime.eventQueue, Event{
+			Type:   SyntheticAutoTransition,
+			Source: "system:auto",
+		})
+		return true, nil
+	}
+
+	return false, nil
 }
 
 // executeExitActions runs all exit actions for a state.
@@ -518,6 +544,16 @@ func splitPath(path string) []string {
 		parts = append(parts, current)
 	}
 	return parts
+}
+
+// hasAutoTransition checks if a node has an auto-transition.
+func hasAutoTransition(node *Node) bool {
+	for _, trans := range node.Transitions {
+		if trans.Event == SyntheticAutoTransition {
+			return true
+		}
+	}
+	return false
 }
 
 // RegisterAction registers a named action function.

@@ -75,7 +75,7 @@ func (sm *StateMachine) executeTransition(fromPath, toPath string, ev Event, tra
 	for _, actionName := range transitionActions {
 		action, exists := sm.actions[actionName]
 		if !exists {
-			continue
+			continue // TODO log this bad boy
 		}
 		_ = action(sm.runtimeCtx, sm.appCtx, ev)
 	}

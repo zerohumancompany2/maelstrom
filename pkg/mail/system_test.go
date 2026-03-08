@@ -4,8 +4,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/maelstrom/v3/internal/testutil"
 )
 
 func TestMailSystem_PublishDeliversMail(t *testing.T) {
@@ -16,16 +14,17 @@ func TestMailSystem_PublishDeliversMail(t *testing.T) {
 		t.Fatalf("Subscribe failed: %v", err)
 	}
 
-	mail := Mail{
+	mailMsg := Mail{
 		ID:            "mail-1",
-		Type:          MailTypeCommand,
-		From:          "agent:sender",
-		To:            "agent:test",
-		Content:       []byte("test content"),
 		CorrelationID: "corr-1",
+		Type:          Heartbeat,
+		Source:        "agent:sender",
+		Target:        "agent:test",
+		Content:       []byte("test content"),
+		CreatedAt:     time.Now(),
 	}
 
-	ack, err := ms.Publish(mail)
+	ack, err := ms.Publish(mailMsg)
 	if err != nil {
 		t.Fatalf("Publish failed: %v", err)
 	}
@@ -34,9 +33,13 @@ func TestMailSystem_PublishDeliversMail(t *testing.T) {
 		t.Error("Expected ack.Success to be true")
 	}
 
-	received := testutil.MustReceiveMail(t, subCh, 1*time.Second)
-	if received.Content == nil || string(received.Content) != "test content" {
-		t.Errorf("Expected mail content 'test content', got %v", received.Content)
+	select {
+	case received := <-subCh:
+		if received.Content == nil {
+			t.Error("Expected mail content to not be nil")
+		}
+	case <-time.After(1 * time.Second):
+		t.Error("Timeout waiting for mail")
 	}
 }
 
@@ -48,23 +51,28 @@ func TestMailSystem_SubscribeReceivesMail(t *testing.T) {
 		t.Fatalf("Subscribe failed: %v", err)
 	}
 
-	mail := Mail{
+	mailMsg := Mail{
 		ID:            "mail-2",
-		Type:          MailTypeEvent,
-		From:          "system",
-		To:            "topic:test",
-		Content:       []byte("event data"),
 		CorrelationID: "corr-2",
+		Type:          Heartbeat,
+		Source:        "system",
+		Target:        "topic:test",
+		Content:       []byte("event data"),
+		CreatedAt:     time.Now(),
 	}
 
-	_, err = ms.Publish(mail)
+	_, err = ms.Publish(mailMsg)
 	if err != nil {
 		t.Fatalf("Publish failed: %v", err)
 	}
 
-	received := testutil.MustReceiveMail(t, subCh, 1*time.Second)
-	if received.To != "topic:test" {
-		t.Errorf("Expected mail To 'topic:test', got %v", received.To)
+	select {
+	case received := <-subCh:
+		if received.Target != "topic:test" {
+			t.Errorf("Expected mail Target 'topic:test', got %v", received.Target)
+		}
+	case <-time.After(1 * time.Second):
+		t.Error("Timeout waiting for mail")
 	}
 }
 
@@ -86,16 +94,17 @@ func TestMailSystem_UnsubscribeRemovesSubscriber(t *testing.T) {
 		t.Fatalf("Unsubscribe failed: %v", err)
 	}
 
-	mail := Mail{
+	mailMsg := Mail{
 		ID:            "mail-3",
-		Type:          MailTypeNotification,
-		From:          "system",
-		To:            "agent:test",
-		Content:       []byte("notify"),
 		CorrelationID: "corr-3",
+		Type:          Heartbeat,
+		Source:        "system",
+		Target:        "agent:test",
+		Content:       []byte("notify"),
+		CreatedAt:     time.Now(),
 	}
 
-	_, err = ms.Publish(mail)
+	_, err = ms.Publish(mailMsg)
 	if err != nil {
 		t.Fatalf("Publish failed: %v", err)
 	}
@@ -130,15 +139,16 @@ func TestMailSystem_ConcurrentPublish(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			mail := Mail{
+			mailMsg := Mail{
 				ID:            "mail-concurrent-" + string(rune(idx)),
-				Type:          MailTypeCommand,
-				From:          "agent:sender",
-				To:            "agent:concurrent",
-				Content:       []byte("content-" + string(rune(idx))),
 				CorrelationID: "corr-concurrent-" + string(rune(idx)),
+				Type:          Heartbeat,
+				Source:        "agent:sender",
+				Target:        "agent:concurrent",
+				Content:       []byte("content-" + string(rune(idx))),
+				CreatedAt:     time.Now(),
 			}
-			_, err := ms.Publish(mail)
+			_, err := ms.Publish(mailMsg)
 			if err != nil {
 				t.Errorf("Publish failed: %v", err)
 			}

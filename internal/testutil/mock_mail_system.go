@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"github.com/maelstrom/v3/pkg/mail"
 	"sync"
 	"time"
 )
@@ -8,76 +9,65 @@ import (
 // MockMailSystem provides a mock implementation of mail.System for testing.
 type MockMailSystem struct {
 	mu          sync.RWMutex
-	subscribers map[string][]chan Mail
-	published   []Mail
+	subscribers map[string][]chan mail.Mail
+	published   []mail.Mail
 	dedupCache  map[string]bool
-}
-
-// Mail is a simplified mail type for testing.
-type Mail struct {
-	ID            string
-	Type          string
-	From          string
-	To            string
-	Content       []byte
-	CorrelationID string
-	Timestamp     time.Time
 }
 
 // NewMockMailSystem creates a new mock mail system.
 func NewMockMailSystem() *MockMailSystem {
 	return &MockMailSystem{
-		subscribers: make(map[string][]chan Mail),
-		published:   make([]Mail, 0),
+		subscribers: make(map[string][]chan mail.Mail),
+		published:   make([]mail.Mail, 0),
 		dedupCache:  make(map[string]bool),
 	}
 }
 
 // Publish simulates publishing mail.
-func (m *MockMailSystem) Publish(mail Mail) (Ack, error) {
+func (m *MockMailSystem) Publish(mailMsg mail.Mail) (mail.Ack, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	// Check for duplicates
-	if m.dedupCache[mail.CorrelationID] {
-		return Ack{}, ErrDuplicateMail
+	if m.dedupCache[mailMsg.CorrelationID] {
+		return mail.Ack{}, ErrDuplicateMail
 	}
-	m.dedupCache[mail.CorrelationID] = true
+	m.dedupCache[mailMsg.CorrelationID] = true
 
-	m.published = append(m.published, mail)
+	m.published = append(m.published, mailMsg)
 
 	// Deliver to subscribers
 	for address, channels := range m.subscribers {
-		if address == mail.To || address == "*" {
+		if address == mailMsg.Target || address == "*" {
 			for _, ch := range channels {
 				select {
-				case ch <- mail:
+				case ch <- mailMsg:
 				default:
 				}
 			}
 		}
 	}
 
-	return Ack{
-		MailID:        mail.ID,
-		CorrelationID: mail.CorrelationID,
+	return mail.Ack{
+		MailID:        mailMsg.ID,
+		CorrelationID: mailMsg.CorrelationID,
 		DeliveredAt:   time.Now(),
 		Success:       true,
 	}, nil
 }
 
 // Subscribe simulates subscribing to an address.
-func (m *MockMailSystem) Subscribe(address string) (<-chan Mail, error) {
+func (m *MockMailSystem) Subscribe(address string) (<-chan mail.Mail, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	ch := make(chan Mail, 100)
+	ch := make(chan mail.Mail, 100)
 	m.subscribers[address] = append(m.subscribers[address], ch)
 	return ch, nil
 }
 
 // Unsubscribe simulates unsubscribing from an address.
-func (m *MockMailSystem) Unsubscribe(address string, ch <-chan Mail) error {
+func (m *MockMailSystem) Unsubscribe(address string, ch <-chan mail.Mail) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -100,20 +90,12 @@ func (m *MockMailSystem) PublishedCount() int {
 }
 
 // GetPublished returns all published mails.
-func (m *MockMailSystem) GetPublished() []Mail {
+func (m *MockMailSystem) GetPublished() []mail.Mail {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	result := make([]Mail, len(m.published))
+	result := make([]mail.Mail, len(m.published))
 	copy(result, m.published)
 	return result
-}
-
-// Ack represents an acknowledgment.
-type Ack struct {
-	MailID        string
-	CorrelationID string
-	DeliveredAt   time.Time
-	Success       bool
 }
 
 // ErrDuplicateMail is returned when a mail with the same correlationId is published.

@@ -1,6 +1,7 @@
 package datasource
 
 import (
+	"github.com/maelstrom/v3/pkg/security"
 	"os"
 	"path/filepath"
 )
@@ -40,7 +41,7 @@ func (d *localDisk) GetTaints(path string) ([]string, error) {
 	return []string{}, nil
 }
 
-func (d *localDisk) ValidateAccess(boundary BoundaryType) error {
+func (d *localDisk) ValidateAccess(boundary security.BoundaryType) error {
 	return nil
 }
 
