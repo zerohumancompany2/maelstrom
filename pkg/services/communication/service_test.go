@@ -3,6 +3,7 @@ package communication
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -682,5 +683,37 @@ func TestCommunicationService_DeduplicationExpiry(t *testing.T) {
 	isDup2 := svc.isDuplicate(correlationID2)
 	if isDup2 {
 		t.Error("Old correlationID should be expired")
+	}
+}
+
+func TestCommunicationService_DeduplicationConcurrent(t *testing.T) {
+	svc := NewCommunicationService()
+
+	numGoroutines := 100
+	correlationID := "concurrent-test-789"
+	var wg sync.WaitGroup
+	duplicateCount := 0
+	var countMu sync.Mutex
+
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			isDup := svc.markAsSeen(correlationID)
+			if isDup {
+				countMu.Lock()
+				duplicateCount++
+				countMu.Unlock()
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	if duplicateCount == 0 {
+		t.Error("Expected at least one duplicate detected in concurrent scenario")
+	}
+	if duplicateCount >= numGoroutines {
+		t.Errorf("Expected fewer than %d duplicates, got %d", numGoroutines, duplicateCount)
 	}
 }

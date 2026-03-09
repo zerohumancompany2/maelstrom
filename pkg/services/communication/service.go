@@ -200,9 +200,23 @@ func (c *CommunicationService) sendToDeadLetter(mail *mail.Mail, reason string) 
 }
 
 func (c *CommunicationService) isDuplicate(correlationID string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	_, exists := c.seenCorrelations[correlationID]
+	return exists
+}
+
+func (c *CommunicationService) markAsSeen(correlationID string) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.seenCorrelations[correlationID]
+	if c.seenCorrelations[correlationID] {
+		return true
+	}
+	c.seenCorrelations[correlationID] = true
+	if _, exists := c.correlationTimestamps[correlationID]; !exists {
+		c.correlationTimestamps[correlationID] = time.Now()
+	}
+	return false
 }
 
 func (c *CommunicationService) isWithinDeduplicationWindow(correlationID string, window time.Duration) bool {
