@@ -17,6 +17,8 @@ type Sequence struct {
 	onComplete    func()
 	statesEntered []string
 	statesMu      sync.RWMutex
+	eventsHandled []string
+	eventsMu      sync.RWMutex
 }
 
 // NewSequence creates a new bootstrap sequence starting at "initializing".
@@ -69,6 +71,11 @@ func (s *Sequence) HandleEvent(ctx context.Context, event string) error {
 	s.mu.RUnlock()
 
 	log.Printf("[bootstrap] Received event: %s in state: %s", event, current)
+
+	// Track event
+	s.eventsMu.Lock()
+	s.eventsHandled = append(s.eventsHandled, event)
+	s.eventsMu.Unlock()
 
 	// State machine transitions
 	transitions := map[string]map[string]string{
@@ -145,5 +152,14 @@ func (s *Sequence) GetStatesEntered() []string {
 	defer s.statesMu.RUnlock()
 	result := make([]string, len(s.statesEntered))
 	copy(result, s.statesEntered)
+	return result
+}
+
+// GetEventsHandled returns a copy of all events handled during bootstrap.
+func (s *Sequence) GetEventsHandled() []string {
+	s.eventsMu.RLock()
+	defer s.eventsMu.RUnlock()
+	result := make([]string, len(s.eventsHandled))
+	copy(result, s.eventsHandled)
 	return result
 }

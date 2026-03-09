@@ -449,3 +449,60 @@ func TestKernel_ServicesLoadInOrder(t *testing.T) {
 		}
 	}
 }
+
+func TestKernel_AllServicesEmitReadyEvents(t *testing.T) {
+	kernel := New()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Start kernel
+	done := make(chan error)
+	go func() {
+		done <- kernel.Start(ctx)
+	}()
+
+	// Wait for events to be handled by polling
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case <-timeout:
+			// Check events even if timeout
+		case <-done:
+			// Bootstrap complete
+		default:
+		}
+
+		seq := kernel.GetSequence()
+		if seq != nil {
+			events := seq.GetEventsHandled()
+			if len(events) >= 4 {
+				break
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Get events from sequence
+	seq := kernel.GetSequence()
+	if seq == nil {
+		t.Fatal("sequence should not be nil")
+	}
+
+	events := seq.GetEventsHandled()
+	expected := []string{"SECURITY_READY", "COMMUNICATION_READY", "OBSERVABILITY_READY", "LIFECYCLE_READY"}
+
+	if len(events) < len(expected) {
+		t.Errorf("expected at least %d events, got %d: %v", len(expected), len(events), events)
+	}
+
+	for i, expectedEvent := range expected {
+		if i >= len(events) {
+			t.Errorf("missing event at index %d: expected %q", i, expectedEvent)
+			continue
+		}
+		if events[i] != expectedEvent {
+			t.Errorf("event[%d]: expected %q, got %q", i, expectedEvent, events[i])
+		}
+	}
+}
