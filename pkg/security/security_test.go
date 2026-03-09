@@ -492,3 +492,72 @@ func TestTaintEngine_PropagateTaint_MapMerge(t *testing.T) {
 		}
 	}
 }
+
+func TestTaintEngine_PropagateTaint_NestedMap(t *testing.T) {
+	engine := NewTaintEngine()
+
+	nested := map[string]interface{}{
+		"_taints": []string{"PII"},
+		"level1": map[string]interface{}{
+			"_taints": []string{"PII"},
+			"level2": map[string]interface{}{
+				"_taints": []string{"PII"},
+				"data":    "secret",
+			},
+		},
+	}
+
+	result, err := engine.Propagate(nested, []string{"SECRET"})
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected map[string]interface{}, got %T", result)
+	}
+
+	rootTaints, ok := resultMap["_taints"].([]string)
+	if !ok {
+		t.Fatalf("Expected root _taints to be []string, got %T", resultMap["_taints"])
+	}
+
+	if len(rootTaints) != 2 {
+		t.Errorf("Expected root to have 2 taints, got %d", len(rootTaints))
+	}
+
+	level1, ok := resultMap["level1"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected level1 to be map[string]interface{}, got %T", resultMap["level1"])
+	}
+
+	level1Taints, ok := level1["_taints"].([]string)
+	if !ok {
+		t.Fatalf("Expected level1 _taints to be []string, got %T", level1["_taints"])
+	}
+
+	if len(level1Taints) != 2 {
+		t.Errorf("Expected level1 to have 2 taints, got %d", len(level1Taints))
+	}
+
+	level2, ok := level1["level2"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected level2 to be map[string]interface{}, got %T", level1["level2"])
+	}
+
+	level2Taints, ok := level2["_taints"].([]string)
+	if !ok {
+		t.Fatalf("Expected level2 _taints to be []string, got %T", level2["_taints"])
+	}
+
+	if len(level2Taints) != 2 {
+		t.Errorf("Expected level2 to have 2 taints, got %d", len(level2Taints))
+	}
+
+	expectedTaints := map[string]bool{"PII": true, "SECRET": true}
+	for _, taint := range rootTaints {
+		if !expectedTaints[taint] {
+			t.Errorf("Unexpected root taint %q", taint)
+		}
+	}
+}

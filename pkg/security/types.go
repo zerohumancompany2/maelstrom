@@ -220,7 +220,16 @@ func (e *taintEngineImpl) propagateTaintToMap(m map[string]interface{}, newTaint
 			result[k] = merged
 			continue
 		}
-		result[k] = val
+		switch v := val.(type) {
+		case map[string]interface{}:
+			nested, err := e.propagateTaintToMap(v, newTaints)
+			if err != nil {
+				return nil, err
+			}
+			result[k] = nested
+		default:
+			result[k] = val
+		}
 	}
 
 	return result, nil
