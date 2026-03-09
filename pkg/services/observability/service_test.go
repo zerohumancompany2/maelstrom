@@ -2,6 +2,8 @@ package observability
 
 import (
 	"testing"
+
+	"github.com/maelstrom/v3/pkg/mail"
 )
 
 func TestObservabilityService_NewObservabilityServiceReturnsNonNil(t *testing.T) {
@@ -19,6 +21,16 @@ func TestObservabilityService_IDReturnsCorrectString(t *testing.T) {
 
 	if id != "sys:observability" {
 		t.Errorf("Expected ID sys:observability, got %s", id)
+	}
+}
+
+func TestObservabilityService_HandleMailReturnsNil(t *testing.T) {
+	svc := NewObservabilityService()
+
+	err := svc.HandleMail(mail.Mail{})
+
+	if err != nil {
+		t.Errorf("Expected HandleMail to return nil, got %v", err)
 	}
 }
 
