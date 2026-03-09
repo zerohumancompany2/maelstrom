@@ -38,22 +38,47 @@ func TestKernel_StartsBootstrapAndWaits(t *testing.T) {
 	}
 }
 
-// TestKernel_BootstrapCompletes verifies full bootstrap sequence.
+func waitForBootstrapComplete(t *testing.T, kernel *Kernel, timeout time.Duration) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	done := make(chan bool)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			if kernel.IsBootstrapComplete() {
+				done <- true
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-ctx.Done():
+		t.Fatal("Bootstrap did not complete within timeout")
+	}
+}
+
+// TestKernel_BootstrapCompletes verifies full bootstrap sequence with channel-based waiting.
 func TestKernel_BootstrapCompletes(t *testing.T) {
 	kernel := New()
 
-	// Use a longer timeout to allow bootstrap to complete
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	// Start kernel
 	done := make(chan error)
 	go func() {
 		done <- kernel.Start(ctx)
 	}()
 
-	// Wait for bootstrap to complete (need more time for async events)
-	time.Sleep(800 * time.Millisecond)
+	waitForBootstrapComplete(t, kernel, 2*time.Second)
 
 	if !kernel.IsBootstrapComplete() {
 		t.Error("bootstrap should be complete")
@@ -63,7 +88,6 @@ func TestKernel_BootstrapCompletes(t *testing.T) {
 
 	select {
 	case <-done:
-		// OK
 	case <-time.After(1 * time.Second):
 		t.Fatal("timeout waiting for kernel")
 	}
