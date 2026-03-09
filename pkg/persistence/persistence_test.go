@@ -23,7 +23,34 @@ func TestPersistence_RefusesBoundaryViolation(t *testing.T) {
 }
 
 func TestPersistence_EnforcesTaintPolicy(t *testing.T) {
-	panic("not implemented")
+	p := &Persistence{
+		taintPolicy: &security.TaintPolicy{
+			RedactMode: "strict",
+		},
+		dataSource: nil,
+	}
+
+	tests := []struct {
+		name     string
+		taints   []string
+		boundary security.BoundaryType
+		wantErr  bool
+	}{
+		{"INNER_ONLY on outer", []string{"INNER_ONLY"}, security.OuterBoundary, true},
+		{"SECRET on DMZ", []string{"SECRET"}, security.DMZBoundary, true},
+		{"PII on outer", []string{"PII"}, security.OuterBoundary, true},
+		{"USER_SUPPLIED on outer", []string{"USER_SUPPLIED"}, security.OuterBoundary, false},
+		{"TOOL_OUTPUT on DMZ", []string{"TOOL_OUTPUT"}, security.DMZBoundary, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := p.ValidateTaintPolicy(tt.taints, tt.boundary)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateTaintPolicy() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }
 
 func TestPersistence_AllowsCompliantWrites(t *testing.T) {
