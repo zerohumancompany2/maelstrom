@@ -1,15 +1,9 @@
 package humangateway
 
+import "github.com/maelstrom/v3/pkg/mail"
+
 // SessionID represents a unique chat session identifier
 type SessionID string
-
-// StreamChunk represents a chunk of streamed response data
-type StreamChunk struct {
-	Data     string
-	Sequence int
-	IsFinal  bool
-	Taints   []string
-}
 
 // ChatSession represents a chat session with an agent
 type ChatSession struct {
@@ -18,3 +12,6 @@ type ChatSession struct {
 	Messages  []string
 	Active    bool
 }
+
+// StreamChunk is an alias for mail.StreamChunk
+type StreamChunk = mail.StreamChunk
