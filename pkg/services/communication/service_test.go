@@ -639,3 +639,23 @@ func TestCommunicationService_Deduplication(t *testing.T) {
 	_, _ = svc.Publish(m1)
 	_, _ = svc.Publish(m2)
 }
+
+func TestCommunicationService_DeduplicationWindow(t *testing.T) {
+	svc := NewCommunicationService()
+
+	correlationID := "window-test-456"
+	window := 5 * time.Second
+
+	svc.trackDeliveryAttempt(correlationID)
+
+	withinWindow := svc.isWithinDeduplicationWindow(correlationID, window)
+	if !withinWindow {
+		t.Error("Message should be within deduplication window")
+	}
+
+	time.Sleep(100 * time.Millisecond)
+	withinWindow = svc.isWithinDeduplicationWindow(correlationID, window)
+	if !withinWindow {
+		t.Error("Message should still be within deduplication window")
+	}
+}

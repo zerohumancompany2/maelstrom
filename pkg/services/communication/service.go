@@ -16,27 +16,29 @@ type pendingReply struct {
 }
 
 type CommunicationService struct {
-	id               string
-	router           *mail.MailRouter
-	publisher        mail.Publisher
-	subscribers      map[string][]chan mail.Mail
-	deliveryAttempts map[string]int
-	pendingReplies   map[string]pendingReply
-	seenCorrelations map[string]bool
-	observability    *observability.ObservabilityService
-	mu               sync.RWMutex
+	id                    string
+	router                *mail.MailRouter
+	publisher             mail.Publisher
+	subscribers           map[string][]chan mail.Mail
+	deliveryAttempts      map[string]int
+	pendingReplies        map[string]pendingReply
+	seenCorrelations      map[string]bool
+	correlationTimestamps map[string]time.Time
+	observability         *observability.ObservabilityService
+	mu                    sync.RWMutex
 }
 
 func NewCommunicationService() *CommunicationService {
 	router := mail.NewMailRouter()
 	return &CommunicationService{
-		id:               "sys:communication",
-		router:           router,
-		publisher:        mail.NewRouterPublisher(router),
-		subscribers:      make(map[string][]chan mail.Mail),
-		deliveryAttempts: make(map[string]int),
-		pendingReplies:   make(map[string]pendingReply),
-		seenCorrelations: make(map[string]bool),
+		id:                    "sys:communication",
+		router:                router,
+		publisher:             mail.NewRouterPublisher(router),
+		subscribers:           make(map[string][]chan mail.Mail),
+		deliveryAttempts:      make(map[string]int),
+		pendingReplies:        make(map[string]pendingReply),
+		seenCorrelations:      make(map[string]bool),
+		correlationTimestamps: make(map[string]time.Time),
 	}
 }
 
@@ -163,6 +165,9 @@ func (c *CommunicationService) trackDeliveryAttempt(correlationID string) {
 	defer c.mu.Unlock()
 	c.deliveryAttempts[correlationID]++
 	c.seenCorrelations[correlationID] = true
+	if _, exists := c.correlationTimestamps[correlationID]; !exists {
+		c.correlationTimestamps[correlationID] = time.Now()
+	}
 }
 
 func (c *CommunicationService) Request(replyChan chan *mail.Mail, timeout time.Duration) (*mail.Mail, error) {
@@ -198,4 +203,14 @@ func (c *CommunicationService) isDuplicate(correlationID string) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.seenCorrelations[correlationID]
+}
+
+func (c *CommunicationService) isWithinDeduplicationWindow(correlationID string, window time.Duration) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	timestamp, exists := c.correlationTimestamps[correlationID]
+	if !exists {
+		return false
+	}
+	return time.Since(timestamp) < window
 }
