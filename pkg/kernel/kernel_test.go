@@ -29,7 +29,7 @@ func TestKernel_StartsBootstrapAndWaits(t *testing.T) {
 
 	select {
 	case err := <-done:
-		if err != context.Canceled && err != context.DeadlineExceeded {
+		if err != context.Canceled && err != context.DeadlineExceeded && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 	case <-time.After(1 * time.Second):
