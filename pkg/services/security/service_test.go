@@ -2,6 +2,8 @@ package security
 
 import (
 	"testing"
+
+	"github.com/maelstrom/v3/pkg/mail"
 )
 
 func TestSecurityService_NewSecurityServiceReturnsNonNil(t *testing.T) {
@@ -19,6 +21,16 @@ func TestSecurityService_IDReturnsCorrectString(t *testing.T) {
 
 	if id != "sys:security" {
 		t.Errorf("Expected ID sys:security, got %s", id)
+	}
+}
+
+func TestSecurityService_HandleMailReturnsNil(t *testing.T) {
+	svc := NewSecurityService()
+
+	err := svc.HandleMail(mail.Mail{})
+
+	if err != nil {
+		t.Errorf("Expected HandleMail to return nil, got %v", err)
 	}
 }
 
