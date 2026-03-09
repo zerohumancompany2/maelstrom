@@ -98,6 +98,43 @@ func TestLifecycleService_ListEmptyWhenNoRuntimes(t *testing.T) {
 	}
 }
 
+func TestLifecycleService_SpawnTracksRuntime(t *testing.T) {
+	engine := statechart.NewEngine()
+	svc := NewLifecycleService(engine)
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+	}
+
+	rtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	list, err := svc.List()
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+
+	if len(list) != 1 {
+		t.Errorf("Expected 1 runtime in list, got %d", len(list))
+	}
+
+	if list[0].ID != string(rtID) {
+		t.Errorf("Expected runtime ID %s, got %s", rtID, list[0].ID)
+	}
+
+	if list[0].DefinitionID != "test-chart" {
+		t.Errorf("Expected DefinitionID test-chart, got %s", list[0].DefinitionID)
+	}
+
+	if list[0].Boundary != mail.InnerBoundary {
+		t.Errorf("Expected Boundary inner, got %v", list[0].Boundary)
+	}
+}
+
 func TestLifecycleService_StartReturnsNil(t *testing.T) {
 	svc := NewLifecycleServiceWithoutEngine()
 

@@ -39,7 +39,26 @@ func (l *LifecycleService) HandleMail(mail mail.Mail) error {
 }
 
 func (l *LifecycleService) Spawn(def statechart.ChartDefinition) (statechart.RuntimeID, error) {
-	return statechart.RuntimeID("fake-runtime-id"), nil
+	if l.engine == nil {
+		return statechart.RuntimeID("fake-runtime-id"), nil
+	}
+
+	id, err := l.engine.Spawn(def, nil)
+	if err != nil {
+		return "", err
+	}
+
+	l.mu.Lock()
+	l.runtimes[id] = RuntimeInfo{
+		ID:           string(id),
+		DefinitionID: def.ID,
+		Boundary:     mail.InnerBoundary,
+		ActiveStates: []string{def.InitialState},
+		IsRunning:    false,
+	}
+	l.mu.Unlock()
+
+	return id, nil
 }
 
 func (l *LifecycleService) Stop(id statechart.RuntimeID) error {
