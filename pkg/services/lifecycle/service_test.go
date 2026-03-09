@@ -100,7 +100,10 @@ func TestLifecycleService_SpawnChart(t *testing.T) {
 }
 
 func TestLifecycleService_BoundaryInner(t *testing.T) {
-	// Placeholder for future implementation
+	svc := NewLifecycleService()
+	if svc.Boundary() != mail.InnerBoundary {
+		t.Errorf("Expected boundary 'inner', got: %v", svc.Boundary())
+	}
 }
 
 func TestLifecycleService_ID(t *testing.T) {

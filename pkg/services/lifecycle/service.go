@@ -19,6 +19,10 @@ func (l *LifecycleService) ID() string {
 	return "sys:lifecycle"
 }
 
+func (l *LifecycleService) Boundary() mail.BoundaryType {
+	return mail.InnerBoundary
+}
+
 func (l *LifecycleService) HandleMail(mail mail.Mail) error {
 	return nil
 }
