@@ -1,6 +1,8 @@
 package admin
 
 import (
+	"fmt"
+
 	"github.com/maelstrom/v3/pkg/security"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
@@ -47,5 +49,8 @@ func (s *adminService) InjectEvent(agentId string, event statechart.Event) error
 }
 
 func (s *adminService) ExecuteCommand(cmd string, token string) error {
+	if token == "" {
+		return fmt.Errorf("2FA token required")
+	}
 	return nil
 }

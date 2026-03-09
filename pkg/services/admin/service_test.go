@@ -92,3 +92,12 @@ func TestAdminService_AdminCommand(t *testing.T) {
 		t.Errorf("Expected nil error for valid command, got %v", err)
 	}
 }
+
+func TestAdminService_2FAGate(t *testing.T) {
+	svc := NewAdminService()
+
+	err := svc.ExecuteCommand("test-command", "")
+	if err == nil {
+		t.Error("Expected error for empty token")
+	}
+}
