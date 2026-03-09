@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"fmt"
 	"testing"
 )
 
@@ -142,4 +143,30 @@ type MockKernel struct {
 func (m *MockKernel) RegisterService(name string, service interface{}) error {
 	m.services[name] = service
 	return nil
+}
+
+// TestErrorPath_TriggersFailedState verifies error path triggers failed state.
+func TestErrorPath_TriggersFailedState(t *testing.T) {
+	kernel := &MockKernel{
+		services: make(map[string]interface{}),
+	}
+	seq := NewSequenceWithKernel(kernel)
+
+	var enteredStates []string
+	seq.OnStateEnter(func(state string) error {
+		enteredStates = append(enteredStates, state)
+		if state == "security" {
+			return fmt.Errorf("security bootstrap failed")
+		}
+		return nil
+	})
+
+	ctx := context.Background()
+	if err := seq.Start(ctx); err == nil {
+		t.Fatal("expected error during state entry")
+	}
+
+	if len(enteredStates) != 1 || enteredStates[0] != "security" {
+		t.Errorf("expected [security], got %v", enteredStates)
+	}
 }
