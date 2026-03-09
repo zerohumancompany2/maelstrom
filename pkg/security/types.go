@@ -199,20 +199,23 @@ func (e *taintEngineImpl) Propagate(obj any, newTaints []string) (any, error) {
 func (e *taintEngineImpl) propagateTaintToMap(m map[string]interface{}, newTaints []string) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
 
-	existingTaints := make(map[string]bool)
+	seen := make(map[string]bool)
+	merged := make([]string, 0)
+
 	if existing, ok := m["_taints"].([]string); ok {
 		for _, t := range existing {
-			existingTaints[t] = true
+			if !seen[t] {
+				seen[t] = true
+				merged = append(merged, t)
+			}
 		}
 	}
 
 	for _, t := range newTaints {
-		existingTaints[t] = true
-	}
-
-	merged := make([]string, 0, len(existingTaints))
-	for t := range existingTaints {
-		merged = append(merged, t)
+		if !seen[t] {
+			seen[t] = true
+			merged = append(merged, t)
+		}
 	}
 
 	for k, val := range m {

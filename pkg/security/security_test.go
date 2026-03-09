@@ -647,3 +647,38 @@ func TestTaintEngine_PropagateTaint_Slice(t *testing.T) {
 		}
 	}
 }
+
+func TestTaintEngine_PropagateTaint_Deduplication(t *testing.T) {
+	engine := NewTaintEngine()
+
+	data := map[string]interface{}{
+		"_taints": []string{"TOOL_OUTPUT", "PII", "SECRET"},
+		"key":     "value",
+	}
+
+	result, err := engine.Propagate(data, []string{"SECRET", "PII", "WORKSPACE"})
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected map[string]interface{}, got %T", result)
+	}
+
+	taints, ok := resultMap["_taints"].([]string)
+	if !ok {
+		t.Fatalf("Expected _taints key with []string value, got %T", resultMap["_taints"])
+	}
+
+	if len(taints) != 4 {
+		t.Fatalf("Expected 4 taints (no duplicates), got %d: %v", len(taints), taints)
+	}
+
+	expectedTaints := []string{"TOOL_OUTPUT", "PII", "SECRET", "WORKSPACE"}
+	for i, expectedTaint := range expectedTaints {
+		if taints[i] != expectedTaint {
+			t.Errorf("Expected taint at index %d to be %q, got %q (order must preserve first occurrence)", i, expectedTaint, taints[i])
+		}
+	}
+}
