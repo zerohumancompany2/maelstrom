@@ -67,3 +67,41 @@ func TestMail_StreamChunkMigrationComplete(t *testing.T) {
 		t.Error("MailMetadata.StreamChunk should be *StreamChunk type")
 	}
 }
+
+func TestMailMetadata_TypeAlignment(t *testing.T) {
+	metadata := MailMetadata{
+		Tokens:      100,
+		Model:       "gpt-4",
+		Cost:        0.05,
+		Boundary:    InnerBoundary,
+		Taints:      []string{"TEST"},
+		Stream:      true,
+		StreamChunk: &StreamChunk{Data: "chunk", Sequence: 1},
+		IsFinal:     false,
+	}
+
+	if metadata.Tokens != 100 {
+		t.Error("Tokens field mismatch")
+	}
+	if metadata.Model != "gpt-4" {
+		t.Error("Model field mismatch")
+	}
+	if metadata.Cost != 0.05 {
+		t.Error("Cost field mismatch")
+	}
+	if metadata.Boundary != InnerBoundary {
+		t.Error("Boundary field mismatch")
+	}
+	if len(metadata.Taints) != 1 {
+		t.Error("Taints field mismatch")
+	}
+	if !metadata.Stream {
+		t.Error("Stream field mismatch")
+	}
+	if metadata.StreamChunk.Data != "chunk" {
+		t.Error("StreamChunk field mismatch")
+	}
+	if metadata.IsFinal {
+		t.Error("IsFinal field mismatch")
+	}
+}
