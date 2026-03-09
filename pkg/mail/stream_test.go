@@ -64,3 +64,46 @@ func TestStreamChunkFormat(t *testing.T) {
 		t.Errorf("Expected Sequence 2, got %d", finalChunk.Sequence)
 	}
 }
+
+func TestTaintStripping(t *testing.T) {
+	chunk := StreamChunk{
+		Data:   "test data",
+		Taints: []string{"USER_SUPPLIED", "TOOL_OUTPUT", "INNER_BOUNDARY"},
+	}
+
+	// Test with allowed taints
+	allowed := []string{"USER_SUPPLIED", "TOOL_OUTPUT"}
+	stripped := StripForbiddenTaints(chunk, allowed)
+
+	if len(stripped.Taints) != 2 {
+		t.Errorf("Expected 2 taints, got %d", len(stripped.Taints))
+	}
+
+	// Verify correct taints preserved
+	hasUserSupplied := false
+	hasToolOutput := false
+	for _, t := range stripped.Taints {
+		if t == "USER_SUPPLIED" {
+			hasUserSupplied = true
+		}
+		if t == "TOOL_OUTPUT" {
+			hasToolOutput = true
+		}
+	}
+	if !hasUserSupplied {
+		t.Error("Expected USER_SUPPLIED to be preserved")
+	}
+	if !hasToolOutput {
+		t.Error("Expected TOOL_OUTPUT to be preserved")
+	}
+
+	// Test with empty allowed list (strip all)
+	chunk2 := StreamChunk{
+		Data:   "test data",
+		Taints: []string{"USER_SUPPLIED"},
+	}
+	stripped2 := StripForbiddenTaints(chunk2, []string{})
+	if len(stripped2.Taints) != 0 {
+		t.Errorf("Expected 0 taints with empty allowed list, got %d", len(stripped2.Taints))
+	}
+}

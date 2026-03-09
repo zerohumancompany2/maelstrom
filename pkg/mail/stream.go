@@ -44,5 +44,22 @@ func UpgradeToStream(sessionID string, lastEventID *string) (chan StreamChunk, e
 
 // StripForbiddenTaints removes taints not in the allowed list
 func StripForbiddenTaints(chunk StreamChunk, allowed []string) StreamChunk {
-	panic("not implemented")
+	if len(allowed) == 0 {
+		chunk.Taints = nil
+		return chunk
+	}
+
+	allowedMap := make(map[string]bool)
+	for _, a := range allowed {
+		allowedMap[a] = true
+	}
+
+	var filtered []string
+	for _, taint := range chunk.Taints {
+		if allowedMap[taint] {
+			filtered = append(filtered, taint)
+		}
+	}
+	chunk.Taints = filtered
+	return chunk
 }
