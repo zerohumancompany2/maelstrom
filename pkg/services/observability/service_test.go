@@ -280,3 +280,34 @@ func TestObservabilityService_QueryTracesByTimeRange(t *testing.T) {
 		t.Errorf("Expected 2 traces in time range, got %d", len(traces))
 	}
 }
+
+func TestObservabilityService_LogDeadLetter(t *testing.T) {
+	svc := NewObservabilityService()
+
+	testMail := mail.Mail{
+		ID:     "mail-123",
+		Source: "test-source",
+		Target: "test-target",
+		Type:   mail.Error,
+	}
+
+	err := svc.LogDeadLetter(testMail, "max retries exceeded")
+
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	entries, err := svc.QueryDeadLetters()
+	if err != nil {
+		t.Errorf("Expected nil error from QueryDeadLetters, got %v", err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("Expected 1 dead letter entry, got %d", len(entries))
+	}
+	if entries[0].Reason != "max retries exceeded" {
+		t.Errorf("Expected reason 'max retries exceeded', got %s", entries[0].Reason)
+	}
+	if entries[0].Logged.IsZero() {
+		t.Error("Expected Logged timestamp to be set")
+	}
+}

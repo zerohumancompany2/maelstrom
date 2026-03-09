@@ -2,14 +2,16 @@ package observability
 
 import (
 	"sync"
+	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/services"
 )
 
 type ObservabilityService struct {
-	mu     sync.Mutex
-	traces []services.Trace
+	mu          sync.Mutex
+	traces      []services.Trace
+	deadLetters []DeadLetterEntry
 }
 
 func NewObservabilityService() *ObservabilityService {
@@ -63,4 +65,24 @@ func (o *ObservabilityService) Start() error {
 
 func (o *ObservabilityService) Stop() error {
 	return nil
+}
+
+func (o *ObservabilityService) LogDeadLetter(mail mail.Mail, reason string) error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	entry := DeadLetterEntry{
+		Mail:   mail,
+		Reason: reason,
+		Logged: time.Now(),
+	}
+	o.deadLetters = append(o.deadLetters, entry)
+	return nil
+}
+
+func (o *ObservabilityService) QueryDeadLetters() ([]DeadLetterEntry, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	result := make([]DeadLetterEntry, len(o.deadLetters))
+	copy(result, o.deadLetters)
+	return result, nil
 }
