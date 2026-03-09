@@ -58,5 +58,13 @@ func getForbiddenTaintsForBoundary(boundary BoundaryType) []string {
 }
 
 func (iv *IsolatedView) GetOperation() string {
-	return ""
+	return iv.Operation
+}
+
+func (iv *IsolatedView) IsReadOperation() bool {
+	return iv.Operation == "read" || iv.Operation == "list"
+}
+
+func (iv *IsolatedView) IsWriteOperation() bool {
+	return iv.Operation == "write"
 }

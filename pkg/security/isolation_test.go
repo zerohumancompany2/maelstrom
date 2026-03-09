@@ -62,3 +62,56 @@ func TestNamespaceIsolate_FilterData(t *testing.T) {
 		t.Error("TOOL_OUTPUT taint should remain on DMZ boundary")
 	}
 }
+
+func TestNamespaceIsolate_Operation(t *testing.T) {
+	t.Run("WriteOperation", func(t *testing.T) {
+		view, _ := NamespaceIsolate("agent-123", "write")
+
+		operation := view.GetOperation()
+		if operation != "write" {
+			t.Errorf("Expected operation 'write', got %s", operation)
+		}
+
+		if !view.IsWriteOperation() {
+			t.Error("Expected IsWriteOperation to return true for write operation")
+		}
+
+		if view.IsReadOperation() {
+			t.Error("Expected IsReadOperation to return false for write operation")
+		}
+	})
+
+	t.Run("ReadOperation", func(t *testing.T) {
+		view, _ := NamespaceIsolate("agent-123", "read")
+
+		operation := view.GetOperation()
+		if operation != "read" {
+			t.Errorf("Expected operation 'read', got %s", operation)
+		}
+
+		if view.IsWriteOperation() {
+			t.Error("Expected IsWriteOperation to return false for read operation")
+		}
+
+		if !view.IsReadOperation() {
+			t.Error("Expected IsReadOperation to return true for read operation")
+		}
+	})
+
+	t.Run("ListOperation", func(t *testing.T) {
+		view, _ := NamespaceIsolate("agent-123", "list")
+
+		operation := view.GetOperation()
+		if operation != "list" {
+			t.Errorf("Expected operation 'list', got %s", operation)
+		}
+
+		if view.IsWriteOperation() {
+			t.Error("Expected IsWriteOperation to return false for list operation")
+		}
+
+		if !view.IsReadOperation() {
+			t.Error("Expected IsReadOperation to return true for list operation")
+		}
+	})
+}
