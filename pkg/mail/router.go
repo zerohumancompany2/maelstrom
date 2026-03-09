@@ -36,6 +36,12 @@ func (r *MailRouter) Route(mail Mail) error {
 			return errors.New("agent not found: " + id)
 		}
 		return inbox.Push(mail)
+	case AddressTypeTopic:
+		topic, exists := r.topics[id]
+		if !exists {
+			return errors.New("topic not found: " + id)
+		}
+		return topic.Publish(mail)
 	default:
 		return errors.New("unknown address type")
 	}

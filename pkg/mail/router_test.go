@@ -52,3 +52,22 @@ func TestMailRouter_RouteToAgent(t *testing.T) {
 	}
 	agentInbox.mu.RUnlock()
 }
+
+func TestMailRouter_RouteToTopic(t *testing.T) {
+	router := NewMailRouter()
+
+	topic := &Topic{Name: "market-data"}
+	router.SubscribeTopic("market-data", topic)
+
+	mail := Mail{
+		ID:     "msg-002",
+		Source: "sys:data-service",
+		Target: "topic:market-data",
+		Type:   MailTypeAssistant,
+	}
+
+	err := router.Route(mail)
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+}
