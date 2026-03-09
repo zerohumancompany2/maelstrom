@@ -157,3 +157,42 @@ func TestGatewayService_RegisterHTTPEndpoint(t *testing.T) {
 		t.Errorf("Expected nil error, got %v", err)
 	}
 }
+
+func TestGatewayService_HTTPEndpointHandler(t *testing.T) {
+	gw := NewGatewayService()
+
+	called := false
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	})
+
+	err := gw.RegisterHTTPEndpoint("/test", handler)
+	if err != nil {
+		t.Fatalf("Expected nil error, got %v", err)
+	}
+
+	rr := &testResponseWriter{}
+	req := &http.Request{}
+
+	gw.ServeHTTP(rr, req)
+
+	if !called {
+		t.Error("Expected handler to be called")
+	}
+}
+
+type testResponseWriter struct {
+	code int
+}
+
+func (t *testResponseWriter) Header() http.Header {
+	return make(http.Header)
+}
+
+func (t *testResponseWriter) Write([]byte) (int, error) {
+	return 0, nil
+}
+
+func (t *testResponseWriter) WriteHeader(code int) {
+	t.code = code
+}

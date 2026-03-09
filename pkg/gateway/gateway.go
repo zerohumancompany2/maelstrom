@@ -69,3 +69,11 @@ func (g *GatewayService) RegisterHTTPEndpoint(path string, handler http.Handler)
 	g.endpoints[path] = handler
 	return nil
 }
+
+func (g *GatewayService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	for _, handler := range g.endpoints {
+		handler.ServeHTTP(w, r)
+	}
+}
