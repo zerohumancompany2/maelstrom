@@ -185,3 +185,27 @@ func TestContextBlockSource_ToolRegistryBoundaryFilter(t *testing.T) {
 		}
 	}
 }
+
+func TestContextBlockSource_UnknownSourceType(t *testing.T) {
+	// Given: A ContextBlock with source: unknownType (not static/session/memoryService/toolRegistry/runtime)
+	block := &ContextBlock{
+		Name:   "unknown-block",
+		Source: "unknownType",
+	}
+
+	// When: AssembleSource is called on the block
+	result, err := AssembleSource(block, nil, nil, nil)
+
+	// Then: Error is returned indicating unsupported source type
+	if err == nil {
+		t.Fatal("Expected error for unknown source type, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "unsupported source type") {
+		t.Errorf("Expected error to indicate unsupported source type, got: %v", err)
+	}
+
+	if result != nil {
+		t.Errorf("Expected nil result for unknown source type, got: %v", result)
+	}
+}
