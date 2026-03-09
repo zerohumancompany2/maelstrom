@@ -92,7 +92,27 @@ func TestObservabilityService_BootstrapChart(t *testing.T) {
 }
 
 func TestObservabilityService_EmitTrace(t *testing.T) {
-	// Placeholder for future implementation
+	svc := NewObservabilityService()
+	trace := services.Trace{
+		ID:        "test-trace-1",
+		RuntimeID: "test-runtime",
+		EventType: "transition",
+		StatePath: "root/child",
+	}
+	err := svc.EmitTrace(trace)
+	if err != nil {
+		t.Errorf("EmitTrace should return nil, got: %v", err)
+	}
+	traces, err := svc.QueryTraces("test-runtime")
+	if err != nil {
+		t.Errorf("QueryTraces should return nil error, got: %v", err)
+	}
+	if len(traces) != 1 {
+		t.Errorf("Expected 1 trace, got %d", len(traces))
+	}
+	if traces[0].ID != "test-trace-1" {
+		t.Errorf("Expected trace ID 'test-trace-1', got: %s", traces[0].ID)
+	}
 }
 
 func TestObservabilityService_BoundaryInner(t *testing.T) {

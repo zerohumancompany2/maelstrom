@@ -8,7 +8,8 @@ import (
 )
 
 type ObservabilityService struct {
-	mu sync.Mutex
+	mu     sync.Mutex
+	traces []services.Trace
 }
 
 func NewObservabilityService() *ObservabilityService {
@@ -28,11 +29,22 @@ func (o *ObservabilityService) HandleMail(mail mail.Mail) error {
 }
 
 func (o *ObservabilityService) EmitTrace(trace services.Trace) error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.traces = append(o.traces, trace)
 	return nil
 }
 
 func (o *ObservabilityService) QueryTraces(runtimeID string) ([]services.Trace, error) {
-	return nil, nil
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	var result []services.Trace
+	for _, trace := range o.traces {
+		if trace.RuntimeID == runtimeID {
+			result = append(result, trace)
+		}
+	}
+	return result, nil
 }
 
 func (o *ObservabilityService) Start() error {
