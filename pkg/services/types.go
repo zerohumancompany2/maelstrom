@@ -10,3 +10,17 @@ type Trace struct {
 	Timestamp time.Time // event time
 	Payload   any       // event payload
 }
+
+type TraceFilters struct {
+	RuntimeID string
+	EventType string
+	FromTime  time.Time
+	ToTime    time.Time
+}
+
+type MetricsCollector struct {
+	StateCounts    map[string]int
+	TransitionRate float64
+	EventRate      float64
+	LastUpdate     time.Time
+}
