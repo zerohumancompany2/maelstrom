@@ -27,3 +27,25 @@ func TestServices_TraceFiltersHasRequiredFields(t *testing.T) {
 		t.Error("expected ToTime to be now")
 	}
 }
+
+func TestServices_MetricsCollectorHasRequiredFields(t *testing.T) {
+	collector := MetricsCollector{
+		StateCounts:    map[string]int{"state1": 1},
+		TransitionRate: 1.5,
+		EventRate:      2.5,
+		LastUpdate:     time.Now(),
+	}
+
+	if len(collector.StateCounts) != 1 {
+		t.Errorf("expected StateCounts to have 1 entry, got %d", len(collector.StateCounts))
+	}
+	if collector.StateCounts["state1"] != 1 {
+		t.Errorf("expected StateCounts['state1'] to be 1, got %d", collector.StateCounts["state1"])
+	}
+	if collector.TransitionRate != 1.5 {
+		t.Errorf("expected TransitionRate to be 1.5, got %f", collector.TransitionRate)
+	}
+	if collector.EventRate != 2.5 {
+		t.Errorf("expected EventRate to be 2.5, got %f", collector.EventRate)
+	}
+}

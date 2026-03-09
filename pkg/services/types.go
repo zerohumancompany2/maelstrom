@@ -17,3 +17,10 @@ type TraceFilters struct {
 	FromTime  time.Time
 	ToTime    time.Time
 }
+
+type MetricsCollector struct {
+	StateCounts    map[string]int
+	TransitionRate float64
+	EventRate      float64
+	LastUpdate     time.Time
+}
