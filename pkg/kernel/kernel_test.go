@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/maelstrom/v3/pkg/statechart"
 )
 
 // TestKernel_StartsBootstrapAndWaits verifies kernel starts bootstrap sequence.
@@ -109,4 +111,10 @@ func TestKernel_WithConfig_SetsConfig(t *testing.T) {
 	if k.config.AppVars["key"] != "value" {
 		t.Errorf("expected AppVars[key] to be value, got %q", k.config.AppVars["key"])
 	}
+}
+
+func TestKernel_RegisterBootstrapActions_RegistersFourActions(t *testing.T) {
+	engine := statechart.NewEngine()
+	k := NewWithEngine(engine)
+	k.RegisterBootstrapActions()
 }

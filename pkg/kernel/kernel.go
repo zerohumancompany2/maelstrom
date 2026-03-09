@@ -48,6 +48,17 @@ func (k *Kernel) WithConfig(cfg KernelConfig) *Kernel {
 	return k
 }
 
+// RegisterBootstrapActions registers the four bootstrap actions.
+func (k *Kernel) RegisterBootstrapActions() {
+	if k.engine == nil {
+		return
+	}
+	k.engine.RegisterAction("securityBootstrap", securityBootstrap)
+	k.engine.RegisterAction("communicationBootstrap", communicationBootstrap)
+	k.engine.RegisterAction("observabilityBootstrap", observabilityBootstrap)
+	k.engine.RegisterAction("lifecycleBootstrap", lifecycleBootstrap)
+}
+
 // Start begins the bootstrap sequence and transitions to runtime.
 func (k *Kernel) Start(ctx context.Context) error {
 	log.Println("[kernel] Starting kernel")
