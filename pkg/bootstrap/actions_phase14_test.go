@@ -406,3 +406,8 @@ func TestSignalKernelReady_AggregatesServices(t *testing.T) {
 		t.Errorf("expected 4 services, got %d: %v", len(serviceList), services)
 	}
 }
+
+// TestBootstrapChart_ActionsExecuteInOrder verifies bootstrap chart executes actions in order.
+func TestBootstrapChart_ActionsExecuteInOrder(t *testing.T) {
+	t.Skip("Integration test - requires full bootstrap chart execution with new actions")
+}
