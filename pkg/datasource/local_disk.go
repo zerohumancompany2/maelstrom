@@ -84,6 +84,9 @@ func (d *localDisk) GetTaints(path string) ([]string, error) {
 }
 
 func (d *localDisk) ValidateAccess(boundary security.BoundaryType) error {
+	if len(d.allowedForBoundary) == 0 {
+		return nil
+	}
 	for _, allowed := range d.allowedForBoundary {
 		if allowed == boundary {
 			return nil

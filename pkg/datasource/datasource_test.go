@@ -58,7 +58,7 @@ func TestDataSource_GetTaints(t *testing.T) {
 
 	source, _ := registry.Get("localDisk", map[string]any{"path": "/tmp/test-ds"})
 
-	taints, err := source.GetTaints("/tmp/test-ds/file.txt")
+	taints, err := source.GetTaints("/tmp/test-ds/file2.txt")
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
