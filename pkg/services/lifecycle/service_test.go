@@ -59,6 +59,20 @@ func TestLifecycleService_StopReturnsNil(t *testing.T) {
 	}
 }
 
+func TestLifecycleService_ListReturnsNilSlice(t *testing.T) {
+	svc := NewLifecycleService()
+
+	list, err := svc.List()
+
+	if err != nil {
+		t.Errorf("Expected List to return nil error, got %v", err)
+	}
+
+	if list != nil {
+		t.Error("Expected List to return nil slice")
+	}
+}
+
 func TestLifecycleService_BootstrapChart(t *testing.T) {
 	chart := BootstrapChart()
 
