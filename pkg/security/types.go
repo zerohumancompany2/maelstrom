@@ -41,8 +41,11 @@ type RedactRule struct {
 
 type TaintSet map[string]bool
 
-func (t TaintSet) Add(taint string) {
-	t[taint] = true
+func (t *TaintSet) Add(taint string) {
+	if *t == nil {
+		*t = make(TaintSet)
+	}
+	(*t)[taint] = true
 }
 
 func (t TaintSet) Has(taint string) bool {

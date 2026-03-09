@@ -353,6 +353,20 @@ func TestSecurity_MailValidation(t *testing.T) {
 	}
 }
 
+func TestTaintSet_AddHas(t *testing.T) {
+	var set TaintSet
+
+	set.Add("PII")
+
+	if !set.Has("PII") {
+		t.Error("Expected Has(\"PII\") to return true after Add(\"PII\")")
+	}
+
+	if set.Has("SECRET") {
+		t.Error("Expected Has(\"SECRET\") to return false")
+	}
+}
+
 func TestTaintEngine_AttachTaint_Mail(t *testing.T) {
 	engine := NewTaintEngine()
 
