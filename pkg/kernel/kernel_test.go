@@ -242,3 +242,28 @@ func TestKernel_Shutdown_WithNilEngine_NoPanic(t *testing.T) {
 		t.Errorf("Shutdown with nil engine should return nil, got %v", err)
 	}
 }
+
+func TestKernel_IsBootstrapComplete_AfterBootstrap(t *testing.T) {
+	kernel := New()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	done := make(chan error)
+	go func() {
+		done <- kernel.Start(ctx)
+	}()
+
+	time.Sleep(800 * time.Millisecond)
+
+	if !kernel.IsBootstrapComplete() {
+		t.Error("bootstrap should be complete after Start() finishes")
+	}
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(1 * time.Second):
+		t.Fatal("timeout waiting for kernel")
+	}
+}
