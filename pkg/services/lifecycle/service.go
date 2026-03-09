@@ -46,8 +46,15 @@ func (l *LifecycleService) Stop(id statechart.RuntimeID) error {
 	return nil
 }
 
-func (l *LifecycleService) List() ([]string, error) {
-	return nil, nil
+func (l *LifecycleService) List() ([]RuntimeInfo, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	result := make([]RuntimeInfo, 0, len(l.runtimes))
+	for _, info := range l.runtimes {
+		result = append(result, info)
+	}
+	return result, nil
 }
 
 func (l *LifecycleService) Start() error {

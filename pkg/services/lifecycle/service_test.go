@@ -59,7 +59,7 @@ func TestLifecycleService_StopReturnsNil(t *testing.T) {
 	}
 }
 
-func TestLifecycleService_ListReturnsNilSlice(t *testing.T) {
+func TestLifecycleService_ListReturnsRuntimeInfo(t *testing.T) {
 	svc := NewLifecycleServiceWithoutEngine()
 
 	list, err := svc.List()
@@ -68,8 +68,15 @@ func TestLifecycleService_ListReturnsNilSlice(t *testing.T) {
 		t.Errorf("Expected List to return nil error, got %v", err)
 	}
 
-	if list != nil {
-		t.Error("Expected List to return nil slice")
+	// Verify it's []RuntimeInfo type by checking we can access RuntimeInfo fields
+	if len(list) != 0 {
+		t.Errorf("Expected empty slice, got %d items", len(list))
+	}
+
+	// Type assertion to verify return type
+	_, ok := interface{}(list).([]RuntimeInfo)
+	if !ok {
+		t.Error("Expected List to return []RuntimeInfo type")
 	}
 }
 
