@@ -736,6 +736,34 @@ func TestKernel_BootstrapServices(t *testing.T) {
 	}
 }
 
+func TestKernel_BootstrapSequence(t *testing.T) {
+	kernel := &Kernel{
+		engine:       statechart.NewEngine(),
+		services:     make(map[string]statechart.RuntimeID),
+		serviceReady: make(map[string]bool),
+		runtimes:     make(map[string]*runtime.ChartRuntime),
+		mailSystem:   communication.NewCommunicationService(),
+	}
+
+	err := kernel.BootstrapServices()
+	if err != nil {
+		t.Fatalf("BootstrapServices() returned error: %v", err)
+	}
+
+	actualOrder := kernel.GetServiceOrder()
+	expectedOrder := []string{"sys:security", "sys:communication", "sys:observability", "sys:lifecycle"}
+
+	if len(actualOrder) != len(expectedOrder) {
+		t.Fatalf("expected %d services, got %d: %v", len(expectedOrder), len(actualOrder), actualOrder)
+	}
+
+	for i, expectedSvc := range expectedOrder {
+		if actualOrder[i] != expectedSvc {
+			t.Errorf("service[%d]: expected %q, got %q", i, expectedSvc, actualOrder[i])
+		}
+	}
+}
+
 func TestKernel_FullE2EBootstrap(t *testing.T) {
 	kernel := New()
 

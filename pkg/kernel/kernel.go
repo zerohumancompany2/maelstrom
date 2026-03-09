@@ -37,6 +37,8 @@ type Kernel struct {
 	onCompleteCalled atomic.Bool
 	logOutput        []string
 	logMu            sync.RWMutex
+	serviceOrder     []string
+	orderMu          sync.RWMutex
 }
 
 // kernelApplicationContext provides application context with kernel engine access.
@@ -464,7 +466,21 @@ func (k *Kernel) startServiceInOrder(serviceID string) error {
 	k.mu.Lock()
 	k.serviceReady[serviceID] = true
 	k.mu.Unlock()
+
+	k.orderMu.Lock()
+	k.serviceOrder = append(k.serviceOrder, serviceID)
+	k.orderMu.Unlock()
+
 	return nil
+}
+
+// GetServiceOrder returns the order in which services were started.
+func (k *Kernel) GetServiceOrder() []string {
+	k.orderMu.RLock()
+	defer k.orderMu.RUnlock()
+	result := make([]string, len(k.serviceOrder))
+	copy(result, k.serviceOrder)
+	return result
 }
 
 // IsKernelReady returns true if all services are ready.
