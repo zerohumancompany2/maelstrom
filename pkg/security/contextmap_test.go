@@ -339,3 +339,48 @@ func TestContextMap_SystemBlockPreservation(t *testing.T) {
 		t.Errorf("Expected total tokens <= %d, got %d", budget, total)
 	}
 }
+
+func TestContextMap_EvictionSummarize(t *testing.T) {
+	block1 := &ContextBlock{
+		Name:      "system",
+		Content:   strings.Repeat("s", 500),
+		MaxTokens: 500,
+		Priority:  0,
+		Eviction:  "summarize",
+	}
+	block5 := &ContextBlock{
+		Name:      "user",
+		Content:   strings.Repeat("u", 2000),
+		MaxTokens: 2000,
+		Priority:  5,
+		Eviction:  "summarize",
+	}
+
+	blocks := []*ContextBlock{block1, block5}
+	budget := 800
+
+	cm := NewContextMap(blocks, budget)
+	result, err := cm.AssembleWithBudget()
+
+	if err != nil {
+		t.Fatalf("AssembleWithBudget returned error: %v", err)
+	}
+
+	resultNames := make(map[string]bool)
+	for _, block := range result {
+		resultNames[block.Name] = true
+	}
+
+	if !resultNames["system"] {
+		t.Error("Expected system block to be preserved")
+	}
+
+	total := 0
+	for _, block := range result {
+		total += block.MaxTokens
+	}
+
+	if total > budget {
+		t.Errorf("Expected total tokens <= %d after compression/eviction, got %d", budget, total)
+	}
+}
