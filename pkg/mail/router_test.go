@@ -148,3 +148,16 @@ func TestParseAddress_agent(t *testing.T) {
 		t.Errorf("Expected id 'user-123', got %v", id)
 	}
 }
+
+func TestParseAddress_topic(t *testing.T) {
+	addrType, id, err := ParseAddress("topic:market-data")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if addrType != AddressTypeTopic {
+		t.Errorf("Expected AddressTypeTopic, got %v", addrType)
+	}
+	if id != "market-data" {
+		t.Errorf("Expected id 'market-data', got %v", id)
+	}
+}
