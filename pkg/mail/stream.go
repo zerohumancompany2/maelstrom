@@ -112,3 +112,11 @@ func (s *StreamSession) propagateTaints(chunk *StreamChunk, newTaints []string) 
 	chunk.Taints = result
 	return chunk
 }
+
+// checkSecurityBoundary validates boundary transitions
+func (s *StreamSession) checkSecurityBoundary(from, to BoundaryType) error {
+	if from == DMZBoundary && to == InnerBoundary {
+		return fmt.Errorf("invalid boundary transition: DMZ to Inner")
+	}
+	return nil
+}

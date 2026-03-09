@@ -364,3 +364,17 @@ func TestMailStream_TaintPropagation(t *testing.T) {
 		t.Error("Expected PROCESSING to be added")
 	}
 }
+
+func TestMailStream_SecurityCheck(t *testing.T) {
+	session := NewStreamSession("test-session", nil)
+
+	err := session.checkSecurityBoundary(InnerBoundary, DMZBoundary)
+	if err != nil {
+		t.Errorf("Expected nil error for valid boundary transition, got %v", err)
+	}
+
+	err = session.checkSecurityBoundary(DMZBoundary, InnerBoundary)
+	if err == nil {
+		t.Error("Expected error for invalid boundary transition")
+	}
+}
