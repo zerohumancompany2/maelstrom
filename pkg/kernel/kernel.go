@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/maelstrom/v3/pkg/bootstrap"
@@ -21,18 +22,19 @@ type KernelConfig struct {
 
 // Kernel orchestrates bootstrap and hands off to ChartRegistry.
 type Kernel struct {
-	engine        statechart.Library
-	config        KernelConfig
-	factory       *runtime.Factory
-	sequence      *bootstrap.Sequence
-	bootstrapRTID statechart.RuntimeID
-	services      map[string]statechart.RuntimeID
-	serviceReady  map[string]bool
-	runtimes      map[string]*runtime.ChartRuntime
-	appCtx        statechart.ApplicationContext
-	mailSystem    *communication.CommunicationService
-	mu            sync.RWMutex
-	readyChan     chan struct{}
+	engine           statechart.Library
+	config           KernelConfig
+	factory          *runtime.Factory
+	sequence         *bootstrap.Sequence
+	bootstrapRTID    statechart.RuntimeID
+	services         map[string]statechart.RuntimeID
+	serviceReady     map[string]bool
+	runtimes         map[string]*runtime.ChartRuntime
+	appCtx           statechart.ApplicationContext
+	mailSystem       *communication.CommunicationService
+	mu               sync.RWMutex
+	readyChan        chan struct{}
+	onCompleteCalled atomic.Bool
 }
 
 // kernelApplicationContext provides application context with kernel engine access.
@@ -328,6 +330,12 @@ func (k *Kernel) waitForKernelReady(ctx context.Context, bootstrapRTID statechar
 
 func (k *Kernel) onBootstrapComplete() {
 	log.Println("[kernel] Kernel going dormant")
+	k.onCompleteCalled.Store(true)
+}
+
+// GetCompletionStatus returns true if onComplete callback was called.
+func (k *Kernel) GetCompletionStatus() bool {
+	return k.onCompleteCalled.Load()
 }
 
 // IsBootstrapComplete returns true if bootstrap has finished.

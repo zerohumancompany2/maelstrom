@@ -568,3 +568,45 @@ func TestKernel_KernelReadyEventEmitted(t *testing.T) {
 		t.Error("KERNEL_READY should be emitted after LIFECYCLE_READY")
 	}
 }
+
+func TestKernel_OnCompleteCallbackInvoked(t *testing.T) {
+	kernel := New()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Channel to signal when onComplete is called
+	onCompleteCalled := make(chan struct{})
+
+	// Start kernel
+	done := make(chan error)
+	go func() {
+		done <- kernel.Start(ctx)
+	}()
+
+	// Wait for completion callback with timeout
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case <-timeout:
+			t.Fatal("timeout waiting for onComplete callback")
+		case <-done:
+		default:
+		}
+
+		if kernel.GetCompletionStatus() {
+			close(onCompleteCalled)
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Verify completion status
+	if !kernel.GetCompletionStatus() {
+		t.Error("GetCompletionStatus() should return true after onComplete is called")
+	}
+
+	if !kernel.IsBootstrapComplete() {
+		t.Error("IsBootstrapComplete() should return true after onComplete is called")
+	}
+}
