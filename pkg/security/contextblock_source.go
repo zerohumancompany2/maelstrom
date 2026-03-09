@@ -3,6 +3,8 @@ package security
 import (
 	"fmt"
 	"strings"
+
+	"github.com/maelstrom/v3/pkg/mail"
 )
 
 type Session struct {
@@ -108,5 +110,19 @@ func assembleMemoryService(block *ContextBlock, memorySvc MemoryService) ([]byte
 }
 
 func assembleToolRegistry(block *ContextBlock, toolRegistry *ToolRegistry) ([]byte, error) {
-	return nil, nil
+	if toolRegistry == nil {
+		return []byte(""), nil
+	}
+
+	tools := toolRegistry.GetToolsByBoundary(mail.BoundaryType(block.BoundaryFilter))
+
+	var builder strings.Builder
+	for i, tool := range tools {
+		if i > 0 {
+			builder.WriteString(",")
+		}
+		builder.WriteString(tool.Name)
+	}
+
+	return []byte(builder.String()), nil
 }

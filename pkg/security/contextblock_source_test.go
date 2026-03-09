@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/maelstrom/v3/pkg/mail"
 )
 
 func TestContextBlockSource_StaticContent(t *testing.T) {
@@ -134,6 +136,51 @@ func TestContextBlockSource_MemoryServiceRAG(t *testing.T) {
 		expectedMem := fmt.Sprintf("|||MEMORY-%03d|||", i)
 		if strings.Contains(resultStr, expectedMem) {
 			t.Errorf("Expected result to NOT contain memory results beyond topK including %s", expectedMem)
+			break
+		}
+	}
+}
+
+func TestContextBlockSource_ToolRegistryBoundaryFilter(t *testing.T) {
+	// Given: A ContextBlock with source: toolRegistry, boundaryFilter: dmz
+	toolRegistry := NewToolRegistry()
+	toolRegistry.RegisterTool(&ToolConfig{Name: "|||DMZ-TOOL-1|||", Boundary: mail.BoundaryType("dmz")})
+	toolRegistry.RegisterTool(&ToolConfig{Name: "|||DMZ-TOOL-2|||", Boundary: mail.BoundaryType("dmz")})
+	toolRegistry.RegisterTool(&ToolConfig{Name: "|||DMZ-TOOL-3|||", Boundary: mail.BoundaryType("dmz")})
+	toolRegistry.RegisterTool(&ToolConfig{Name: "|||INNER-TOOL-1|||", Boundary: mail.BoundaryType("inner")})
+	toolRegistry.RegisterTool(&ToolConfig{Name: "|||INNER-TOOL-2|||", Boundary: mail.BoundaryType("inner")})
+
+	block := &ContextBlock{
+		Name:           "tool-context",
+		Source:         string(SourceToolRegistry),
+		BoundaryFilter: DMZBoundary,
+	}
+
+	// When: AssembleSource is called at DMZ boundary
+	result, err := AssembleSource(block, nil, nil, toolRegistry)
+
+	// Then: Block returns only tools marked as visible at DMZ boundary
+	if err != nil {
+		t.Fatalf("AssembleSource returned error: %v", err)
+	}
+
+	if len(result) == 0 {
+		t.Fatal("Expected result to contain tools")
+	}
+
+	resultStr := string(result)
+	for i := 1; i <= 3; i++ {
+		expectedTool := fmt.Sprintf("|||DMZ-TOOL-%d|||", i)
+		if !strings.Contains(resultStr, expectedTool) {
+			t.Errorf("Expected result to contain DMZ tools including %s", expectedTool)
+			break
+		}
+	}
+
+	for i := 1; i <= 2; i++ {
+		expectedTool := fmt.Sprintf("|||INNER-TOOL-%d|||", i)
+		if strings.Contains(resultStr, expectedTool) {
+			t.Errorf("Expected result to NOT contain INNER tools including %s", expectedTool)
 			break
 		}
 	}
