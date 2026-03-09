@@ -21,17 +21,18 @@ type KernelConfig struct {
 
 // Kernel orchestrates bootstrap and hands off to ChartRegistry.
 type Kernel struct {
-	engine       statechart.Library
-	config       KernelConfig
-	factory      *runtime.Factory
-	sequence     *bootstrap.Sequence
-	services     map[string]statechart.RuntimeID
-	serviceReady map[string]bool
-	runtimes     map[string]*runtime.ChartRuntime
-	appCtx       statechart.ApplicationContext
-	mailSystem   *communication.CommunicationService
-	mu           sync.RWMutex
-	readyChan    chan struct{}
+	engine        statechart.Library
+	config        KernelConfig
+	factory       *runtime.Factory
+	sequence      *bootstrap.Sequence
+	bootstrapRTID statechart.RuntimeID
+	services      map[string]statechart.RuntimeID
+	serviceReady  map[string]bool
+	runtimes      map[string]*runtime.ChartRuntime
+	appCtx        statechart.ApplicationContext
+	mailSystem    *communication.CommunicationService
+	mu            sync.RWMutex
+	readyChan     chan struct{}
 }
 
 // kernelApplicationContext provides application context with kernel engine access.
@@ -138,12 +139,11 @@ func (k *Kernel) Start(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to spawn bootstrap runtime: %w", err)
 		}
-		log.Printf("[kernel] Spawning bootstrap runtime: %s", bootstrapRTID)
-
-		// Register bootstrap service
 		k.mu.Lock()
+		k.bootstrapRTID = bootstrapRTID
 		k.services["sys:bootstrap"] = bootstrapRTID
 		k.mu.Unlock()
+		log.Printf("[kernel] Spawning bootstrap runtime: %s", bootstrapRTID)
 
 		// Start the bootstrap runtime
 		if err := k.engine.Control(bootstrapRTID, statechart.CmdStart); err != nil {
@@ -334,6 +334,13 @@ func (k *Kernel) GetRuntimes() map[string]*runtime.ChartRuntime {
 	k.mu.RLock()
 	defer k.mu.RUnlock()
 	return k.runtimes
+}
+
+// GetBootstrapRuntimeID returns the bootstrap runtime ID.
+func (k *Kernel) GetBootstrapRuntimeID() statechart.RuntimeID {
+	k.mu.RLock()
+	defer k.mu.RUnlock()
+	return k.bootstrapRTID
 }
 
 // GetServiceRuntimeID returns the RuntimeID for a service.

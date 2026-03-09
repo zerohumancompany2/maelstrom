@@ -362,3 +362,27 @@ func TestKernel_LoadsBootstrapChart(t *testing.T) {
 		t.Errorf("expected spec.initial to be 'sys:bootstrap/init', got %q", spec)
 	}
 }
+
+// TestKernel_SpawnsBootstrapRuntime verifies kernel spawns bootstrap runtime and tracks ID.
+func TestKernel_SpawnsBootstrapRuntime(t *testing.T) {
+	engine := statechart.NewEngine()
+	k := NewWithEngine(engine)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	done := make(chan error)
+	go func() {
+		done <- k.Start(ctx)
+	}()
+
+	time.Sleep(300 * time.Millisecond)
+
+	rtID := k.GetBootstrapRuntimeID()
+	if rtID == "" {
+		t.Error("expected non-empty bootstrap runtime ID")
+	}
+
+	cancel()
+	<-done
+}
