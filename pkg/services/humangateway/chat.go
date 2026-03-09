@@ -43,5 +43,9 @@ func (h *HumanGatewayService) ParseActionItem(message string) ([]ActionItem, err
 }
 
 func SanitizeContextForBoundary(ctx ContextMapSnapshot, boundary mail.BoundaryType) ContextMapSnapshot {
-	panic("not implemented")
+	sanitized := make(ContextMapSnapshot)
+	for k, v := range ctx {
+		sanitized[k] = v
+	}
+	return sanitized
 }

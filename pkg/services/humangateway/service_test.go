@@ -98,3 +98,21 @@ func TestHumanGatewayService_SessionManagement(t *testing.T) {
 		t.Error("Expected nil for non-existent session")
 	}
 }
+
+func TestHumanGatewayService_SanitizedContext(t *testing.T) {
+	ctx := ContextMapSnapshot{
+		"conversation": []any{"msg1", "msg2"},
+		"memory":       "important data",
+		"internal":     "secret data",
+	}
+
+	sanitized := SanitizeContextForBoundary(ctx, mail.InnerBoundary)
+	if len(sanitized) != len(ctx) {
+		t.Errorf("Expected %d keys, got %d", len(ctx), len(sanitized))
+	}
+
+	sanitizedOuter := SanitizeContextForBoundary(ctx, mail.OuterBoundary)
+	if len(sanitizedOuter) != len(ctx) {
+		t.Errorf("Expected %d keys, got %d", len(ctx), len(sanitizedOuter))
+	}
+}
