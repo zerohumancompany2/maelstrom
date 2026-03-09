@@ -135,6 +135,10 @@ func (c *CommunicationService) PublishWithRetry(mail *mail.Mail, maxRetries int)
 		if ack.Success {
 			return nil
 		}
+		if attempt < maxRetries {
+			backoff := time.Duration(1<<uint(attempt)) * time.Second
+			time.Sleep(backoff)
+		}
 	}
 	return errors.New("delivery failed after max retries")
 }

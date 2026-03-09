@@ -299,3 +299,20 @@ func TestCommunicationService_RetryOnFailure(t *testing.T) {
 		t.Error("Expected error after retries, got nil")
 	}
 }
+
+func TestCommunicationService_ExponentialBackoff(t *testing.T) {
+	svc := NewCommunicationService()
+
+	start := time.Now()
+	m := mail.Mail{Source: "test", Target: "non-existent:address"}
+
+	err := svc.PublishWithRetry(&m, 3)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Error("Expected error after retries, got nil")
+	}
+	if elapsed < 1*time.Second {
+		t.Errorf("Expected exponential backoff delays, got %v", elapsed)
+	}
+}
