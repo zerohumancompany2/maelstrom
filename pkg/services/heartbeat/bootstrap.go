@@ -15,6 +15,8 @@ type HeartbeatService interface {
 	Unschedule(agentId string) error
 	Trigger(agentId string) error
 	GetSchedule(agentId string) (Schedule, error)
+	ScheduleCron(cron string) error
+	TriggerAll() error
 }
 
 // BootstrapChart returns the chart definition for sys:heartbeat

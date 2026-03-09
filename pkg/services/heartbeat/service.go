@@ -45,3 +45,11 @@ func (s *heartbeatService) GetSchedule(agentId string) (Schedule, error) {
 	defer s.mu.Unlock()
 	return s.schedules[agentId], nil
 }
+
+func (s *heartbeatService) ScheduleCron(cron string) error {
+	return nil
+}
+
+func (s *heartbeatService) TriggerAll() error {
+	return nil
+}

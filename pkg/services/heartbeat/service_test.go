@@ -78,3 +78,21 @@ func TestHeartbeat_Unschedule(t *testing.T) {
 		t.Errorf("Expected empty schedule after unschedule, got %v", sched)
 	}
 }
+
+func TestHeartbeatService_Schedule(t *testing.T) {
+	svc := NewHeartbeatService()
+
+	err := svc.ScheduleCron("0 * * * *")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+}
+
+func TestHeartbeatService_Trigger(t *testing.T) {
+	svc := NewHeartbeatService()
+
+	err := svc.TriggerAll()
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+}
