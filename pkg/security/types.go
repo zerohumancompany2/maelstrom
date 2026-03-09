@@ -218,9 +218,10 @@ func (e *taintEngineImpl) propagateTaintToMap(m map[string]interface{}, newTaint
 		}
 	}
 
+	result["_taints"] = merged
+
 	for k, val := range m {
 		if k == "_taints" {
-			result[k] = merged
 			continue
 		}
 		switch v := val.(type) {

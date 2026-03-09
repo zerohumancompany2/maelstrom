@@ -682,3 +682,54 @@ func TestTaintEngine_PropagateTaint_Deduplication(t *testing.T) {
 		}
 	}
 }
+
+func TestTaintEngine_PropagateTaint_EmptySource(t *testing.T) {
+	engine := NewTaintEngine()
+
+	dataNoTaints := map[string]interface{}{
+		"key": "value",
+	}
+
+	result, err := engine.Propagate(dataNoTaints, []string{"NEW_TAINT"})
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected map[string]interface{}, got %T", result)
+	}
+
+	taints, ok := resultMap["_taints"].([]string)
+	if !ok {
+		t.Fatalf("Expected _taints key with []string value, got %T", resultMap["_taints"])
+	}
+
+	if len(taints) != 1 || taints[0] != "NEW_TAINT" {
+		t.Errorf("Expected ['NEW_TAINT'], got %v", taints)
+	}
+
+	existingTaints := map[string]interface{}{
+		"_taints": []string{"EXISTING"},
+		"key":     "value",
+	}
+
+	result2, err := engine.Propagate(existingTaints, []string{})
+	if err != nil {
+		t.Fatalf("Expected no error for empty newTaints, got %v", err)
+	}
+
+	resultMap2, ok := result2.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected map[string]interface{}, got %T", result2)
+	}
+
+	taints2, ok := resultMap2["_taints"].([]string)
+	if !ok {
+		t.Fatalf("Expected _taints key with []string value, got %T", resultMap2["_taints"])
+	}
+
+	if len(taints2) != 1 || taints2[0] != "EXISTING" {
+		t.Errorf("Expected ['EXISTING'] preserved, got %v", taints2)
+	}
+}
