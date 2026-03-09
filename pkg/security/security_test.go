@@ -2,6 +2,8 @@ package security
 
 import (
 	"testing"
+
+	"github.com/maelstrom/v3/pkg/mail"
 )
 
 func TestContextMap_AssemblyOrder(t *testing.T) {
@@ -286,5 +288,45 @@ func TestSecurity_MailValidation(t *testing.T) {
 
 	if validated == nil {
 		t.Error("Expected validated mail to be non-nil")
+	}
+}
+
+func TestTaintEngine_AttachTaint_Mail(t *testing.T) {
+	engine := NewTaintEngine()
+
+	m := &mail.Mail{
+		ID:     "msg-1",
+		Source: "user",
+		Metadata: mail.MailMetadata{
+			Taints: []string{"USER_SUPPLIED"},
+		},
+	}
+
+	result, err := engine.AttachTaint(m, []string{"TOOL_OUTPUT"})
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	resultMail, ok := result.(*mail.Mail)
+	if !ok {
+		t.Fatalf("Expected *mail.Mail, got %T", result)
+	}
+
+	expectedTaints := []string{"USER_SUPPLIED", "TOOL_OUTPUT"}
+	if len(resultMail.Metadata.Taints) != len(expectedTaints) {
+		t.Errorf("Expected %d taints, got %d", len(expectedTaints), len(resultMail.Metadata.Taints))
+	}
+
+	for _, expectedTaint := range expectedTaints {
+		found := false
+		for _, actualTaint := range resultMail.Metadata.Taints {
+			if actualTaint == expectedTaint {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected taint %q not found in %v", expectedTaint, resultMail.Metadata.Taints)
+		}
 	}
 }

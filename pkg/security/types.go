@@ -1,5 +1,7 @@
 package security
 
+import "github.com/maelstrom/v3/pkg/mail"
+
 type BoundaryType string
 
 const (
@@ -156,6 +158,7 @@ type TaintEngine interface {
 	CheckForbidden(taints []string, boundary BoundaryType) error
 	Redact(obj any, rules []RedactRule) (any, error)
 	ReportTaints(chartID string) (TaintMap, error)
+	AttachTaint(obj any, taints []string) (any, error)
 }
 
 type taintEngineImpl struct {
@@ -190,6 +193,27 @@ func (e *taintEngineImpl) Redact(obj any, rules []RedactRule) (any, error) {
 
 func (e *taintEngineImpl) ReportTaints(chartID string) (TaintMap, error) {
 	return e.taints, nil
+}
+
+func (e *taintEngineImpl) AttachTaint(obj any, taints []string) (any, error) {
+	switch v := obj.(type) {
+	case *mail.Mail:
+		existing := make(map[string]bool)
+		for _, t := range v.Metadata.Taints {
+			existing[t] = true
+		}
+		for _, t := range taints {
+			existing[t] = true
+		}
+		merged := make([]string, 0, len(existing))
+		for t := range existing {
+			merged = append(merged, t)
+		}
+		v.Metadata.Taints = merged
+		return v, nil
+	default:
+		return obj, nil
+	}
 }
 
 type BoundaryService interface {
