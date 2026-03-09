@@ -4,6 +4,7 @@ package services
 
 import (
 	"errors"
+	"sort"
 	"sync"
 
 	"github.com/maelstrom/v3/pkg/mail"
@@ -61,8 +62,14 @@ func (sr *ServiceRegistry) Get(name string) (Service, bool) {
 
 // List returns all registered service names.
 func (sr *ServiceRegistry) List() []string {
-	// TODO: implement
-	return nil
+	sr.mu.RLock()
+	defer sr.mu.RUnlock()
+	names := make([]string, 0, len(sr.services))
+	for name := range sr.services {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // TODO: implement lifecycle tracking (registered, running, stopped)

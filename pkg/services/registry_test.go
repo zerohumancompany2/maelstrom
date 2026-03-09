@@ -97,3 +97,23 @@ func TestServiceRegistry_GetNotFound(t *testing.T) {
 		t.Fatal("Get() returned non-nil service for non-existent service")
 	}
 }
+
+func TestServiceRegistry_List(t *testing.T) {
+	sr := NewServiceRegistry()
+
+	sr.Register("sys:communication", &mockService{id: "sys:communication"})
+	sr.Register("sys:security", &mockService{id: "sys:security"})
+	sr.Register("sys:lifecycle", &mockService{id: "sys:lifecycle"})
+
+	names := sr.List()
+	if len(names) != 3 {
+		t.Fatalf("List() returned %d names, want 3", len(names))
+	}
+
+	expected := []string{"sys:communication", "sys:lifecycle", "sys:security"}
+	for i, name := range expected {
+		if names[i] != name {
+			t.Fatalf("List()[%d] = %q, want %q", i, names[i], name)
+		}
+	}
+}
