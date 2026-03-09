@@ -34,7 +34,7 @@ func TestWebSocketAdapter_Bidirectional(t *testing.T) {
 		Content: "Response content",
 		Source:  "agent:bot",
 		Metadata: mail.MailMetadata{
-			Stream: nil,
+			StreamChunk: nil,
 		},
 	}
 

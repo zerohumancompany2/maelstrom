@@ -49,7 +49,7 @@ func (a *WebSocketAdapter) NormalizeOutbound(mailObj mail.Mail) ([]byte, error) 
 		"id":      mailObj.ID,
 		"content": mailObj.Content,
 		"source":  mailObj.Source,
-		"stream":  mailObj.Metadata.Stream != nil,
+		"stream":  mailObj.Metadata.StreamChunk != nil,
 	})
 }
 
