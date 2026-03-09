@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"fmt"
+	"net/http"
 	"sync"
 
 	"github.com/maelstrom/v3/pkg/mail"
@@ -49,4 +50,22 @@ func (g *Gateway) ListAdapters() []string {
 		names = append(names, name)
 	}
 	return names
+}
+
+type GatewayService struct {
+	endpoints map[string]http.Handler
+	mu        sync.RWMutex
+}
+
+func NewGatewayService() *GatewayService {
+	return &GatewayService{
+		endpoints: make(map[string]http.Handler),
+	}
+}
+
+func (g *GatewayService) RegisterHTTPEndpoint(path string, handler http.Handler) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.endpoints[path] = handler
+	return nil
 }

@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/maelstrom/v3/pkg/gateway/adapters"
@@ -143,5 +144,16 @@ func TestAdapter_NormalizationRoundTrip(t *testing.T) {
 			t.Errorf("Adapter %s: Expected source '%s', got '%s'",
 				adapter.Name(), expectedSource, inbound.Source)
 		}
+	}
+}
+
+func TestGatewayService_RegisterHTTPEndpoint(t *testing.T) {
+	gw := NewGatewayService()
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+
+	err := gw.RegisterHTTPEndpoint("/test", handler)
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
 	}
 }
