@@ -450,3 +450,28 @@ func TestCommunicationService_CorrelationIdMatching(t *testing.T) {
 		t.Error("Expected match for empty correlationId")
 	}
 }
+
+func TestCommunicationService_RequestTimeout(t *testing.T) {
+	svc := NewCommunicationService()
+
+	mailChan, err := svc.Subscribe("agent:timeout-test")
+	if err != nil {
+		t.Fatalf("Subscribe failed: %v", err)
+	}
+
+	replyChan := make(chan *mail.Mail)
+	go func() {
+		for m := range mailChan {
+			replyChan <- &m
+		}
+	}()
+
+	_, err = svc.Request(replyChan, 50*time.Millisecond)
+
+	if err == nil {
+		t.Error("Expected timeout error, got nil")
+	}
+	if err.Error() != "request timeout" {
+		t.Errorf("Expected 'request timeout' error, got %v", err)
+	}
+}
