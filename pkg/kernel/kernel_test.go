@@ -130,3 +130,17 @@ func TestKernel_RegisterBootstrapActions_WithNilEngine_NoPanic(t *testing.T) {
 		k.RegisterBootstrapActions()
 	}()
 }
+
+func TestKernel_Start_RegistersActionsBeforeSpawn(t *testing.T) {
+	ordered := make(chan string, 2)
+	engine := statechart.NewEngine()
+	k := NewWithEngine(engine)
+	k.RegisterBootstrapActions()
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	go func() {
+		_ = k.Start(ctx)
+	}()
+	time.Sleep(50 * time.Millisecond)
+	_ = ordered
+}

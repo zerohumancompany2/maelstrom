@@ -63,6 +63,9 @@ func (k *Kernel) RegisterBootstrapActions() {
 func (k *Kernel) Start(ctx context.Context) error {
 	log.Println("[kernel] Starting kernel")
 
+	// Register bootstrap actions before spawning
+	k.RegisterBootstrapActions()
+
 	// Load bootstrap chart definition
 	def, err := bootstrap.LoadBootstrapChart()
 	if err != nil {
