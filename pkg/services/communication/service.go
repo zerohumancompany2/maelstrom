@@ -1,28 +1,44 @@
 package communication
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
+	"github.com/maelstrom/v3/pkg/services/observability"
 )
 
+type pendingReply struct {
+	ch        chan *mail.Mail
+	createdAt time.Time
+}
+
 type CommunicationService struct {
-	id          string
-	router      *mail.MailRouter
-	publisher   mail.Publisher
-	subscribers map[string][]chan mail.Mail
-	mu          sync.RWMutex
+	id                    string
+	router                *mail.MailRouter
+	publisher             mail.Publisher
+	subscribers           map[string][]chan mail.Mail
+	deliveryAttempts      map[string]int
+	pendingReplies        map[string]pendingReply
+	seenCorrelations      map[string]bool
+	correlationTimestamps map[string]time.Time
+	observability         *observability.ObservabilityService
+	mu                    sync.RWMutex
 }
 
 func NewCommunicationService() *CommunicationService {
 	router := mail.NewMailRouter()
 	return &CommunicationService{
-		id:          "sys:communication",
-		router:      router,
-		publisher:   mail.NewRouterPublisher(router),
-		subscribers: make(map[string][]chan mail.Mail),
+		id:                    "sys:communication",
+		router:                router,
+		publisher:             mail.NewRouterPublisher(router),
+		subscribers:           make(map[string][]chan mail.Mail),
+		deliveryAttempts:      make(map[string]int),
+		pendingReplies:        make(map[string]pendingReply),
+		seenCorrelations:      make(map[string]bool),
+		correlationTimestamps: make(map[string]time.Time),
 	}
 }
 
@@ -124,4 +140,103 @@ func (c *CommunicationService) Start() error {
 
 func (c *CommunicationService) Stop() error {
 	return nil
+}
+
+func (c *CommunicationService) PublishWithRetry(mail *mail.Mail, maxRetries int) error {
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		ack, err := c.Publish(*mail)
+		if err != nil {
+			return err
+		}
+		if ack.Success {
+			return nil
+		}
+		if attempt < maxRetries {
+			backoff := time.Duration(1<<uint(attempt)) * time.Second
+			time.Sleep(backoff)
+		}
+	}
+	c.sendToDeadLetter(mail, "delivery failed after max retries")
+	return errors.New("delivery failed after max retries")
+}
+
+func (c *CommunicationService) trackDeliveryAttempt(correlationID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.deliveryAttempts[correlationID]++
+	c.seenCorrelations[correlationID] = true
+	if _, exists := c.correlationTimestamps[correlationID]; !exists {
+		c.correlationTimestamps[correlationID] = time.Now()
+	}
+}
+
+func (c *CommunicationService) Request(replyChan chan *mail.Mail, timeout time.Duration) (*mail.Mail, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	select {
+	case reply, ok := <-replyChan:
+		if !ok {
+			return nil, errors.New("reply channel closed")
+		}
+		return reply, nil
+	case <-ctx.Done():
+		return nil, errors.New("request timeout")
+	}
+}
+
+func (c *CommunicationService) matchReply(correlationID string, mail *mail.Mail) bool {
+	return mail.CorrelationID == correlationID
+}
+
+func (c *CommunicationService) SetObservability(obs *observability.ObservabilityService) {
+	c.observability = obs
+}
+
+func (c *CommunicationService) sendToDeadLetter(mail *mail.Mail, reason string) {
+	if c.observability != nil {
+		c.observability.LogDeadLetter(*mail, reason)
+	}
+}
+
+func (c *CommunicationService) isDuplicate(correlationID string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	_, exists := c.seenCorrelations[correlationID]
+	return exists
+}
+
+func (c *CommunicationService) markAsSeen(correlationID string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.seenCorrelations[correlationID] {
+		return true
+	}
+	c.seenCorrelations[correlationID] = true
+	if _, exists := c.correlationTimestamps[correlationID]; !exists {
+		c.correlationTimestamps[correlationID] = time.Now()
+	}
+	return false
+}
+
+func (c *CommunicationService) isWithinDeduplicationWindow(correlationID string, window time.Duration) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	timestamp, exists := c.correlationTimestamps[correlationID]
+	if !exists {
+		return false
+	}
+	return time.Since(timestamp) < window
+}
+
+func (c *CommunicationService) expireOldCorrelationIDs(window time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now := time.Now()
+	for corrID, timestamp := range c.correlationTimestamps {
+		if now.Sub(timestamp) > window {
+			delete(c.seenCorrelations, corrID)
+			delete(c.correlationTimestamps, corrID)
+		}
+	}
 }

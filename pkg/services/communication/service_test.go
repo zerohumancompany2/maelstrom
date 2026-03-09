@@ -1,11 +1,14 @@
 package communication
 
 import (
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
+	"github.com/maelstrom/v3/pkg/services/observability"
 )
 
 func TestCommunicationService_NewCommunicationServiceReturnsNonNil(t *testing.T) {
@@ -285,5 +288,432 @@ func TestCommunicationService_UnsubscribeNotFoundReturnsError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "no subscribers") {
 		t.Errorf("Expected error mentioning 'no subscribers', got %v", err)
+	}
+}
+
+func TestCommunicationService_RetryOnFailure(t *testing.T) {
+	svc := NewCommunicationService()
+
+	m := mail.Mail{Source: "test", Target: "non-existent:address"}
+
+	err := svc.PublishWithRetry(&m, 3)
+
+	if err == nil {
+		t.Error("Expected error after retries, got nil")
+	}
+}
+
+func TestCommunicationService_ExponentialBackoff(t *testing.T) {
+	svc := NewCommunicationService()
+
+	start := time.Now()
+	m := mail.Mail{Source: "test", Target: "non-existent:address"}
+
+	err := svc.PublishWithRetry(&m, 3)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Error("Expected error after retries, got nil")
+	}
+	if elapsed < 1*time.Second {
+		t.Errorf("Expected exponential backoff delays, got %v", elapsed)
+	}
+}
+
+func TestCommunicationService_MaxRespectsLimit(t *testing.T) {
+	svc := NewCommunicationService()
+
+	start := time.Now()
+	m := mail.Mail{Source: "test", Target: "non-existent:address"}
+
+	err := svc.PublishWithRetry(&m, 1)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Error("Expected error after max retries, got nil")
+	}
+	if elapsed > 2*time.Second {
+		t.Errorf("Expected to respect max retries limit, got %v elapsed", elapsed)
+	}
+}
+
+func TestCommunicationService_DeliveryTracking(t *testing.T) {
+	svc := NewCommunicationService()
+
+	correlationID := "test-tracking-123"
+	m := mail.Mail{Source: "test", Target: "non-existent:address", CorrelationID: correlationID}
+
+	svc.PublishWithRetry(&m, 2)
+
+	svc.trackDeliveryAttempt(correlationID)
+	svc.trackDeliveryAttempt(correlationID)
+	svc.trackDeliveryAttempt(correlationID)
+}
+
+func TestCommunicationService_RequestReply(t *testing.T) {
+	svc := NewCommunicationService()
+
+	mailChan, err := svc.Subscribe("agent:reply")
+	if err != nil {
+		t.Fatalf("Subscribe failed: %v", err)
+	}
+
+	replyChan := make(chan *mail.Mail)
+	go func() {
+		for m := range mailChan {
+			replyChan <- &m
+		}
+	}()
+
+	correlationID := "test-correlation-456"
+	requestMail := mail.Mail{
+		ID:            "request-1",
+		CorrelationID: correlationID,
+		Source:        "agent:requester",
+		Target:        "agent:handler",
+		Type:          mail.MailTypeUser,
+		Content:       "test request",
+	}
+
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		replyMail := mail.Mail{
+			ID:            "reply-1",
+			CorrelationID: correlationID,
+			Source:        "agent:handler",
+			Target:        "agent:reply",
+			Type:          mail.MailTypeAssistant,
+			Content:       "test reply",
+		}
+		_, _ = svc.Publish(replyMail)
+	}()
+
+	reply, err := svc.Request(replyChan, 1*time.Second)
+
+	if err != nil {
+		t.Errorf("Request failed: %v", err)
+	}
+	if reply == nil {
+		t.Error("Expected non-nil reply")
+	}
+	if reply.CorrelationID != correlationID {
+		t.Errorf("Expected CorrelationID %s, got %s", correlationID, reply.CorrelationID)
+	}
+	if reply.Content != "test reply" {
+		t.Errorf("Expected content 'test reply', got %v", reply.Content)
+	}
+	_ = requestMail
+}
+
+func TestCommunicationService_CorrelationIdMatching(t *testing.T) {
+	svc := NewCommunicationService()
+
+	correlationID := "corr-match-789"
+	otherCorrelationID := "other-corr-abc"
+
+	matchingMail := &mail.Mail{
+		ID:            "mail-1",
+		CorrelationID: correlationID,
+		Source:        "agent:sender",
+		Target:        "agent:receiver",
+		Type:          mail.MailTypeUser,
+		Content:       "matching content",
+	}
+
+	nonMatchingMail := &mail.Mail{
+		ID:            "mail-2",
+		CorrelationID: otherCorrelationID,
+		Source:        "agent:sender",
+		Target:        "agent:receiver",
+		Type:          mail.MailTypeUser,
+		Content:       "non-matching content",
+	}
+
+	matchResult := svc.matchReply(correlationID, matchingMail)
+	if !matchResult {
+		t.Error("Expected match for matching correlationId")
+	}
+
+	nonMatchResult := svc.matchReply(correlationID, nonMatchingMail)
+	if nonMatchResult {
+		t.Error("Expected no match for different correlationId")
+	}
+
+	emptyCorrelationMail := &mail.Mail{
+		ID:            "mail-3",
+		CorrelationID: "",
+		Source:        "agent:sender",
+		Target:        "agent:receiver",
+		Type:          mail.MailTypeUser,
+		Content:       "empty correlation content",
+	}
+
+	emptyMatchResult := svc.matchReply("", emptyCorrelationMail)
+	if !emptyMatchResult {
+		t.Error("Expected match for empty correlationId")
+	}
+}
+
+func TestCommunicationService_RequestTimeout(t *testing.T) {
+	svc := NewCommunicationService()
+
+	mailChan, err := svc.Subscribe("agent:timeout-test")
+	if err != nil {
+		t.Fatalf("Subscribe failed: %v", err)
+	}
+
+	replyChan := make(chan *mail.Mail)
+	go func() {
+		for m := range mailChan {
+			replyChan <- &m
+		}
+	}()
+
+	_, err = svc.Request(replyChan, 50*time.Millisecond)
+
+	if err == nil {
+		t.Error("Expected timeout error, got nil")
+	}
+	if err.Error() != "request timeout" {
+		t.Errorf("Expected 'request timeout' error, got %v", err)
+	}
+}
+
+func TestCommunicationService_MultipleRequests(t *testing.T) {
+	svc := NewCommunicationService()
+
+	numRequests := 5
+	results := make(chan string, numRequests)
+
+	for i := 0; i < numRequests; i++ {
+		correlationID := fmt.Sprintf("multi-corr-%d", i)
+
+		mailChan, err := svc.Subscribe(fmt.Sprintf("agent:multi-reply-%d", i))
+		if err != nil {
+			t.Fatalf("Subscribe failed: %v", err)
+		}
+
+		replyChan := make(chan *mail.Mail)
+		go func() {
+			for m := range mailChan {
+				replyChan <- &m
+			}
+		}()
+
+		go func() {
+			time.Sleep(10 * time.Millisecond)
+			replyMail := mail.Mail{
+				ID:            fmt.Sprintf("reply-%d", i),
+				CorrelationID: correlationID,
+				Source:        "agent:handler",
+				Target:        fmt.Sprintf("agent:multi-reply-%d", i),
+				Type:          mail.MailTypeAssistant,
+				Content:       fmt.Sprintf("reply-%d", i),
+			}
+			_, _ = svc.Publish(replyMail)
+		}()
+
+		go func() {
+			reply, err := svc.Request(replyChan, 1*time.Second)
+			if err != nil {
+				results <- fmt.Sprintf("error-%d", i)
+				return
+			}
+			if reply.CorrelationID != correlationID {
+				results <- fmt.Sprintf("wrong-corr-%d", i)
+				return
+			}
+			results <- fmt.Sprintf("success-%d", i)
+		}()
+	}
+
+	successCount := 0
+	for i := 0; i < numRequests; i++ {
+		result := <-results
+		if strings.HasPrefix(result, "success-") {
+			successCount++
+		}
+	}
+
+	if successCount != numRequests {
+		t.Errorf("Expected %d successful requests, got %d", numRequests, successCount)
+	}
+}
+
+func TestCommunicationService_DeadLetterOnFailure(t *testing.T) {
+	svc := NewCommunicationService()
+	obs := observability.NewObservabilityService()
+	svc.SetObservability(obs)
+
+	m := mail.Mail{ID: "fail-mail-1", Source: "test", Target: "non-existent:address"}
+
+	err := svc.PublishWithRetry(&m, 0)
+
+	if err == nil {
+		t.Error("Expected error after delivery failure, got nil")
+	}
+
+	entries, err := obs.QueryDeadLetters()
+	if err != nil {
+		t.Errorf("Expected nil error from QueryDeadLetters, got %v", err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("Expected 1 dead letter entry, got %d", len(entries))
+	}
+	if entries[0].Mail.ID != "fail-mail-1" {
+		t.Errorf("Expected mail ID 'fail-mail-1', got %s", entries[0].Mail.ID)
+	}
+}
+
+func TestCommunicationService_DeadLetterWithReason(t *testing.T) {
+	svc := NewCommunicationService()
+	obs := observability.NewObservabilityService()
+	svc.SetObservability(obs)
+
+	m := mail.Mail{ID: "fail-mail-2", Source: "test", Target: "non-existent:address"}
+
+	err := svc.PublishWithRetry(&m, 0)
+
+	if err == nil {
+		t.Error("Expected error after delivery failure, got nil")
+	}
+
+	entries, err := obs.QueryDeadLetters()
+	if err != nil {
+		t.Errorf("Expected nil error from QueryDeadLetters, got %v", err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("Expected 1 dead letter entry, got %d", len(entries))
+	}
+	if entries[0].Reason != "delivery failed after max retries" {
+		t.Errorf("Expected reason 'delivery failed after max retries', got %s", entries[0].Reason)
+	}
+}
+
+func TestCommunicationService_DeadLetterAfterMaxRetries(t *testing.T) {
+	svc := NewCommunicationService()
+	obs := observability.NewObservabilityService()
+	svc.SetObservability(obs)
+
+	m := mail.Mail{ID: "fail-mail-3", Source: "test", Target: "non-existent:address"}
+
+	err := svc.PublishWithRetry(&m, 2)
+
+	if err == nil {
+		t.Error("Expected error after max retries, got nil")
+	}
+
+	entries, err := obs.QueryDeadLetters()
+	if err != nil {
+		t.Errorf("Expected nil error from QueryDeadLetters, got %v", err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("Expected 1 dead letter entry after max retries, got %d", len(entries))
+	}
+	if entries[0].Mail.ID != "fail-mail-3" {
+		t.Errorf("Expected mail ID 'fail-mail-3', got %s", entries[0].Mail.ID)
+	}
+	if entries[0].Reason != "delivery failed after max retries" {
+		t.Errorf("Expected reason 'delivery failed after max retries', got %s", entries[0].Reason)
+	}
+}
+
+func TestCommunicationService_Deduplication(t *testing.T) {
+	svc := NewCommunicationService()
+
+	correlationID := "dedup-test-123"
+	m1 := mail.Mail{ID: "mail-1", Source: "test", Target: "test-topic", CorrelationID: correlationID}
+	m2 := mail.Mail{ID: "mail-2", Source: "test", Target: "test-topic", CorrelationID: correlationID}
+
+	isDup1 := svc.isDuplicate(correlationID)
+	if isDup1 {
+		t.Error("First message should not be a duplicate")
+	}
+
+	svc.trackDeliveryAttempt(correlationID)
+
+	isDup2 := svc.isDuplicate(correlationID)
+	if !isDup2 {
+		t.Error("Second message with same correlationID should be a duplicate")
+	}
+
+	_, _ = svc.Publish(m1)
+	_, _ = svc.Publish(m2)
+}
+
+func TestCommunicationService_DeduplicationWindow(t *testing.T) {
+	svc := NewCommunicationService()
+
+	correlationID := "window-test-456"
+	window := 5 * time.Second
+
+	svc.trackDeliveryAttempt(correlationID)
+
+	withinWindow := svc.isWithinDeduplicationWindow(correlationID, window)
+	if !withinWindow {
+		t.Error("Message should be within deduplication window")
+	}
+
+	time.Sleep(100 * time.Millisecond)
+	withinWindow = svc.isWithinDeduplicationWindow(correlationID, window)
+	if !withinWindow {
+		t.Error("Message should still be within deduplication window")
+	}
+}
+
+func TestCommunicationService_DeduplicationExpiry(t *testing.T) {
+	svc := NewCommunicationService()
+
+	correlationID1 := "expire-test-1"
+	correlationID2 := "expire-test-2"
+	window := 100 * time.Millisecond
+
+	svc.trackDeliveryAttempt(correlationID1)
+	svc.trackDeliveryAttempt(correlationID2)
+
+	time.Sleep(150 * time.Millisecond)
+
+	svc.expireOldCorrelationIDs(window)
+
+	isDup1 := svc.isDuplicate(correlationID1)
+	if isDup1 {
+		t.Error("Old correlationID should be expired")
+	}
+
+	isDup2 := svc.isDuplicate(correlationID2)
+	if isDup2 {
+		t.Error("Old correlationID should be expired")
+	}
+}
+
+func TestCommunicationService_DeduplicationConcurrent(t *testing.T) {
+	svc := NewCommunicationService()
+
+	numGoroutines := 100
+	correlationID := "concurrent-test-789"
+	var wg sync.WaitGroup
+	duplicateCount := 0
+	var countMu sync.Mutex
+
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			isDup := svc.markAsSeen(correlationID)
+			if isDup {
+				countMu.Lock()
+				duplicateCount++
+				countMu.Unlock()
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	if duplicateCount == 0 {
+		t.Error("Expected at least one duplicate detected in concurrent scenario")
+	}
+	if duplicateCount >= numGoroutines {
+		t.Errorf("Expected fewer than %d duplicates, got %d", numGoroutines, duplicateCount)
 	}
 }

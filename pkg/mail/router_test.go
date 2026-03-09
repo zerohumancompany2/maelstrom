@@ -2,6 +2,22 @@ package mail
 
 import "testing"
 
+type mockTopicSubscriber struct {
+	ch chan Mail
+}
+
+func (m *mockTopicSubscriber) Receive() chan Mail {
+	return m.ch
+}
+
+func (m *mockTopicSubscriber) Subscribe(topic string) error {
+	return nil
+}
+
+func (m *mockTopicSubscriber) Unsubscribe(topic string) error {
+	return nil
+}
+
 func TestMailRouter_SubscribeMethods(t *testing.T) {
 	router := NewMailRouter()
 
@@ -133,5 +149,71 @@ func TestMailRouter_RouteToUnknownAddress(t *testing.T) {
 	err = router.Route(mail)
 	if err == nil {
 		t.Error("Expected error for invalid address format")
+	}
+}
+
+func TestParseAddress_agent(t *testing.T) {
+	addrType, id, err := ParseAddress("agent:user-123")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if addrType != AddressTypeAgent {
+		t.Errorf("Expected AddressTypeAgent, got %v", addrType)
+	}
+	if id != "user-123" {
+		t.Errorf("Expected id 'user-123', got %v", id)
+	}
+}
+
+func TestParseAddress_topic(t *testing.T) {
+	addrType, id, err := ParseAddress("topic:market-data")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if addrType != AddressTypeTopic {
+		t.Errorf("Expected AddressTypeTopic, got %v", addrType)
+	}
+	if id != "market-data" {
+		t.Errorf("Expected id 'market-data', got %v", id)
+	}
+}
+
+func TestParseAddress_sys(t *testing.T) {
+	addrType, id, err := ParseAddress("sys:heartbeat")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if addrType != AddressTypeSys {
+		t.Errorf("Expected AddressTypeSys, got %v", addrType)
+	}
+	if id != "heartbeat" {
+		t.Errorf("Expected id 'heartbeat', got %v", id)
+	}
+}
+
+func TestParseAddress_invalid(t *testing.T) {
+	_, _, err := ParseAddress("invalid-format")
+	if err == nil {
+		t.Error("Expected error for invalid format")
+	}
+}
+
+func TestTopicSubscriber_Interface(t *testing.T) {
+	sub := &mockTopicSubscriber{ch: make(chan Mail)}
+
+	var _ TopicSubscriber = sub
+}
+
+func TestTopicSubscriber_Subscribe(t *testing.T) {
+	sub := &mockTopicSubscriber{ch: make(chan Mail)}
+
+	err := sub.Subscribe("test-topic")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	err = sub.Unsubscribe("test-topic")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
 	}
 }

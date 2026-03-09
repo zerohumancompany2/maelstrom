@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"fmt"
+	"net/http"
 	"sync"
 
 	"github.com/maelstrom/v3/pkg/mail"
@@ -49,4 +50,65 @@ func (g *Gateway) ListAdapters() []string {
 		names = append(names, name)
 	}
 	return names
+}
+
+type GatewayService struct {
+	endpoints map[string]http.Handler
+	mu        sync.RWMutex
+}
+
+func NewGatewayService() *GatewayService {
+	return &GatewayService{
+		endpoints: make(map[string]http.Handler),
+	}
+}
+
+func (g *GatewayService) RegisterHTTPEndpoint(path string, handler http.Handler) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.endpoints[path] = handler
+	return nil
+}
+
+func (g *GatewayService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	for _, handler := range g.endpoints {
+		handler.ServeHTTP(w, r)
+	}
+}
+
+func (g *GatewayService) GetOpenAPISpec() *OpenAPISpec {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	spec := &OpenAPISpec{
+		OpenAPI: "3.0.0",
+		Info: Info{
+			Title:   "Gateway API",
+			Version: "1.0.0",
+		},
+		Paths: make(map[string]interface{}),
+	}
+
+	for path := range g.endpoints {
+		spec.Paths[path] = map[string]interface{}{
+			"get": map[string]interface{}{
+				"summary": "Endpoint at " + path,
+			},
+		}
+	}
+
+	return spec
+}
+
+func (g *GatewayService) checkBoundaryExposure(boundary mail.BoundaryType) bool {
+	switch boundary {
+	case mail.InnerBoundary:
+		return false
+	case mail.DMZBoundary, mail.OuterBoundary:
+		return true
+	default:
+		return false
+	}
 }

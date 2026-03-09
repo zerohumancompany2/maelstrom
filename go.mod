@@ -6,6 +6,7 @@ require (
 	github.com/antithesishq/antithesis-sdk-go v0.5.0-default-no-op // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/google/go-tpm v0.9.8 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/klauspost/compress v1.18.3 // indirect
 	github.com/minio/highwayhash v1.0.4-0.20251030100505-070ab1a87a76 // indirect
 	github.com/nats-io/jwt/v2 v2.8.0 // indirect

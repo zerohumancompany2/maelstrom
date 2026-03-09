@@ -1,6 +1,7 @@
 package observability
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -394,5 +395,145 @@ func TestObservabilityService_MetricsUpdateOnTrace(t *testing.T) {
 	metrics = svc.GetMetrics()
 	if metrics.StateCounts["root/state-b"] != 1 {
 		t.Errorf("Expected StateCounts['root/state-b'] = 1, got %d", metrics.StateCounts["root/state-b"])
+	}
+}
+
+func TestObservabilityService_QueryDeadLettersWithFilters(t *testing.T) {
+	svc := NewObservabilityService()
+
+	mail1 := mail.Mail{ID: "mail-1", Source: "src-1", Target: "tgt-1", Type: mail.Error}
+	mail2 := mail.Mail{ID: "mail-2", Source: "src-2", Target: "tgt-2", Type: mail.Error}
+	mail3 := mail.Mail{ID: "mail-3", Source: "src-3", Target: "tgt-3", Type: mail.Error}
+	svc.LogDeadLetter(mail1, "reason-a")
+	svc.LogDeadLetter(mail2, "reason-b")
+	svc.LogDeadLetter(mail3, "reason-a")
+
+	filters := &DeadLetterFilters{Reason: "reason-a"}
+	entries := svc.QueryDeadLettersWithFilters(filters)
+
+	if len(entries) != 2 {
+		t.Errorf("Expected 2 dead letter entries with reason-a, got %d", len(entries))
+	}
+	if entries[0].Reason != "reason-a" {
+		t.Errorf("Expected reason 'reason-a', got %s", entries[0].Reason)
+	}
+	if entries[1].Reason != "reason-a" {
+		t.Errorf("Expected reason 'reason-a', got %s", entries[1].Reason)
+	}
+}
+
+func TestObservabilityService_TransitionRate(t *testing.T) {
+	svc := NewObservabilityService()
+
+	svc.trackTransition("idle", "running")
+	svc.trackTransition("running", "stopped")
+	svc.trackTransition("idle", "running")
+
+	metrics := svc.GetMetrics()
+
+	if metrics.TransitionRate != 3 {
+		t.Errorf("Expected TransitionRate 3, got %f", metrics.TransitionRate)
+	}
+}
+
+func TestObservabilityService_EventRate(t *testing.T) {
+	svc := NewObservabilityService()
+
+	svc.trackEvent("transition")
+	svc.trackEvent("entry")
+	svc.trackEvent("exit")
+
+	metrics := svc.GetMetrics()
+
+	if metrics.EventRate != 3 {
+		t.Errorf("Expected EventRate 3, got %f", metrics.EventRate)
+	}
+}
+
+func TestObservabilityService_MetricsCollector(t *testing.T) {
+	svc := NewObservabilityService()
+
+	metrics := svc.GetMetrics()
+
+	if metrics.StateCounts == nil {
+		t.Error("Expected StateCounts to be non-nil")
+	}
+	if metrics.LastUpdate.IsZero() {
+		t.Error("Expected LastUpdate to be set")
+	}
+	if metrics.TransitionRate != 0 {
+		t.Errorf("Expected TransitionRate 0, got %f", metrics.TransitionRate)
+	}
+	if metrics.EventRate != 0 {
+		t.Errorf("Expected EventRate 0, got %f", metrics.EventRate)
+	}
+}
+
+func TestObservabilityService_MetricsAggregation(t *testing.T) {
+	svc := NewObservabilityService()
+
+	svc.trackTransition("idle", "running")
+	svc.trackEvent("transition")
+
+	aggregated := svc.aggregateMetrics(5 * time.Minute)
+
+	if aggregated.TransitionRate != 1 {
+		t.Errorf("Expected TransitionRate 1, got %f", aggregated.TransitionRate)
+	}
+	if aggregated.EventRate != 1 {
+		t.Errorf("Expected EventRate 1, got %f", aggregated.EventRate)
+	}
+}
+
+func TestObservabilityService_QueryDeadLettersNoCopy(t *testing.T) {
+	svc := NewObservabilityService()
+
+	mail1 := mail.Mail{ID: "mail-1", Source: "src-1", Target: "tgt-1", Type: mail.Error}
+	svc.LogDeadLetter(mail1, "reason-1")
+
+	filters := &DeadLetterFilters{Reason: "reason-1"}
+	entries := svc.QueryDeadLettersNoCopy(filters)
+
+	if len(entries) != 1 {
+		t.Errorf("Expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].Mail.ID != "mail-1" {
+		t.Errorf("Expected mail ID mail-1, got %s", entries[0].Mail.ID)
+	}
+}
+
+func TestObservabilityService_QueryDeadLettersMemory(t *testing.T) {
+	svc := NewObservabilityService()
+
+	for i := 0; i < 100; i++ {
+		mail := mail.Mail{ID: fmt.Sprintf("mail-%d", i), Source: "src", Target: "tgt", Type: mail.Error}
+		svc.LogDeadLetter(mail, "reason")
+	}
+
+	memoryUsage := svc.getMemoryUsage()
+
+	if memoryUsage == 0 {
+		t.Error("Expected memory usage to be greater than 0")
+	}
+}
+
+func TestObservabilityService_QueryDeadLettersLargeSet(t *testing.T) {
+	svc := NewObservabilityService()
+
+	for i := 0; i < 10000; i++ {
+		mail := mail.Mail{ID: fmt.Sprintf("mail-%d", i), Source: "src", Target: "tgt", Type: mail.Error}
+		svc.LogDeadLetter(mail, "reason")
+	}
+
+	start := time.Now()
+	filters := &DeadLetterFilters{Reason: "reason"}
+	entries := svc.QueryDeadLettersNoCopy(filters)
+	duration := time.Since(start)
+
+	if len(entries) != 10000 {
+		t.Errorf("Expected 10000 entries, got %d", len(entries))
+	}
+	if duration > 1*time.Second {
+		t.Errorf("Query took too long: %v", duration)
 	}
 }

@@ -24,6 +24,18 @@ func TestMail_StreamChunkHasRequiredFields(t *testing.T) {
 	}
 }
 
+func TestMailMetadata_StreamBool(t *testing.T) {
+	metadata := MailMetadata{}
+	metadata.Stream = true
+	if !metadata.Stream {
+		t.Error("MailMetadata.Stream should be bool type and settable to true")
+	}
+	metadata.Stream = false
+	if metadata.Stream {
+		t.Error("MailMetadata.Stream should be bool type and settable to false")
+	}
+}
+
 func TestMail_StreamChunkMigrationComplete(t *testing.T) {
 	// Test 1: mail.StreamChunk type exists and is usable
 	chunk := StreamChunk{
@@ -36,22 +48,60 @@ func TestMail_StreamChunkMigrationComplete(t *testing.T) {
 		t.Error("mail.StreamChunk should be usable")
 	}
 
-	// Test 2: MailMetadata.Stream field type is *StreamChunk (not bool)
+	// Test 2: MailMetadata.StreamChunk field type is *StreamChunk
 	metadata := MailMetadata{}
-	metadata.Stream = &chunk
-	if metadata.Stream == nil {
-		t.Error("MailMetadata.Stream should accept *StreamChunk")
+	metadata.StreamChunk = &chunk
+	if metadata.StreamChunk == nil {
+		t.Error("MailMetadata.StreamChunk should accept *StreamChunk")
 	}
 
-	// Test 3: Can assign nil to MailMetadata.Stream
-	metadata.Stream = nil
-	if metadata.Stream != nil {
-		t.Error("MailMetadata.Stream should accept nil")
+	// Test 3: Can assign nil to MailMetadata.StreamChunk
+	metadata.StreamChunk = nil
+	if metadata.StreamChunk != nil {
+		t.Error("MailMetadata.StreamChunk should accept nil")
 	}
 
-	// Test 4: Verify Stream field is pointer type by checking assignment works
-	metadata.Stream = &StreamChunk{Data: "final", Sequence: 2, IsFinal: true}
-	if metadata.Stream.Data != "final" {
-		t.Error("MailMetadata.Stream should be *StreamChunk type")
+	// Test 4: Verify StreamChunk field is pointer type by checking assignment works
+	metadata.StreamChunk = &StreamChunk{Data: "final", Sequence: 2, IsFinal: true}
+	if metadata.StreamChunk.Data != "final" {
+		t.Error("MailMetadata.StreamChunk should be *StreamChunk type")
+	}
+}
+
+func TestMailMetadata_TypeAlignment(t *testing.T) {
+	metadata := MailMetadata{
+		Tokens:      100,
+		Model:       "gpt-4",
+		Cost:        0.05,
+		Boundary:    InnerBoundary,
+		Taints:      []string{"TEST"},
+		Stream:      true,
+		StreamChunk: &StreamChunk{Data: "chunk", Sequence: 1},
+		IsFinal:     false,
+	}
+
+	if metadata.Tokens != 100 {
+		t.Error("Tokens field mismatch")
+	}
+	if metadata.Model != "gpt-4" {
+		t.Error("Model field mismatch")
+	}
+	if metadata.Cost != 0.05 {
+		t.Error("Cost field mismatch")
+	}
+	if metadata.Boundary != InnerBoundary {
+		t.Error("Boundary field mismatch")
+	}
+	if len(metadata.Taints) != 1 {
+		t.Error("Taints field mismatch")
+	}
+	if !metadata.Stream {
+		t.Error("Stream field mismatch")
+	}
+	if metadata.StreamChunk.Data != "chunk" {
+		t.Error("StreamChunk field mismatch")
+	}
+	if metadata.IsFinal {
+		t.Error("IsFinal field mismatch")
 	}
 }

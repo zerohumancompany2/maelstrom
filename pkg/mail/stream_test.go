@@ -165,3 +165,216 @@ func TestStreamChunk_Sequence(t *testing.T) {
 		t.Errorf("Expected first sequence to be 1, got %d", chunks[0].Sequence)
 	}
 }
+
+func TestStreamSession_Send(t *testing.T) {
+	session := NewStreamSession("test-session", nil)
+	chunk := StreamChunk{Data: "test data", Sequence: 1, IsFinal: false}
+
+	err := session.Send(chunk)
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	received, ok := <-session.Chunks
+	if !ok {
+		t.Error("Expected channel to be open and contain chunk")
+	}
+
+	if received.Data != chunk.Data {
+		t.Errorf("Expected data 'test data', got '%s'", received.Data)
+	}
+	if received.Sequence != chunk.Sequence {
+		t.Errorf("Expected sequence 1, got %d", received.Sequence)
+	}
+}
+
+func TestStreamSession_SendMultiple(t *testing.T) {
+	session := NewStreamSession("test-session", nil)
+	chunks := []StreamChunk{
+		{Data: "Part 1", Sequence: 1, IsFinal: false},
+		{Data: "Part 2", Sequence: 2, IsFinal: false},
+		{Data: "Part 3", Sequence: 3, IsFinal: true},
+	}
+
+	for _, chunk := range chunks {
+		err := session.Send(chunk)
+		if err != nil {
+			t.Errorf("Expected nil error for chunk %d, got %v", chunk.Sequence, err)
+		}
+	}
+
+	received := make([]StreamChunk, 0, 3)
+	for i := 0; i < 3; i++ {
+		receivedChunk, ok := <-session.Chunks
+		if !ok {
+			t.Errorf("Expected to receive chunk %d but channel was closed", i+1)
+			break
+		}
+		received = append(received, receivedChunk)
+	}
+
+	if len(received) != 3 {
+		t.Errorf("Expected 3 chunks, got %d", len(received))
+	}
+
+	for i, chunk := range chunks {
+		if received[i].Data != chunk.Data {
+			t.Errorf("Chunk %d: Expected data '%s', got '%s'", i+1, chunk.Data, received[i].Data)
+		}
+		if received[i].Sequence != chunk.Sequence {
+			t.Errorf("Chunk %d: Expected sequence %d, got %d", i+1, chunk.Sequence, received[i].Sequence)
+		}
+	}
+}
+
+func TestStreamSession_Close(t *testing.T) {
+	session := NewStreamSession("test-session", nil)
+
+	err := session.Close()
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	if !session.Closed {
+		t.Error("Expected session to be closed")
+	}
+
+	select {
+	case _, ok := <-session.Chunks:
+		if ok {
+			t.Error("Expected channel to be closed")
+		}
+	default:
+		// Channel may have no data, check if closed
+		if !session.Closed {
+			t.Error("Expected session to be marked as closed")
+		}
+	}
+}
+
+func TestStreamSession_CloseAfterSend(t *testing.T) {
+	session := NewStreamSession("test-session", nil)
+
+	chunks := []StreamChunk{
+		{Data: "Part 1", Sequence: 1, IsFinal: false},
+		{Data: "Part 2", Sequence: 2, IsFinal: true},
+	}
+
+	for _, chunk := range chunks {
+		err := session.Send(chunk)
+		if err != nil {
+			t.Errorf("Expected nil error for chunk %d, got %v", chunk.Sequence, err)
+		}
+	}
+
+	err := session.Close()
+	if err != nil {
+		t.Errorf("Expected nil error on Close, got %v", err)
+	}
+
+	if !session.Closed {
+		t.Error("Expected session to be closed after Close()")
+	}
+
+	received := make([]StreamChunk, 0)
+	for chunk := range session.Chunks {
+		received = append(received, chunk)
+	}
+
+	if len(received) != 2 {
+		t.Errorf("Expected 2 chunks before close, got %d", len(received))
+	}
+
+	err = session.Send(StreamChunk{Data: "after close", Sequence: 3})
+	if err == nil {
+		t.Error("Expected error when sending to closed session")
+	}
+}
+
+func TestMailStream_TaintStripping(t *testing.T) {
+	session := NewStreamSession("test-session", nil)
+	chunk := StreamChunk{
+		Data:     "test data",
+		Sequence: 1,
+		Taints:   []string{"USER_SUPPLIED", "TOOL_OUTPUT", "INNER_BOUNDARY"},
+	}
+
+	stripped := session.stripTaints(&chunk)
+
+	if len(stripped.Taints) != 2 {
+		t.Errorf("Expected 2 taints after stripping, got %d", len(stripped.Taints))
+	}
+
+	hasUserSupplied := false
+	hasToolOutput := false
+	for _, t := range stripped.Taints {
+		if t == "USER_SUPPLIED" {
+			hasUserSupplied = true
+		}
+		if t == "TOOL_OUTPUT" {
+			hasToolOutput = true
+		}
+	}
+	if !hasUserSupplied {
+		t.Error("Expected USER_SUPPLIED to be preserved")
+	}
+	if !hasToolOutput {
+		t.Error("Expected TOOL_OUTPUT to be preserved")
+	}
+	hasInnerBoundary := false
+	for _, t := range stripped.Taints {
+		if t == "INNER_BOUNDARY" {
+			hasInnerBoundary = true
+		}
+	}
+	if hasInnerBoundary {
+		t.Error("Expected INNER_BOUNDARY to be stripped")
+	}
+}
+
+func TestMailStream_TaintPropagation(t *testing.T) {
+	session := NewStreamSession("test-session", nil)
+
+	inputChunk := StreamChunk{
+		Data:     "test data",
+		Sequence: 1,
+		Taints:   []string{"USER_SUPPLIED"},
+	}
+
+	propagated := session.propagateTaints(&inputChunk, []string{"PROCESSING"})
+
+	if len(propagated.Taints) != 2 {
+		t.Errorf("Expected 2 taints after propagation, got %d", len(propagated.Taints))
+	}
+
+	hasUserSupplied := false
+	hasProcessing := false
+	for _, t := range propagated.Taints {
+		if t == "USER_SUPPLIED" {
+			hasUserSupplied = true
+		}
+		if t == "PROCESSING" {
+			hasProcessing = true
+		}
+	}
+	if !hasUserSupplied {
+		t.Error("Expected USER_SUPPLIED to be preserved")
+	}
+	if !hasProcessing {
+		t.Error("Expected PROCESSING to be added")
+	}
+}
+
+func TestMailStream_SecurityCheck(t *testing.T) {
+	session := NewStreamSession("test-session", nil)
+
+	err := session.checkSecurityBoundary(InnerBoundary, DMZBoundary)
+	if err != nil {
+		t.Errorf("Expected nil error for valid boundary transition, got %v", err)
+	}
+
+	err = session.checkSecurityBoundary(DMZBoundary, InnerBoundary)
+	if err == nil {
+		t.Error("Expected error for invalid boundary transition")
+	}
+}

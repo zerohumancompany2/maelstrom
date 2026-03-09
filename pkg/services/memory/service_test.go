@@ -65,3 +65,27 @@ func TestMemory_List(t *testing.T) {
 		t.Errorf("Expected 0 results, got %d", len(results))
 	}
 }
+
+func TestMemoryService_Store(t *testing.T) {
+	svc := NewMemoryService()
+
+	err := svc.StoreKey("test-key", "test-value")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+}
+
+func TestMemoryService_Query(t *testing.T) {
+	svc := NewMemoryService()
+
+	svc.StoreKey("test-key", "test-value")
+
+	val, err := svc.QueryKey("test-key")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	if val != "test-value" {
+		t.Errorf("Expected 'test-value', got '%v'", val)
+	}
+}

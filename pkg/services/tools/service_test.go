@@ -188,3 +188,27 @@ func TestTools_NotFound(t *testing.T) {
 		t.Fatalf("Unregister nonexistent tool failed: %v", err)
 	}
 }
+
+func TestToolsService_Register(t *testing.T) {
+	svc := NewToolsService()
+
+	err := svc.RegisterByName("test-tool", ToolDescriptor{Name: "test-tool"})
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+}
+
+func TestToolsService_Resolve(t *testing.T) {
+	svc := NewToolsService()
+
+	svc.RegisterByName("test-tool", ToolDescriptor{Name: "test-tool"})
+
+	tool, err := svc.ResolveByName("test-tool")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	if tool.Name != "test-tool" {
+		t.Errorf("Expected name 'test-tool', got '%s'", tool.Name)
+	}
+}

@@ -37,6 +37,12 @@ type Kernel struct {
 	onCompleteCalled atomic.Bool
 	logOutput        []string
 	logMu            sync.RWMutex
+	serviceOrder     []string
+	orderMu          sync.RWMutex
+	readyEvents      []string
+	eventsMu         sync.RWMutex
+	failService      string
+	failMu           sync.RWMutex
 }
 
 // kernelApplicationContext provides application context with kernel engine access.
@@ -446,6 +452,60 @@ func (k *Kernel) SetServiceReady(name string) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	k.serviceReady[name] = true
+}
+
+// BootstrapServices starts all services in the correct order.
+func (k *Kernel) BootstrapServices() error {
+	serviceOrder := []string{"sys:security", "sys:communication", "sys:observability", "sys:lifecycle"}
+	for _, serviceID := range serviceOrder {
+		if err := k.startServiceInOrder(serviceID); err != nil {
+			return fmt.Errorf("failed to start service %s: %w", serviceID, err)
+		}
+	}
+	return nil
+}
+
+// startServiceInOrder starts a service and tracks its state.
+func (k *Kernel) startServiceInOrder(serviceID string) error {
+	k.failMu.RLock()
+	shouldFail := k.failService == serviceID
+	k.failMu.RUnlock()
+
+	if shouldFail {
+		return fmt.Errorf("service %s failed to start", serviceID)
+	}
+
+	k.mu.Lock()
+	k.serviceReady[serviceID] = true
+	k.mu.Unlock()
+
+	k.orderMu.Lock()
+	k.serviceOrder = append(k.serviceOrder, serviceID)
+	k.orderMu.Unlock()
+
+	k.eventsMu.Lock()
+	k.readyEvents = append(k.readyEvents, serviceID)
+	k.eventsMu.Unlock()
+
+	return nil
+}
+
+// GetServiceOrder returns the order in which services were started.
+func (k *Kernel) GetServiceOrder() []string {
+	k.orderMu.RLock()
+	defer k.orderMu.RUnlock()
+	result := make([]string, len(k.serviceOrder))
+	copy(result, k.serviceOrder)
+	return result
+}
+
+// GetReadyEvents returns the ready events emitted during bootstrap.
+func (k *Kernel) GetReadyEvents() []string {
+	k.eventsMu.RLock()
+	defer k.eventsMu.RUnlock()
+	result := make([]string, len(k.readyEvents))
+	copy(result, k.readyEvents)
+	return result
 }
 
 // IsKernelReady returns true if all services are ready.

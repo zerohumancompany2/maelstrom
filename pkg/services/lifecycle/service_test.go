@@ -265,3 +265,175 @@ func TestLifecycleService_NewWithEngineReturnsNonNil(t *testing.T) {
 		t.Error("Expected NewLifecycleService(engine) to return non-nil")
 	}
 }
+
+func TestLifecycleService_RuntimeStateUpdate(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+	}
+	rtID, _ := svc.Spawn(def)
+
+	err := svc.updateRuntimeState(string(rtID), "running")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	list, _ := svc.List()
+	if len(list) != 1 {
+		t.Errorf("Expected 1 runtime, got %d", len(list))
+	}
+	if list[0].ActiveStates[0] != "running" {
+		t.Errorf("Expected state 'running', got %v", list[0].ActiveStates)
+	}
+}
+
+func TestLifecycleService_ListWithStates(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def1 := statechart.ChartDefinition{ID: "chart-1", InitialState: "idle"}
+	def2 := statechart.ChartDefinition{ID: "chart-2", InitialState: "running"}
+	rtID1, _ := svc.Spawn(def1)
+	_, _ = svc.Spawn(def2)
+
+	svc.updateRuntimeState(string(rtID1), "active")
+
+	runtimes, _ := svc.List()
+
+	if len(runtimes) != 2 {
+		t.Errorf("Expected 2 runtimes, got %d", len(runtimes))
+	}
+	foundActive := false
+	for _, rt := range runtimes {
+		if rt.ActiveStates[0] == "active" {
+			foundActive = true
+			break
+		}
+	}
+	if !foundActive {
+		t.Error("Expected to find runtime with 'active' state")
+	}
+}
+
+func TestLifecycleService_StateHistory(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{ID: "chart-1", InitialState: "idle"}
+	rtID, _ := svc.Spawn(def)
+
+	svc.updateRuntimeState(string(rtID), "running")
+	svc.updateRuntimeState(string(rtID), "stopped")
+
+	history := svc.getStateHistory(string(rtID))
+
+	if len(history) != 3 {
+		t.Errorf("Expected 3 state transitions, got %d", len(history))
+	}
+	if history[0].From != "" || history[0].To != "idle" {
+		t.Errorf("Expected first transition to idle, got %s -> %s", history[0].From, history[0].To)
+	}
+	if history[1].From != "idle" || history[1].To != "running" {
+		t.Errorf("Expected second transition idle -> running, got %s -> %s", history[1].From, history[1].To)
+	}
+	if history[2].From != "running" || history[2].To != "stopped" {
+		t.Errorf("Expected third transition running -> stopped, got %s -> %s", history[2].From, history[2].To)
+	}
+}
+
+func TestLifecycleService_HotReload(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+	}
+
+	rtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	err = svc.HotReload(string(rtID))
+	if err != nil {
+		t.Errorf("Expected HotReload to return nil, got %v", err)
+	}
+}
+
+func TestLifecycleService_HotReloadStatePreservation(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+	}
+
+	rtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	svc.updateRuntimeState(string(rtID), "running")
+
+	err = svc.preserveState(string(rtID))
+	if err != nil {
+		t.Errorf("Expected preserveState to return nil, got %v", err)
+	}
+
+	savedState := svc.getSavedState(string(rtID))
+	if savedState != "running" {
+		t.Errorf("Expected saved state 'running', got %s", savedState)
+	}
+}
+
+func TestLifecycleService_HotReloadFailure(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	err := svc.HotReload("non-existent-runtime")
+	if err == nil {
+		t.Error("Expected HotReload to return error for non-existent runtime")
+	}
+	if err != statechart.ErrRuntimeNotFound {
+		t.Errorf("Expected ErrRuntimeNotFound, got %v", err)
+	}
+}
+
+func TestLifecycleService_HotReloadRollback(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+	}
+
+	rtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	svc.updateRuntimeState(string(rtID), "running")
+
+	err = svc.preserveState(string(rtID))
+	if err != nil {
+		t.Fatalf("Expected preserveState to return nil, got %v", err)
+	}
+
+	svc.updateRuntimeState(string(rtID), "failed")
+
+	err = svc.rollbackReload(string(rtID))
+	if err != nil {
+		t.Errorf("Expected rollbackReload to return nil, got %v", err)
+	}
+
+	list, _ := svc.List()
+	if len(list) != 1 {
+		t.Errorf("Expected 1 runtime, got %d", len(list))
+	}
+	if list[0].ActiveStates[0] != "running" {
+		t.Errorf("Expected state restored to 'running', got %s", list[0].ActiveStates[0])
+	}
+}

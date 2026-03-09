@@ -130,6 +130,98 @@ func TestServiceRegistry_ListEmpty(t *testing.T) {
 	}
 }
 
+func TestServiceRegistry_RegisterWithState(t *testing.T) {
+	sr := NewServiceRegistry()
+	svc := &mockService{id: "test:service"}
+
+	err := sr.RegisterWithState(svc, "registered")
+	if err != nil {
+		t.Fatalf("RegisterWithState() returned error: %v", err)
+	}
+
+	retrieved, ok := sr.Get(svc.ID())
+	if !ok {
+		t.Fatal("Get() returned false for registered service")
+	}
+	if retrieved.(*mockService) != svc {
+		t.Fatal("Get() returned wrong service")
+	}
+
+	state, ok := sr.GetState(svc.ID())
+	if !ok {
+		t.Fatal("GetState() returned false for registered service")
+	}
+	if state != "registered" {
+		t.Fatalf("GetState() returned %q, want %q", state, "registered")
+	}
+}
+
+func TestServiceRegistry_UpdateState(t *testing.T) {
+	sr := NewServiceRegistry()
+	svc := &mockService{id: "test:service"}
+
+	err := sr.RegisterWithState(svc, "registered")
+	if err != nil {
+		t.Fatalf("RegisterWithState() returned error: %v", err)
+	}
+
+	err = sr.UpdateState(svc.ID(), "running")
+	if err != nil {
+		t.Fatalf("UpdateState() returned error: %v", err)
+	}
+
+	state, ok := sr.GetState(svc.ID())
+	if !ok {
+		t.Fatal("GetState() returned false after update")
+	}
+	if state != "running" {
+		t.Fatalf("GetState() returned %q, want %q", state, "running")
+	}
+
+	err = sr.UpdateState("nonexistent", "running")
+	if err != ErrNotFound {
+		t.Fatalf("UpdateState() returned %v, want %v", err, ErrNotFound)
+	}
+}
+
+func TestServiceRegistry_QueryByState(t *testing.T) {
+	sr := NewServiceRegistry()
+
+	svc1 := &mockService{id: "test:service1"}
+	svc2 := &mockService{id: "test:service2"}
+	svc3 := &mockService{id: "test:service3"}
+
+	sr.RegisterWithState(svc1, "registered")
+	sr.RegisterWithState(svc2, "running")
+	sr.RegisterWithState(svc3, "running")
+
+	services := sr.QueryByState("running")
+	if len(services) != 2 {
+		t.Fatalf("QueryByState() returned %d services, want 2", len(services))
+	}
+
+	running := make(map[string]bool)
+	for _, s := range services {
+		running[s.ID()] = true
+	}
+	if !running["test:service2"] || !running["test:service3"] {
+		t.Fatal("QueryByState() returned wrong services")
+	}
+
+	services = sr.QueryByState("registered")
+	if len(services) != 1 {
+		t.Fatalf("QueryByState() returned %d services, want 1", len(services))
+	}
+	if services[0].ID() != "test:service1" {
+		t.Fatalf("QueryByState() returned wrong service ID")
+	}
+
+	services = sr.QueryByState("stopped")
+	if len(services) != 0 {
+		t.Fatalf("QueryByState() returned %d services, want 0", len(services))
+	}
+}
+
 func TestAllServicesIntegrateViaRegistry(t *testing.T) {
 	sr := NewServiceRegistry()
 

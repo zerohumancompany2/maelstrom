@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/maelstrom/v3/pkg/bootstrap"
+	"github.com/maelstrom/v3/pkg/runtime"
+	"github.com/maelstrom/v3/pkg/services/communication"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
 
@@ -709,6 +711,112 @@ func assertDormantLogged(t *testing.T, logs []string) {
 	}
 	if !found {
 		t.Errorf("Expected 'going dormant' in logs. Got: %v", logs)
+	}
+}
+
+func TestKernel_BootstrapServices(t *testing.T) {
+	kernel := &Kernel{
+		engine:       statechart.NewEngine(),
+		services:     make(map[string]statechart.RuntimeID),
+		serviceReady: make(map[string]bool),
+		runtimes:     make(map[string]*runtime.ChartRuntime),
+		mailSystem:   communication.NewCommunicationService(),
+	}
+
+	err := kernel.BootstrapServices()
+	if err != nil {
+		t.Fatalf("BootstrapServices() returned error: %v", err)
+	}
+
+	expectedServices := []string{"sys:security", "sys:communication", "sys:observability", "sys:lifecycle"}
+	for _, svc := range expectedServices {
+		if !kernel.IsServiceReady(svc) {
+			t.Errorf("Service %s should be ready after BootstrapServices()", svc)
+		}
+	}
+}
+
+func TestKernel_BootstrapSequence(t *testing.T) {
+	kernel := &Kernel{
+		engine:       statechart.NewEngine(),
+		services:     make(map[string]statechart.RuntimeID),
+		serviceReady: make(map[string]bool),
+		runtimes:     make(map[string]*runtime.ChartRuntime),
+		mailSystem:   communication.NewCommunicationService(),
+	}
+
+	err := kernel.BootstrapServices()
+	if err != nil {
+		t.Fatalf("BootstrapServices() returned error: %v", err)
+	}
+
+	actualOrder := kernel.GetServiceOrder()
+	expectedOrder := []string{"sys:security", "sys:communication", "sys:observability", "sys:lifecycle"}
+
+	if len(actualOrder) != len(expectedOrder) {
+		t.Fatalf("expected %d services, got %d: %v", len(expectedOrder), len(actualOrder), actualOrder)
+	}
+
+	for i, expectedSvc := range expectedOrder {
+		if actualOrder[i] != expectedSvc {
+			t.Errorf("service[%d]: expected %q, got %q", i, expectedSvc, actualOrder[i])
+		}
+	}
+}
+
+func TestKernel_ServiceReadyEvents(t *testing.T) {
+	kernel := &Kernel{
+		engine:       statechart.NewEngine(),
+		services:     make(map[string]statechart.RuntimeID),
+		serviceReady: make(map[string]bool),
+		runtimes:     make(map[string]*runtime.ChartRuntime),
+		mailSystem:   communication.NewCommunicationService(),
+	}
+
+	err := kernel.BootstrapServices()
+	if err != nil {
+		t.Fatalf("BootstrapServices() returned error: %v", err)
+	}
+
+	events := kernel.GetReadyEvents()
+	expectedEvents := []string{"sys:security", "sys:communication", "sys:observability", "sys:lifecycle"}
+
+	if len(events) != len(expectedEvents) {
+		t.Fatalf("expected %d events, got %d: %v", len(expectedEvents), len(events), events)
+	}
+
+	for i, expectedEvent := range expectedEvents {
+		if events[i] != expectedEvent {
+			t.Errorf("event[%d]: expected %q, got %q", i, expectedEvent, events[i])
+		}
+	}
+}
+
+func TestKernel_BootstrapFailure(t *testing.T) {
+	kernel := &Kernel{
+		engine:       statechart.NewEngine(),
+		services:     make(map[string]statechart.RuntimeID),
+		serviceReady: make(map[string]bool),
+		runtimes:     make(map[string]*runtime.ChartRuntime),
+		mailSystem:   communication.NewCommunicationService(),
+		failService:  "sys:communication",
+	}
+
+	err := kernel.BootstrapServices()
+	if err == nil {
+		t.Fatal("BootstrapServices() should return error when service fails")
+	}
+
+	if !strings.Contains(err.Error(), "sys:communication") {
+		t.Errorf("error should mention failed service, got: %v", err)
+	}
+
+	if !kernel.IsServiceReady("sys:security") {
+		t.Error("sys:security should be ready before failure")
+	}
+
+	if kernel.IsServiceReady("sys:communication") {
+		t.Error("sys:communication should not be ready after failure")
 	}
 }
 

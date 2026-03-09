@@ -16,7 +16,7 @@ func TestSSEAdapter_NormalizeOutbound(t *testing.T) {
 		Type:    mail.MailTypeAssistant,
 		Content: "Hello, world!",
 		Metadata: mail.MailMetadata{
-			Stream: nil,
+			StreamChunk: nil,
 		},
 	}
 
@@ -39,7 +39,7 @@ func TestSSEAdapter_NormalizeOutbound(t *testing.T) {
 		Type:    mail.MailTypePartialAssistant,
 		Content: "chunk data",
 		Metadata: mail.MailMetadata{
-			Stream: &mail.StreamChunk{
+			StreamChunk: &mail.StreamChunk{
 				Sequence: 1,
 				IsFinal:  false,
 			},

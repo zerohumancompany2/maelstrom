@@ -44,8 +44,8 @@ func (a *SSEAdapter) NormalizeOutbound(mailObj mail.Mail) ([]byte, error) {
 	}
 	sb.WriteString(fmt.Sprintf("data: %s\n", string(dataJSON)))
 
-	if mailObj.Metadata.Stream != nil {
-		chunk := mailObj.Metadata.Stream
+	if mailObj.Metadata.StreamChunk != nil {
+		chunk := mailObj.Metadata.StreamChunk
 		sb.WriteString(fmt.Sprintf("id: %d\n", chunk.Sequence))
 		if chunk.IsFinal {
 			sb.WriteString("event: end\n")

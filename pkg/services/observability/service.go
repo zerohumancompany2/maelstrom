@@ -95,6 +95,22 @@ func (o *ObservabilityService) QueryDeadLetters() ([]DeadLetterEntry, error) {
 	return result, nil
 }
 
+func (o *ObservabilityService) QueryDeadLettersWithFilters(filters *DeadLetterFilters) []*DeadLetterEntry {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	var result []*DeadLetterEntry
+	for i := range o.deadLetters {
+		entry := &o.deadLetters[i]
+		if filters != nil {
+			if filters.Reason != "" && entry.Reason != filters.Reason {
+				continue
+			}
+		}
+		result = append(result, entry)
+	}
+	return result
+}
+
 func (o *ObservabilityService) GetMetrics() services.MetricsCollector {
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -104,4 +120,58 @@ func (o *ObservabilityService) GetMetrics() services.MetricsCollector {
 		result.StateCounts[k] = v
 	}
 	return result
+}
+
+func (o *ObservabilityService) trackTransition(from, to string) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.metrics.TransitionRate++
+}
+
+func (o *ObservabilityService) trackEvent(eventType string) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.metrics.EventRate++
+}
+
+func (o *ObservabilityService) aggregateMetrics(duration time.Duration) services.MetricsCollector {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	result := o.metrics
+	result.StateCounts = make(map[string]int)
+	for k, v := range o.metrics.StateCounts {
+		result.StateCounts[k] = v
+	}
+	return result
+}
+
+func (o *ObservabilityService) QueryDeadLettersNoCopy(filters *DeadLetterFilters) []*DeadLetterEntry {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	var result []*DeadLetterEntry
+	for i := range o.deadLetters {
+		entry := &o.deadLetters[i]
+		if filters != nil {
+			if filters.Reason != "" && entry.Reason != filters.Reason {
+				continue
+			}
+			if filters.RuntimeID != "" && entry.Mail.Source != filters.RuntimeID {
+				continue
+			}
+			if !filters.FromTime.IsZero() && entry.Logged.Before(filters.FromTime) {
+				continue
+			}
+			if !filters.ToTime.IsZero() && entry.Logged.After(filters.ToTime) {
+				continue
+			}
+		}
+		result = append(result, entry)
+	}
+	return result
+}
+
+func (o *ObservabilityService) getMemoryUsage() uint64 {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return uint64(len(o.deadLetters) * 100)
 }

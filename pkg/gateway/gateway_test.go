@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/maelstrom/v3/pkg/gateway/adapters"
@@ -143,5 +144,95 @@ func TestAdapter_NormalizationRoundTrip(t *testing.T) {
 			t.Errorf("Adapter %s: Expected source '%s', got '%s'",
 				adapter.Name(), expectedSource, inbound.Source)
 		}
+	}
+}
+
+func TestGatewayService_RegisterHTTPEndpoint(t *testing.T) {
+	gw := NewGatewayService()
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+
+	err := gw.RegisterHTTPEndpoint("/test", handler)
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+}
+
+func TestGatewayService_HTTPEndpointHandler(t *testing.T) {
+	gw := NewGatewayService()
+
+	called := false
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	})
+
+	err := gw.RegisterHTTPEndpoint("/test", handler)
+	if err != nil {
+		t.Fatalf("Expected nil error, got %v", err)
+	}
+
+	rr := &testResponseWriter{}
+	req := &http.Request{}
+
+	gw.ServeHTTP(rr, req)
+
+	if !called {
+		t.Error("Expected handler to be called")
+	}
+}
+
+type testResponseWriter struct {
+	code int
+}
+
+func (t *testResponseWriter) Header() http.Header {
+	return make(http.Header)
+}
+
+func (t *testResponseWriter) Write([]byte) (int, error) {
+	return 0, nil
+}
+
+func (t *testResponseWriter) WriteHeader(code int) {
+	t.code = code
+}
+
+func TestGatewayService_OpenAPIRegistration(t *testing.T) {
+	gw := NewGatewayService()
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+
+	err := gw.RegisterHTTPEndpoint("/api/test", handler)
+	if err != nil {
+		t.Fatalf("Expected nil error, got %v", err)
+	}
+
+	spec := gw.GetOpenAPISpec()
+
+	if spec == nil {
+		t.Fatal("Expected non-nil OpenAPI spec")
+	}
+
+	if _, ok := spec.Paths["/api/test"]; !ok {
+		t.Error("Expected /api/test in OpenAPI paths")
+	}
+}
+
+func TestGatewayService_BoundaryExposure(t *testing.T) {
+	gw := NewGatewayService()
+
+	innerExposed := gw.checkBoundaryExposure(mail.InnerBoundary)
+	if innerExposed {
+		t.Error("Inner boundary should not be exposed")
+	}
+
+	outerExposed := gw.checkBoundaryExposure(mail.OuterBoundary)
+	if !outerExposed {
+		t.Error("Outer boundary should be exposed")
+	}
+
+	dmzExposed := gw.checkBoundaryExposure(mail.DMZBoundary)
+	if !dmzExposed {
+		t.Error("DMZ boundary should be exposed")
 	}
 }

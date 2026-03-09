@@ -1,7 +1,9 @@
 package adapters
 
 import (
+	"net/http"
 	"testing"
+	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
 )
@@ -41,5 +43,27 @@ func TestWebhookAdapter_NormalizeInbound(t *testing.T) {
 	}
 	if content["text"] != "hello world" {
 		t.Error("Expected text to be 'hello world'")
+	}
+}
+
+func TestWebhookAdapter_HTTPServer(t *testing.T) {
+	adapter := NewWebhookAdapter()
+
+	err := adapter.StartServer("127.0.0.1:18080")
+	if err != nil {
+		t.Fatalf("Expected nil error, got %v", err)
+	}
+	defer adapter.StopServer()
+
+	time.Sleep(100 * time.Millisecond)
+
+	resp, err := http.Get("http://127.0.0.1:18080/webhook")
+	if err != nil {
+		t.Fatalf("Expected successful request, got %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
 	}
 }
