@@ -122,3 +122,15 @@ func TestTransition_DMZToInner(t *testing.T) {
 		t.Errorf("EnforceTransition error = %v, want error mentioning SECRET", err)
 	}
 }
+
+func TestTransition_SameBoundary(t *testing.T) {
+	taints := []string{"TOOL_OUTPUT"}
+	result, err := EnforceTransition(DMZBoundary, DMZBoundary, taints)
+	if err != nil {
+		t.Fatalf("EnforceTransition(DMZBoundary, DMZBoundary, %v) returned error: %v", taints, err)
+	}
+	expected := []string{"TOOL_OUTPUT"}
+	if len(result) != len(expected) || result[0] != expected[0] {
+		t.Errorf("EnforceTransition(DMZBoundary, DMZBoundary, %v) = %v, want %v", taints, result, expected)
+	}
+}
