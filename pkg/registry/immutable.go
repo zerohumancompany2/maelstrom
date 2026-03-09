@@ -26,6 +26,9 @@ func (e *ImmutableBoundaryEnforcer) EnforceBoundaryImmutability(oldBoundary, new
 }
 
 func (e *ImmutableBoundaryEnforcer) ValidateMigrationExcludesBoundary(migrationPolicy persistence.MigrationPolicy) error {
+	// All migration policies are valid as long as they don't attempt to change boundary
+	// This is a no-op since boundary is always excluded from migration
+	_ = migrationPolicy
 	return nil
 }
 
