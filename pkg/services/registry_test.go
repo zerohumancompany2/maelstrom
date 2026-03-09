@@ -67,3 +67,21 @@ func TestServiceRegistry_RegisterDuplicate(t *testing.T) {
 		t.Fatal("Get() returned wrong service - original was overwritten")
 	}
 }
+
+func TestServiceRegistry_Get(t *testing.T) {
+	sr := NewServiceRegistry()
+	svc := &mockService{id: "test:service"}
+
+	err := sr.Register("test:service", svc)
+	if err != nil {
+		t.Fatalf("Register() returned error: %v", err)
+	}
+
+	retrieved, ok := sr.Get("test:service")
+	if !ok {
+		t.Fatal("Get() returned false for registered service")
+	}
+	if retrieved != svc {
+		t.Fatal("Get() returned wrong service instance")
+	}
+}
