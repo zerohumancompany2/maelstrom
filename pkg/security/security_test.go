@@ -391,6 +391,37 @@ func TestTaintSet_Union(t *testing.T) {
 	}
 }
 
+func TestTaintSet_EmptyOperations(t *testing.T) {
+	var emptySet TaintSet
+
+	if emptySet.Has("PII") {
+		t.Error("Expected Has on empty set to return false")
+	}
+
+	emptySet.Add("PII")
+	if !emptySet.Has("PII") {
+		t.Error("Expected Add to work on empty set")
+	}
+
+	setWithTaints := TaintSet{"SECRET": true, "TOOL_OUTPUT": true}
+	var anotherEmpty TaintSet
+
+	union1 := setWithTaints.Union(anotherEmpty)
+	if len(union1) != 2 {
+		t.Errorf("Expected union with empty set to return original, got %d elements", len(union1))
+	}
+
+	union2 := anotherEmpty.Union(setWithTaints)
+	if len(union2) != 2 {
+		t.Errorf("Expected union of empty with set to return set, got %d elements", len(union2))
+	}
+
+	nilSetUnion := TaintSet(nil).Union(TaintSet{"PII": true})
+	if len(nilSetUnion) != 1 {
+		t.Errorf("Expected union with nil set to work, got %d elements", len(nilSetUnion))
+	}
+}
+
 func TestTaintEngine_AttachTaint_Mail(t *testing.T) {
 	engine := NewTaintEngine()
 
