@@ -249,3 +249,28 @@ func TestBoundaryAwareTool_ResolvesInnerTools(t *testing.T) {
 		t.Error("Expected schema to contain all fields for inner caller")
 	}
 }
+
+func TestBoundaryAwareTool_BlocksOuterAccess(t *testing.T) {
+	svc := NewToolsService()
+
+	innerTool := ToolDescriptor{
+		Name:      "innerDbQuery",
+		Boundary:  "inner",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "container",
+	}
+
+	err := svc.Register(innerTool)
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	_, err = svc.Resolve("innerDbQuery", "outer")
+	if err == nil {
+		t.Fatal("Expected error when outer caller tries to access inner tool")
+	}
+
+	if err != ErrToolNotAccessible {
+		t.Errorf("Expected ErrToolNotAccessible, got %v", err)
+	}
+}
