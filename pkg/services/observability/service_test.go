@@ -96,7 +96,10 @@ func TestObservabilityService_EmitTrace(t *testing.T) {
 }
 
 func TestObservabilityService_BoundaryInner(t *testing.T) {
-	// Placeholder for future implementation
+	svc := NewObservabilityService()
+	if svc.Boundary() != mail.InnerBoundary {
+		t.Errorf("Expected boundary 'inner', got: %v", svc.Boundary())
+	}
 }
 
 func TestObservabilityService_ID(t *testing.T) {

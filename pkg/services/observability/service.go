@@ -19,6 +19,10 @@ func (o *ObservabilityService) ID() string {
 	return "sys:observability"
 }
 
+func (o *ObservabilityService) Boundary() mail.BoundaryType {
+	return mail.InnerBoundary
+}
+
 func (o *ObservabilityService) HandleMail(mail mail.Mail) error {
 	return nil
 }
