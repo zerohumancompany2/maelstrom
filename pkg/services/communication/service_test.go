@@ -401,3 +401,52 @@ func TestCommunicationService_RequestReply(t *testing.T) {
 	}
 	_ = requestMail
 }
+
+func TestCommunicationService_CorrelationIdMatching(t *testing.T) {
+	svc := NewCommunicationService()
+
+	correlationID := "corr-match-789"
+	otherCorrelationID := "other-corr-abc"
+
+	matchingMail := &mail.Mail{
+		ID:            "mail-1",
+		CorrelationID: correlationID,
+		Source:        "agent:sender",
+		Target:        "agent:receiver",
+		Type:          mail.MailTypeUser,
+		Content:       "matching content",
+	}
+
+	nonMatchingMail := &mail.Mail{
+		ID:            "mail-2",
+		CorrelationID: otherCorrelationID,
+		Source:        "agent:sender",
+		Target:        "agent:receiver",
+		Type:          mail.MailTypeUser,
+		Content:       "non-matching content",
+	}
+
+	matchResult := svc.matchReply(correlationID, matchingMail)
+	if !matchResult {
+		t.Error("Expected match for matching correlationId")
+	}
+
+	nonMatchResult := svc.matchReply(correlationID, nonMatchingMail)
+	if nonMatchResult {
+		t.Error("Expected no match for different correlationId")
+	}
+
+	emptyCorrelationMail := &mail.Mail{
+		ID:            "mail-3",
+		CorrelationID: "",
+		Source:        "agent:sender",
+		Target:        "agent:receiver",
+		Type:          mail.MailTypeUser,
+		Content:       "empty correlation content",
+	}
+
+	emptyMatchResult := svc.matchReply("", emptyCorrelationMail)
+	if !emptyMatchResult {
+		t.Error("Expected match for empty correlationId")
+	}
+}
