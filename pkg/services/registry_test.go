@@ -85,3 +85,15 @@ func TestServiceRegistry_Get(t *testing.T) {
 		t.Fatal("Get() returned wrong service instance")
 	}
 }
+
+func TestServiceRegistry_GetNotFound(t *testing.T) {
+	sr := NewServiceRegistry()
+
+	retrieved, ok := sr.Get("nonexistent")
+	if ok {
+		t.Fatal("Get() returned true for non-existent service")
+	}
+	if retrieved != nil {
+		t.Fatal("Get() returned non-nil service for non-existent service")
+	}
+}
