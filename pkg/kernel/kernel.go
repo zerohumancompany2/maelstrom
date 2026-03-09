@@ -129,6 +129,20 @@ func (k *Kernel) Start(ctx context.Context) error {
 	// Spawn bootstrap runtime if engine is available
 	var bootstrapRTID statechart.RuntimeID
 	if k.engine != nil {
+		// Create and initialize the bootstrap sequence
+		k.mu.Lock()
+		k.sequence = bootstrap.NewSequenceWithKernel(k)
+		k.sequence.OnStateEnter(func(state string) error {
+			k.mu.RLock()
+			bootstrapRTIDCopy := k.bootstrapRTID
+			k.mu.RUnlock()
+			return k.onBootstrapStateEnter(ctx, state, bootstrapRTIDCopy)
+		})
+		k.sequence.OnComplete(func() {
+			k.onBootstrapComplete()
+		})
+		k.mu.Unlock()
+
 		// Create appCtx with engine reference for actions to use
 		appCtx := &kernelApplicationContext{
 			kernel: k,
@@ -148,6 +162,11 @@ func (k *Kernel) Start(ctx context.Context) error {
 		// Start the bootstrap runtime
 		if err := k.engine.Control(bootstrapRTID, statechart.CmdStart); err != nil {
 			return fmt.Errorf("failed to start bootstrap runtime: %w", err)
+		}
+
+		// Start the bootstrap sequence
+		if err := k.sequence.Start(ctx); err != nil {
+			return fmt.Errorf("failed to start bootstrap sequence: %w", err)
 		}
 
 		// Dispatch START_BOOTSTRAP event to begin the bootstrap flow
@@ -341,6 +360,17 @@ func (k *Kernel) GetBootstrapRuntimeID() statechart.RuntimeID {
 	k.mu.RLock()
 	defer k.mu.RUnlock()
 	return k.bootstrapRTID
+}
+
+// GetCurrentState returns the current bootstrap sequence state.
+func (k *Kernel) GetCurrentState() string {
+	k.mu.RLock()
+	seq := k.sequence
+	k.mu.RUnlock()
+	if seq == nil {
+		return ""
+	}
+	return seq.CurrentState()
 }
 
 // GetServiceRuntimeID returns the RuntimeID for a service.

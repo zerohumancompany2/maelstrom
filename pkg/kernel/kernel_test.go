@@ -386,3 +386,28 @@ func TestKernel_SpawnsBootstrapRuntime(t *testing.T) {
 	cancel()
 	<-done
 }
+
+// TestKernel_BootstrapSequenceStartsWithSecurity verifies sequence starts with security state.
+func TestKernel_BootstrapSequenceStartsWithSecurity(t *testing.T) {
+	var capturedState string
+	seq := bootstrap.NewSequence()
+	seq.OnStateEnter(func(state string) error {
+		if capturedState == "" {
+			capturedState = state
+		}
+		return nil
+	})
+
+	ctx := context.Background()
+	if err := seq.Start(ctx); err != nil {
+		t.Fatalf("failed to start sequence: %v", err)
+	}
+
+	if capturedState != "security" {
+		t.Errorf("expected first state to be 'security', got %q", capturedState)
+	}
+
+	if seq.CurrentState() != "security" {
+		t.Errorf("expected CurrentState to be 'security', got %q", seq.CurrentState())
+	}
+}
