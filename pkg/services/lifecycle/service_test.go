@@ -73,6 +73,16 @@ func TestLifecycleService_ListReturnsNilSlice(t *testing.T) {
 	}
 }
 
+func TestLifecycleService_StartReturnsNil(t *testing.T) {
+	svc := NewLifecycleService()
+
+	err := svc.Start()
+
+	if err != nil {
+		t.Errorf("Expected Start to return nil, got %v", err)
+	}
+}
+
 func TestLifecycleService_BootstrapChart(t *testing.T) {
 	chart := BootstrapChart()
 
