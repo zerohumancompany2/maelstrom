@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
+	"github.com/maelstrom/v3/pkg/services/observability"
 )
 
 type pendingReply struct {
@@ -21,6 +22,7 @@ type CommunicationService struct {
 	subscribers      map[string][]chan mail.Mail
 	deliveryAttempts map[string]int
 	pendingReplies   map[string]pendingReply
+	observability    *observability.ObservabilityService
 	mu               sync.RWMutex
 }
 
@@ -150,6 +152,7 @@ func (c *CommunicationService) PublishWithRetry(mail *mail.Mail, maxRetries int)
 			time.Sleep(backoff)
 		}
 	}
+	c.sendToDeadLetter(mail, "delivery failed after max retries")
 	return errors.New("delivery failed after max retries")
 }
 
@@ -176,4 +179,14 @@ func (c *CommunicationService) Request(replyChan chan *mail.Mail, timeout time.D
 
 func (c *CommunicationService) matchReply(correlationID string, mail *mail.Mail) bool {
 	return mail.CorrelationID == correlationID
+}
+
+func (c *CommunicationService) SetObservability(obs *observability.ObservabilityService) {
+	c.observability = obs
+}
+
+func (c *CommunicationService) sendToDeadLetter(mail *mail.Mail, reason string) {
+	if c.observability != nil {
+		c.observability.LogDeadLetter(*mail, reason)
+	}
 }

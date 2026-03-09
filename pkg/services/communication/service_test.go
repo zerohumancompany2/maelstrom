@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
+	"github.com/maelstrom/v3/pkg/services/observability"
 )
 
 func TestCommunicationService_NewCommunicationServiceReturnsNonNil(t *testing.T) {
@@ -535,5 +536,30 @@ func TestCommunicationService_MultipleRequests(t *testing.T) {
 
 	if successCount != numRequests {
 		t.Errorf("Expected %d successful requests, got %d", numRequests, successCount)
+	}
+}
+
+func TestCommunicationService_DeadLetterOnFailure(t *testing.T) {
+	svc := NewCommunicationService()
+	obs := observability.NewObservabilityService()
+	svc.SetObservability(obs)
+
+	m := mail.Mail{ID: "fail-mail-1", Source: "test", Target: "non-existent:address"}
+
+	err := svc.PublishWithRetry(&m, 0)
+
+	if err == nil {
+		t.Error("Expected error after delivery failure, got nil")
+	}
+
+	entries, err := obs.QueryDeadLetters()
+	if err != nil {
+		t.Errorf("Expected nil error from QueryDeadLetters, got %v", err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("Expected 1 dead letter entry, got %d", len(entries))
+	}
+	if entries[0].Mail.ID != "fail-mail-1" {
+		t.Errorf("Expected mail ID 'fail-mail-1', got %s", entries[0].Mail.ID)
 	}
 }
