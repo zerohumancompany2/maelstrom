@@ -92,3 +92,40 @@ func TestDataSource_ValidateAccess(t *testing.T) {
 		t.Errorf("Expected no error for outer, got %v", err)
 	}
 }
+
+func TestRegistry_Register(t *testing.T) {
+	registry := NewRegistry()
+
+	factory := func(config map[string]any) (DataSource, error) {
+		return &localDisk{path: "/custom"}, nil
+	}
+
+	registry.Register("custom", factory)
+
+	names := registry.List()
+	if len(names) != 1 {
+		t.Errorf("Expected 1 registered source, got %d", len(names))
+	}
+
+	if names[0] != "custom" {
+		t.Errorf("Expected name 'custom', got '%s'", names[0])
+	}
+
+	source, err := registry.Get("custom", nil)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if source == nil {
+		t.Error("Expected non-nil source")
+	}
+
+	registry.Register("custom", func(config map[string]any) (DataSource, error) {
+		return &localDisk{path: "/overwritten"}, nil
+	})
+
+	names = registry.List()
+	if len(names) != 1 {
+		t.Errorf("Expected 1 source after overwrite, got %d", len(names))
+	}
+}
