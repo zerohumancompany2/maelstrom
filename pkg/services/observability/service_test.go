@@ -45,6 +45,20 @@ func TestObservabilityService_EmitTraceReturnsNil(t *testing.T) {
 	}
 }
 
+func TestObservabilityService_QueryTracesReturnsNilNil(t *testing.T) {
+	svc := NewObservabilityService()
+
+	traces, err := svc.QueryTraces("runtime-123")
+
+	if err != nil {
+		t.Errorf("Expected QueryTraces to return nil error, got %v", err)
+	}
+
+	if traces != nil {
+		t.Error("Expected QueryTraces to return nil slice")
+	}
+}
+
 func TestObservabilityService_BootstrapChart(t *testing.T) {
 	chart := BootstrapChart()
 
