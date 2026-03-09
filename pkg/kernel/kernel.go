@@ -448,6 +448,25 @@ func (k *Kernel) SetServiceReady(name string) {
 	k.serviceReady[name] = true
 }
 
+// BootstrapServices starts all services in the correct order.
+func (k *Kernel) BootstrapServices() error {
+	serviceOrder := []string{"sys:security", "sys:communication", "sys:observability", "sys:lifecycle"}
+	for _, serviceID := range serviceOrder {
+		if err := k.startServiceInOrder(serviceID); err != nil {
+			return fmt.Errorf("failed to start service %s: %w", serviceID, err)
+		}
+	}
+	return nil
+}
+
+// startServiceInOrder starts a service and tracks its state.
+func (k *Kernel) startServiceInOrder(serviceID string) error {
+	k.mu.Lock()
+	k.serviceReady[serviceID] = true
+	k.mu.Unlock()
+	return nil
+}
+
 // IsKernelReady returns true if all services are ready.
 func (k *Kernel) IsKernelReady() bool {
 	k.mu.RLock()

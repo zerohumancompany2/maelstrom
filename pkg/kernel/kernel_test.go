@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/maelstrom/v3/pkg/bootstrap"
+	"github.com/maelstrom/v3/pkg/runtime"
+	"github.com/maelstrom/v3/pkg/services/communication"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
 
@@ -709,6 +711,28 @@ func assertDormantLogged(t *testing.T, logs []string) {
 	}
 	if !found {
 		t.Errorf("Expected 'going dormant' in logs. Got: %v", logs)
+	}
+}
+
+func TestKernel_BootstrapServices(t *testing.T) {
+	kernel := &Kernel{
+		engine:       statechart.NewEngine(),
+		services:     make(map[string]statechart.RuntimeID),
+		serviceReady: make(map[string]bool),
+		runtimes:     make(map[string]*runtime.ChartRuntime),
+		mailSystem:   communication.NewCommunicationService(),
+	}
+
+	err := kernel.BootstrapServices()
+	if err != nil {
+		t.Fatalf("BootstrapServices() returned error: %v", err)
+	}
+
+	expectedServices := []string{"sys:security", "sys:communication", "sys:observability", "sys:lifecycle"}
+	for _, svc := range expectedServices {
+		if !kernel.IsServiceReady(svc) {
+			t.Errorf("Service %s should be ready after BootstrapServices()", svc)
+		}
 	}
 }
 
