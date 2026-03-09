@@ -3,7 +3,13 @@ package security
 import "testing"
 
 func TestValidateBoundary_Valid(t *testing.T) {
-	panic("not implemented")
+	tests := []BoundaryType{InnerBoundary, DMZBoundary, OuterBoundary}
+	for _, boundary := range tests {
+		err := ValidateBoundary(boundary)
+		if err != nil {
+			t.Errorf("ValidateBoundary(%q) = %v, want nil", boundary, err)
+		}
+	}
 }
 
 func TestValidateBoundary_Invalid(t *testing.T) {

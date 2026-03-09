@@ -1,5 +1,7 @@
 package security
 
+import "fmt"
+
 type Capabilities struct {
 	CanReadSecrets       bool
 	CanWriteSecrets      bool
@@ -9,7 +11,12 @@ type Capabilities struct {
 }
 
 func ValidateBoundary(boundary BoundaryType) error {
-	panic("not implemented")
+	switch boundary {
+	case InnerBoundary, DMZBoundary, OuterBoundary:
+		return nil
+	default:
+		return fmt.Errorf("invalid boundary type: %q", boundary)
+	}
 }
 
 func GetBoundaryCapabilities(boundary BoundaryType) Capabilities {
