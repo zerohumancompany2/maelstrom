@@ -177,6 +177,45 @@ func TestTaintEngine_CheckViolation_SECRET_on_Outer(t *testing.T) {
 	}
 }
 
+func TestTaintEngine_CheckViolation_AllowedTaints(t *testing.T) {
+	engine := NewTaintEngine()
+
+	err := engine.CheckForbidden([]string{"TOOL_OUTPUT"}, DMZBoundary)
+	if err != nil {
+		t.Errorf("Expected no error for TOOL_OUTPUT on DMZ boundary, got %v", err)
+	}
+
+	err = engine.CheckForbidden([]string{"PUBLIC"}, OuterBoundary)
+	if err != nil {
+		t.Errorf("Expected no error for PUBLIC taint on Outer boundary, got %v", err)
+	}
+
+	err = engine.CheckForbidden([]string{"INNER_ONLY"}, InnerBoundary)
+	if err != nil {
+		t.Errorf("Expected no error for INNER_ONLY on Inner boundary, got %v", err)
+	}
+
+	err = engine.CheckForbidden([]string{}, DMZBoundary)
+	if err != nil {
+		t.Errorf("Expected no error for empty taints, got %v", err)
+	}
+
+	err = engine.CheckForbidden([]string{"SECRET"}, InnerBoundary)
+	if err != nil {
+		t.Errorf("Expected no error for SECRET on Inner boundary, got %v", err)
+	}
+
+	err = engine.CheckForbidden([]string{"PII"}, OuterBoundary)
+	if err == nil {
+		t.Error("Expected error for PII taint on Outer boundary, got nil")
+	}
+
+	expectedMsg := "taint PII is forbidden on boundary outer"
+	if err != nil && err.Error() != expectedMsg {
+		t.Errorf("Expected error message %q, got %q", expectedMsg, err.Error())
+	}
+}
+
 func TestTaintEngine_Redaction(t *testing.T) {
 	engine := NewTaintEngine()
 

@@ -263,6 +263,9 @@ func (e *taintEngineImpl) CheckForbidden(taints []string, boundary BoundaryType)
 		if taint == "SECRET" && (boundary == DMZBoundary || boundary == OuterBoundary) {
 			return fmt.Errorf("taint %s is forbidden on boundary %s", taint, boundary)
 		}
+		if taint == "PII" && boundary == OuterBoundary {
+			return fmt.Errorf("taint %s is forbidden on boundary %s", taint, boundary)
+		}
 	}
 	return nil
 }
