@@ -10,7 +10,13 @@ import (
 var (
 	violationRouter *mail.MailRouter
 	routerMu        sync.RWMutex
+	violationCounts map[string]int
+	countsMu        sync.RWMutex
 )
+
+func init() {
+	violationCounts = make(map[string]int)
+}
 
 func SetViolationRouter(router *mail.MailRouter) {
 	routerMu.Lock()
@@ -32,6 +38,10 @@ type ViolationReport struct {
 }
 
 func ReportViolation(runtimeId string, violation TaintViolation) error {
+	countsMu.Lock()
+	violationCounts[runtimeId]++
+	countsMu.Unlock()
+
 	mail := createViolationMail(violation)
 
 	routerMu.RLock()
@@ -46,7 +56,9 @@ func ReportViolation(runtimeId string, violation TaintViolation) error {
 }
 
 func GetViolationCount(runtimeId string) int {
-	return 0
+	countsMu.RLock()
+	defer countsMu.RUnlock()
+	return violationCounts[runtimeId]
 }
 
 func createViolationMail(violation TaintViolation) mail.Mail {

@@ -125,3 +125,53 @@ func TestReportViolation_Details(t *testing.T) {
 		t.Error("Expected timestamp to be present in content")
 	}
 }
+
+func TestReportViolation_Count(t *testing.T) {
+	// Given
+	engine := NewTaintEngine()
+
+	violation1 := TaintViolation{
+		RuntimeID:       "agent-count-test",
+		SourceBoundary:  OuterBoundary,
+		TargetBoundary:  InnerBoundary,
+		ForbiddenTaints: []string{"PII"},
+		Timestamp:       time.Now(),
+	}
+
+	violation2 := TaintViolation{
+		RuntimeID:       "agent-count-test",
+		SourceBoundary:  OuterBoundary,
+		TargetBoundary:  InnerBoundary,
+		ForbiddenTaints: []string{"SECRET"},
+		Timestamp:       time.Now(),
+	}
+
+	// When
+	_, _ = engine.ReportTaints("agent-count-test")
+
+	err1 := ReportViolation("agent-count-test", violation1)
+	if err1 != nil {
+		t.Fatalf("Expected no error from first ReportViolation, got %v", err1)
+	}
+
+	err2 := ReportViolation("agent-count-test", violation2)
+	if err2 != nil {
+		t.Fatalf("Expected no error from second ReportViolation, got %v", err2)
+	}
+
+	taintMap, err := engine.ReportTaints("agent-count-test")
+
+	// Then
+	if err != nil {
+		t.Fatalf("Expected no error from ReportTaints, got %v", err)
+	}
+
+	count := GetViolationCount("agent-count-test")
+	if count != 2 {
+		t.Errorf("Expected violation count to be 2, got %d", count)
+	}
+
+	if taintMap == nil {
+		t.Error("Expected non-nil TaintMap from ReportTaints")
+	}
+}
