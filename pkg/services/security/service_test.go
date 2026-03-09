@@ -260,3 +260,49 @@ func TestSecurityService_NamespaceIsolate(t *testing.T) {
 		t.Error("Expected second item to be data-3")
 	}
 }
+
+func TestSecurityService_NamespaceIsolate_multipleAgents(t *testing.T) {
+	svc := NewSecurityService()
+
+	data := []interface{}{
+		map[string]interface{}{"agentID": "agent-alpha", "value": "alpha-1"},
+		map[string]interface{}{"agentID": "agent-beta", "value": "beta-1"},
+		map[string]interface{}{"agentID": "agent-gamma", "value": "gamma-1"},
+		map[string]interface{}{"agentID": "agent-alpha", "value": "alpha-2"},
+		map[string]interface{}{"agentID": "agent-beta", "value": "beta-2"},
+	}
+
+	resultAlpha := svc.NamespaceIsolate(data, "agent-alpha")
+	resultBeta := svc.NamespaceIsolate(data, "agent-beta")
+	resultGamma := svc.NamespaceIsolate(data, "agent-gamma")
+	resultUnknown := svc.NamespaceIsolate(data, "agent-unknown")
+
+	alphaSlice := resultAlpha.([]interface{})
+	betaSlice := resultBeta.([]interface{})
+	gammaSlice := resultGamma.([]interface{})
+	unknownSlice := resultUnknown.([]interface{})
+
+	if len(alphaSlice) != 2 {
+		t.Errorf("Expected 2 items for agent-alpha, got %d", len(alphaSlice))
+	}
+
+	if len(betaSlice) != 2 {
+		t.Errorf("Expected 2 items for agent-beta, got %d", len(betaSlice))
+	}
+
+	if len(gammaSlice) != 1 {
+		t.Errorf("Expected 1 item for agent-gamma, got %d", len(gammaSlice))
+	}
+
+	if len(unknownSlice) != 0 {
+		t.Errorf("Expected 0 items for unknown agent, got %d", len(unknownSlice))
+	}
+
+	if alphaSlice[0].(map[string]interface{})["value"] != "alpha-1" {
+		t.Error("Expected alpha-1 for first alpha item")
+	}
+
+	if betaSlice[1].(map[string]interface{})["value"] != "beta-2" {
+		t.Error("Expected beta-2 for second beta item")
+	}
+}
