@@ -111,3 +111,14 @@ func TestTransition_OuterToInner(t *testing.T) {
 		t.Errorf("EnforceTransition error = %v, want error mentioning PII", err)
 	}
 }
+
+func TestTransition_DMZToInner(t *testing.T) {
+	taints := []string{"TOOL_OUTPUT", "SECRET"}
+	_, err := EnforceTransition(DMZBoundary, InnerBoundary, taints)
+	if err == nil {
+		t.Fatalf("EnforceTransition(DMZBoundary, InnerBoundary, %v) returned nil error, want error for SECRET", taints)
+	}
+	if !strings.Contains(err.Error(), "SECRET") {
+		t.Errorf("EnforceTransition error = %v, want error mentioning SECRET", err)
+	}
+}
