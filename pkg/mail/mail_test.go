@@ -288,3 +288,66 @@ func TestMail_DeadLetterDeferred(t *testing.T) {
 	}
 	_ = mail
 }
+
+func TestFullMailFlow(t *testing.T) {
+	// Setup
+	router := NewMailRouter()
+	publisher := NewRouterPublisher(router)
+
+	// Create subscriber inbox
+	inbox := &AgentInbox{ID: "test-agent"}
+	router.SubscribeAgent("test-agent", inbox)
+
+	// Create mail with all fields
+	originalMail := Mail{
+		ID:            "msg-001",
+		CorrelationID: "corr-001",
+		Type:          MailTypeUser,
+		CreatedAt:     time.Now(),
+		Source:        "agent:user-agent",
+		Target:        "agent:test-agent",
+		Content:       map[string]any{"text": "hello"},
+		Metadata: MailMetadata{
+			Tokens:   10,
+			Model:    "gpt-4",
+			Cost:     0.01,
+			Boundary: OuterBoundary,
+			Taints:   []string{"USER_SUPPLIED"},
+		},
+	}
+
+	// Publish
+	ack, err := publisher.Publish(originalMail)
+	if err != nil {
+		t.Fatalf("Publish failed: %v", err)
+	}
+
+	// Verify Ack
+	if ack.CorrelationID != originalMail.CorrelationID {
+		t.Errorf("Expected CorrelationID '%s', got '%s'",
+			originalMail.CorrelationID, ack.CorrelationID)
+	}
+
+	if ack.DeliveredAt.IsZero() {
+		t.Error("Expected DeliveredAt to be set")
+	}
+
+	// Verify delivery to inbox
+	inbox.mu.RLock()
+	if len(inbox.Messages) != 1 {
+		t.Errorf("Expected 1 message in inbox, got %d", len(inbox.Messages))
+	}
+	deliveredMail := inbox.Messages[0]
+	inbox.mu.RUnlock()
+
+	// Verify mail integrity
+	if deliveredMail.ID != originalMail.ID {
+		t.Errorf("Expected ID '%s', got '%s'", originalMail.ID, deliveredMail.ID)
+	}
+	if deliveredMail.Type != originalMail.Type {
+		t.Errorf("Expected Type '%s', got '%s'", originalMail.Type, deliveredMail.Type)
+	}
+	if deliveredMail.Source != originalMail.Source {
+		t.Errorf("Expected Source '%s', got '%s'", originalMail.Source, deliveredMail.Source)
+	}
+}
