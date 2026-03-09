@@ -359,3 +359,48 @@ func TestSecurityService_TaintPropagate_addTaints(t *testing.T) {
 		t.Error("Expected original data to be preserved")
 	}
 }
+
+func TestSecurityService_TaintPropagate_mergeTaints(t *testing.T) {
+	svc := NewSecurityService()
+
+	inputObj := map[string]interface{}{
+		"name":    "test",
+		"data":    "value",
+		"_taints": []string{"EXTERNAL"},
+	}
+
+	result, err := svc.TaintPropagate(inputObj, []string{"PII", "SECRET"})
+
+	if err != nil {
+		t.Errorf("Expected TaintPropagate to return nil error, got %v", err)
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		t.Error("Expected result to be map[string]interface{}")
+	}
+
+	taints, _ := resultMap["_taints"].([]string)
+	if len(taints) != 3 {
+		t.Errorf("Expected 3 taints after merge, got %d", len(taints))
+	}
+
+	hasExternal := false
+	hasPII := false
+	hasSecret := false
+	for _, t := range taints {
+		if t == "EXTERNAL" {
+			hasExternal = true
+		}
+		if t == "PII" {
+			hasPII = true
+		}
+		if t == "SECRET" {
+			hasSecret = true
+		}
+	}
+
+	if !hasExternal || !hasPII || !hasSecret {
+		t.Errorf("Expected all taints to be merged, got %v", taints)
+	}
+}
