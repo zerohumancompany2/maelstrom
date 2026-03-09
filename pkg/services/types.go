@@ -10,3 +10,10 @@ type Trace struct {
 	Timestamp time.Time // event time
 	Payload   any       // event payload
 }
+
+type TraceFilters struct {
+	RuntimeID string
+	EventType string
+	FromTime  time.Time
+	ToTime    time.Time
+}
