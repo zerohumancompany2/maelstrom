@@ -10,3 +10,10 @@ type DeadLetterEntry struct {
 	Reason string
 	Logged time.Time
 }
+
+type DeadLetterFilters struct {
+	RuntimeID string
+	FromTime  time.Time
+	ToTime    time.Time
+	Reason    string
+}

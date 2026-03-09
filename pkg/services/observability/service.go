@@ -95,6 +95,22 @@ func (o *ObservabilityService) QueryDeadLetters() ([]DeadLetterEntry, error) {
 	return result, nil
 }
 
+func (o *ObservabilityService) QueryDeadLettersWithFilters(filters *DeadLetterFilters) []*DeadLetterEntry {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	var result []*DeadLetterEntry
+	for i := range o.deadLetters {
+		entry := &o.deadLetters[i]
+		if filters != nil {
+			if filters.Reason != "" && entry.Reason != filters.Reason {
+				continue
+			}
+		}
+		result = append(result, entry)
+	}
+	return result
+}
+
 func (o *ObservabilityService) GetMetrics() services.MetricsCollector {
 	o.mu.Lock()
 	defer o.mu.Unlock()

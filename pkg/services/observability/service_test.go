@@ -396,3 +396,27 @@ func TestObservabilityService_MetricsUpdateOnTrace(t *testing.T) {
 		t.Errorf("Expected StateCounts['root/state-b'] = 1, got %d", metrics.StateCounts["root/state-b"])
 	}
 }
+
+func TestObservabilityService_QueryDeadLettersWithFilters(t *testing.T) {
+	svc := NewObservabilityService()
+
+	mail1 := mail.Mail{ID: "mail-1", Source: "src-1", Target: "tgt-1", Type: mail.Error}
+	mail2 := mail.Mail{ID: "mail-2", Source: "src-2", Target: "tgt-2", Type: mail.Error}
+	mail3 := mail.Mail{ID: "mail-3", Source: "src-3", Target: "tgt-3", Type: mail.Error}
+	svc.LogDeadLetter(mail1, "reason-a")
+	svc.LogDeadLetter(mail2, "reason-b")
+	svc.LogDeadLetter(mail3, "reason-a")
+
+	filters := &DeadLetterFilters{Reason: "reason-a"}
+	entries := svc.QueryDeadLettersWithFilters(filters)
+
+	if len(entries) != 2 {
+		t.Errorf("Expected 2 dead letter entries with reason-a, got %d", len(entries))
+	}
+	if entries[0].Reason != "reason-a" {
+		t.Errorf("Expected reason 'reason-a', got %s", entries[0].Reason)
+	}
+	if entries[1].Reason != "reason-a" {
+		t.Errorf("Expected reason 'reason-a', got %s", entries[1].Reason)
+	}
+}
