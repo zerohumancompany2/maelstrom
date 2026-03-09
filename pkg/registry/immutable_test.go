@@ -68,3 +68,39 @@ func TestBoundaryImmutability_VersionUpgrade(t *testing.T) {
 		}
 	}
 }
+
+// TestBoundaryImmutability_MigrationPolicy verifies migrationPolicy cannot modify boundary field.
+func TestBoundaryImmutability_MigrationPolicy(t *testing.T) {
+	// Given: Chart with boundary set to "dmz" and migrationPolicy configured
+	currentBoundary := mail.DMZBoundary
+	attemptedBoundary := mail.InnerBoundary
+	enforcer := NewImmutableBoundaryEnforcer()
+
+	// When: Migration operation attempts to include boundary in contextTransform or onVersionChange
+	// Then: Error is returned rejecting boundary modification attempt
+	err := enforcer.EnforceBoundaryImmutability(currentBoundary, attemptedBoundary)
+	if err == nil {
+		t.Error("expected error when migration attempts to change boundary, got nil")
+	}
+	if err != ErrBoundaryChangeNotAllowed {
+		t.Errorf("expected ErrBoundaryChangeNotAllowed, got: %v", err)
+	}
+
+	// Verify all migration policies are valid (they cannot affect boundary)
+	for _, policy := range []persistence.MigrationPolicy{
+		persistence.ShallowHistory,
+		persistence.DeepHistory,
+		persistence.CleanStart,
+	} {
+		err := enforcer.ValidateMigrationExcludesBoundary(policy)
+		if err != nil {
+			t.Errorf("ValidateMigrationExcludesBoundary should succeed for policy %v, got: %v", policy, err)
+		}
+	}
+
+	// Verify boundary is preserved regardless of migration policy
+	preserved := enforcer.PreserveBoundaryDuringHotReload(currentBoundary)
+	if preserved != currentBoundary {
+		t.Errorf("boundary should be preserved: expected %q, got %q", currentBoundary, preserved)
+	}
+}
