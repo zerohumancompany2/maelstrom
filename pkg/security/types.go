@@ -1,6 +1,10 @@
 package security
 
-import "github.com/maelstrom/v3/pkg/mail"
+import (
+	"fmt"
+
+	"github.com/maelstrom/v3/pkg/mail"
+)
 
 type BoundaryType string
 
@@ -196,6 +200,10 @@ func (e *taintEngineImpl) ReportTaints(chartID string) (TaintMap, error) {
 }
 
 func (e *taintEngineImpl) AttachTaint(obj any, taints []string) (any, error) {
+	if obj == nil {
+		return nil, fmt.Errorf("cannot attach taints to nil object")
+	}
+
 	switch v := obj.(type) {
 	case *mail.Mail:
 		existing := make(map[string]bool)

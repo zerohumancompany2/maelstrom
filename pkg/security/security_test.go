@@ -421,3 +421,39 @@ func TestTaintEngine_AttachTaint_Nested(t *testing.T) {
 		t.Errorf("Expected data to be 'secret', got %v", level2["data"])
 	}
 }
+
+func TestTaintEngine_AttachTaint_Empty(t *testing.T) {
+	engine := NewTaintEngine()
+
+	data := map[string]interface{}{
+		"key": "value",
+	}
+
+	result, err := engine.AttachTaint(data, []string{})
+	if err != nil {
+		t.Fatalf("Expected no error for empty taints, got %v", err)
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected map[string]interface{}, got %T", result)
+	}
+
+	taints, ok := resultMap["_taints"].([]string)
+	if !ok {
+		t.Fatalf("Expected _taints key with []string value, got %T", resultMap["_taints"])
+	}
+
+	if len(taints) != 0 {
+		t.Errorf("Expected empty taints, got %v", taints)
+	}
+
+	nilResult, nilErr := engine.AttachTaint(nil, []string{"TAINT"})
+	if nilErr == nil {
+		t.Error("Expected error for nil object, got nil")
+	}
+
+	if nilResult != nil {
+		t.Errorf("Expected nil result for nil input, got %v", nilResult)
+	}
+}
