@@ -326,3 +326,36 @@ func TestSecurityService_CheckTaintPolicy_denied(t *testing.T) {
 		t.Error("Expected CheckTaintPolicy to return false for denied transition")
 	}
 }
+
+func TestSecurityService_TaintPropagate_addTaints(t *testing.T) {
+	svc := NewSecurityService()
+
+	inputObj := map[string]interface{}{
+		"name": "test",
+		"data": "value",
+	}
+
+	result, err := svc.TaintPropagate(inputObj, []string{"PII"})
+
+	if err != nil {
+		t.Errorf("Expected TaintPropagate to return nil error, got %v", err)
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		t.Error("Expected result to be map[string]interface{}")
+	}
+
+	if _, hasTaints := resultMap["_taints"]; !hasTaints {
+		t.Error("Expected _taints key to be added to object")
+	}
+
+	taints, _ := resultMap["_taints"].([]string)
+	if len(taints) != 1 || taints[0] != "PII" {
+		t.Errorf("Expected taints to be [PII], got %v", taints)
+	}
+
+	if resultMap["name"] != "test" {
+		t.Error("Expected original data to be preserved")
+	}
+}

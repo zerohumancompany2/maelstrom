@@ -47,7 +47,19 @@ func (s *SecurityService) ValidateAndSanitize(m mail.Mail, sourceBoundary, targe
 }
 
 func (s *SecurityService) TaintPropagate(obj any, newTaints []string) (any, error) {
-	return obj, nil
+	result, ok := obj.(map[string]interface{})
+	if !ok {
+		return obj, nil
+	}
+
+	if result["_taints"] == nil {
+		result["_taints"] = []string{}
+	}
+
+	existing := result["_taints"].([]string)
+	result["_taints"] = append(existing, newTaints...)
+
+	return result, nil
 }
 
 func (s *SecurityService) ReportTaints(runtimeId string) (security.TaintMap, error) {
