@@ -1,6 +1,7 @@
 package datasource
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -70,5 +71,36 @@ func TestInMemory_GetTaints(t *testing.T) {
 
 	if len(emptyTaints) != 0 {
 		t.Errorf("Expected empty taints for unknown path, got %v", emptyTaints)
+	}
+}
+
+func TestInMemory_Concurrent(t *testing.T) {
+	ds := NewInMemoryDataSource()
+
+	numGoroutines := 10
+	numOps := 100
+
+	done := make(chan bool, numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
+		go func(id int) {
+			for j := 0; j < numOps; j++ {
+				path := fmt.Sprintf("/workspace/concurrent_%d_%d.txt", id, j)
+				taints := []string{fmt.Sprintf("TAINT_%d", id)}
+
+				go func() {
+					ds.TagOnWrite(path, taints)
+				}()
+
+				go func() {
+					ds.GetTaints(path)
+				}()
+			}
+			done <- true
+		}(i)
+	}
+
+	for i := 0; i < numGoroutines; i++ {
+		<-done
 	}
 }
