@@ -165,8 +165,8 @@ func TestTools_Unregister(t *testing.T) {
 	}
 
 	_, err = svc.Resolve("unregister-test", "inner")
-	if err != nil {
-		t.Fatalf("Resolve after unregister failed: %v", err)
+	if err != ErrToolNotFound {
+		t.Fatalf("Expected ErrToolNotFound after unregister, got %v", err)
 	}
 }
 
@@ -174,8 +174,8 @@ func TestTools_NotFound(t *testing.T) {
 	svc := NewToolsService()
 
 	_, err := svc.Resolve("nonexistent-tool", "inner")
-	if err != nil {
-		t.Fatalf("Resolve for nonexistent tool failed: %v", err)
+	if err != ErrToolNotFound {
+		t.Fatalf("Expected ErrToolNotFound, got %v", err)
 	}
 
 	_, err = svc.Invoke("nonexistent-tool", map[string]any{}, "inner")

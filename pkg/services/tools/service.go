@@ -107,6 +107,7 @@ func (s *toolsService) Invoke(toolName string, args map[string]any, callerBounda
 }
 
 func (s *toolsService) Unregister(name string) error {
+	delete(s.registry, name)
 	return nil
 }
 
