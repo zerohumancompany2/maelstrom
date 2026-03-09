@@ -316,3 +316,13 @@ func TestSecurityService_CheckTaintPolicy_allowed(t *testing.T) {
 		t.Error("Expected CheckTaintPolicy to return true for allowed transition")
 	}
 }
+
+func TestSecurityService_CheckTaintPolicy_denied(t *testing.T) {
+	svc := NewSecurityService()
+
+	result := svc.CheckTaintPolicy([]string{"UNTRUSTED"}, "write")
+
+	if result {
+		t.Error("Expected CheckTaintPolicy to return false for denied transition")
+	}
+}

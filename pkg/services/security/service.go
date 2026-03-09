@@ -59,6 +59,11 @@ func (s *SecurityService) PrepareContextForBoundary(runtimeId string, boundary m
 }
 
 func (s *SecurityService) CheckTaintPolicy(taints []string, action string) bool {
+	for _, taint := range taints {
+		if taint == "UNTRUSTED" {
+			return false
+		}
+	}
 	return true
 }
 
