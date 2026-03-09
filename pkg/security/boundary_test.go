@@ -80,3 +80,20 @@ func TestTransition_InnerToDMZ(t *testing.T) {
 		}
 	}
 }
+
+func TestTransition_InnerToOuter(t *testing.T) {
+	taints := []string{"SECRET", "PII", "TOOL_OUTPUT", "EXTERNAL"}
+	result, err := EnforceTransition(InnerBoundary, OuterBoundary, taints)
+	if err != nil {
+		t.Fatalf("EnforceTransition(InnerBoundary, OuterBoundary, %v) returned error: %v", taints, err)
+	}
+	expected := []string{"EXTERNAL"}
+	if len(result) != len(expected) {
+		t.Errorf("EnforceTransition(InnerBoundary, OuterBoundary, %v) = %v, want %v", taints, result, expected)
+	}
+	for i, v := range expected {
+		if result[i] != v {
+			t.Errorf("EnforceTransition(InnerBoundary, OuterBoundary, %v)[%d] = %v, want %v", taints, i, result[i], v)
+		}
+	}
+}
