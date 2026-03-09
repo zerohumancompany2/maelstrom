@@ -190,3 +190,32 @@ func TestDataSource_AlwaysTaintAsMode_ReturnsConfiguredTaints(t *testing.T) {
 		}
 	}
 }
+
+func TestDataSource_AlwaysTaintAsMode_MultipleTaints(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	ds, err := NewLocalDisk(map[string]any{
+		"path":      tmpDir,
+		"taintMode": "alwaysTaintAs=INNER_ONLY,SECRET",
+	})
+	if err != nil {
+		t.Fatalf("NewLocalDisk failed: %v", err)
+	}
+
+	testFile := tmpDir + "/config.txt"
+	taints, err := ds.GetTaints(testFile)
+	if err != nil {
+		t.Fatalf("GetTaints failed: %v", err)
+	}
+
+	expected := []string{"INNER_ONLY", "SECRET"}
+	if len(taints) != len(expected) {
+		t.Errorf("taint length mismatch: got %d, want %d", len(taints), len(expected))
+	}
+
+	for i, exp := range expected {
+		if taints[i] != exp {
+			t.Errorf("taint[%d] mismatch: got %q, want %q", i, taints[i], exp)
+		}
+	}
+}
