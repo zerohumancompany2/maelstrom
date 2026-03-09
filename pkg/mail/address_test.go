@@ -39,6 +39,45 @@ func TestMail_Types(t *testing.T) {
 	}
 }
 
+func TestMail_Metadata(t *testing.T) {
+	meta := MailMetadata{
+		Tokens:   150,
+		Model:    "gpt-4",
+		Cost:     0.03,
+		Boundary: InnerBoundary,
+		Taints:   []string{"USER_SUPPLIED", "TOOL_OUTPUT"},
+		Stream:   nil,
+		IsFinal:  true,
+	}
+
+	if meta.Tokens != 150 {
+		t.Errorf("Expected Tokens 150, got %d", meta.Tokens)
+	}
+	if meta.Model != "gpt-4" {
+		t.Errorf("Expected Model 'gpt-4', got '%s'", meta.Model)
+	}
+	if meta.Boundary != InnerBoundary {
+		t.Errorf("Expected Boundary InnerBoundary, got %s", meta.Boundary)
+	}
+
+	// Test boundary types
+	if InnerBoundary != "inner" {
+		t.Errorf("Expected InnerBoundary to be 'inner', got '%s'", InnerBoundary)
+	}
+	if DMZBoundary != "dmz" {
+		t.Errorf("Expected DMZBoundary to be 'dmz', got '%s'", DMZBoundary)
+	}
+	if OuterBoundary != "outer" {
+		t.Errorf("Expected OuterBoundary to be 'outer', got '%s'", OuterBoundary)
+	}
+
+	// Test empty taints
+	emptyMeta := MailMetadata{Taints: []string{}}
+	if len(emptyMeta.Taints) != 0 {
+		t.Error("Expected empty Taints slice")
+	}
+}
+
 func TestMail_AddressFormats(t *testing.T) {
 	// Test agent:<id> format
 	if !IsValidAgentAddress("agent:recommendation-agent") {
