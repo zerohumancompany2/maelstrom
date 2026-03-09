@@ -33,3 +33,17 @@ func TestPublisher_Publish(t *testing.T) {
 		t.Error("Expected DeliveredAt to be set")
 	}
 }
+
+func TestPublisherInterface_ImplementedByRouter(t *testing.T) {
+	router := NewMailRouter()
+	publisher := NewRouterPublisher(router)
+
+	// Verify RouterPublisher implements Publisher interface
+	var _ Publisher = publisher
+
+	// Use as Publisher
+	var p Publisher = publisher
+	if p == nil {
+		t.Error("Expected non-nil Publisher")
+	}
+}
