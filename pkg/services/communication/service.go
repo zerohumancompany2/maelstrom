@@ -9,20 +9,22 @@ import (
 )
 
 type CommunicationService struct {
-	id          string
-	router      *mail.MailRouter
-	publisher   mail.Publisher
-	subscribers map[string][]chan mail.Mail
-	mu          sync.RWMutex
+	id               string
+	router           *mail.MailRouter
+	publisher        mail.Publisher
+	subscribers      map[string][]chan mail.Mail
+	deliveryAttempts map[string]int
+	mu               sync.RWMutex
 }
 
 func NewCommunicationService() *CommunicationService {
 	router := mail.NewMailRouter()
 	return &CommunicationService{
-		id:          "sys:communication",
-		router:      router,
-		publisher:   mail.NewRouterPublisher(router),
-		subscribers: make(map[string][]chan mail.Mail),
+		id:               "sys:communication",
+		router:           router,
+		publisher:        mail.NewRouterPublisher(router),
+		subscribers:      make(map[string][]chan mail.Mail),
+		deliveryAttempts: make(map[string]int),
 	}
 }
 
@@ -144,5 +146,7 @@ func (c *CommunicationService) PublishWithRetry(mail *mail.Mail, maxRetries int)
 }
 
 func (c *CommunicationService) trackDeliveryAttempt(correlationID string) {
-	panic("not implemented")
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.deliveryAttempts[correlationID]++
 }

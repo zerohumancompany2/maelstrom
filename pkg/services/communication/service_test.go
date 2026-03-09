@@ -333,3 +333,16 @@ func TestCommunicationService_MaxRespectsLimit(t *testing.T) {
 		t.Errorf("Expected to respect max retries limit, got %v elapsed", elapsed)
 	}
 }
+
+func TestCommunicationService_DeliveryTracking(t *testing.T) {
+	svc := NewCommunicationService()
+
+	correlationID := "test-tracking-123"
+	m := mail.Mail{Source: "test", Target: "non-existent:address", CorrelationID: correlationID}
+
+	svc.PublishWithRetry(&m, 2)
+
+	svc.trackDeliveryAttempt(correlationID)
+	svc.trackDeliveryAttempt(correlationID)
+	svc.trackDeliveryAttempt(correlationID)
+}
