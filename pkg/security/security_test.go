@@ -367,6 +367,30 @@ func TestTaintSet_AddHas(t *testing.T) {
 	}
 }
 
+func TestTaintSet_Union(t *testing.T) {
+	set1 := TaintSet{"PII": true, "SECRET": true}
+	set2 := TaintSet{"SECRET": true, "TOOL_OUTPUT": true}
+
+	result := set1.Union(set2)
+
+	expectedCount := 3
+	if len(result) != expectedCount {
+		t.Errorf("Expected union to have %d elements, got %d", expectedCount, len(result))
+	}
+
+	if !result.Has("PII") {
+		t.Error("Expected union to contain PII")
+	}
+
+	if !result.Has("SECRET") {
+		t.Error("Expected union to contain SECRET")
+	}
+
+	if !result.Has("TOOL_OUTPUT") {
+		t.Error("Expected union to contain TOOL_OUTPUT")
+	}
+}
+
 func TestTaintEngine_AttachTaint_Mail(t *testing.T) {
 	engine := NewTaintEngine()
 
