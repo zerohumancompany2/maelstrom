@@ -107,3 +107,41 @@ func TestPolicyEnforcement_Audit(t *testing.T) {
 		t.Error("Expected violation to be logged to audit trail")
 	}
 }
+
+func TestPolicyEnforcement_AllowedOnExit(t *testing.T) {
+	ClearAuditLog()
+
+	// Given: A data object with only allowed taint ["TOOL_OUTPUT"]
+	data := map[string]interface{}{
+		"tool_result": "search results",
+		"_taints":     []string{"TOOL_OUTPUT"},
+	}
+
+	// Given: A TaintPolicy with allowedOnExit: ["TOOL_OUTPUT"] in redact mode
+	policy := TaintPolicyConfig{
+		Enforcement:   EnforcementRedact,
+		AllowedOnExit: []string{"TOOL_OUTPUT"},
+		RedactRules: []RedactRule{
+			{Taint: "PII", Replacement: "[PERSONAL_INFO]"},
+			{Taint: "SECRET", Replacement: "[REDACTED]"},
+		},
+	}
+
+	// When: EnforcePolicy is called with the data and policy
+	result, err := EnforcePolicy(data, policy, OuterBoundary)
+
+	// Then: allowedOnExit acts as whitelist for outbound taints
+	// Fields with only allowed taints pass through unchanged
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected result to be map[string]interface{}")
+	}
+
+	if resultMap["tool_result"] != "search results" {
+		t.Errorf("Expected tool_result unchanged (TOOL_OUTPUT is allowed), got '%v'", resultMap["tool_result"])
+	}
+}

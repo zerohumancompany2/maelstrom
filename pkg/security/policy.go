@@ -67,9 +67,9 @@ func redactMap(m map[string]interface{}, rules []RedactRule) (map[string]interfa
 		return m, nil
 	}
 
-	redactMap := make(map[string]string)
+	redactRules := make(map[string]string)
 	for _, rule := range rules {
-		redactMap[rule.Taint] = rule.Replacement
+		redactRules[rule.Taint] = rule.Replacement
 	}
 
 	result := make(map[string]interface{})
@@ -77,34 +77,31 @@ func redactMap(m map[string]interface{}, rules []RedactRule) (map[string]interfa
 		if k == "_taints" {
 			continue
 		}
-		shouldRedact := false
-		for _, t := range taints {
-			if _, ok := redactMap[t]; ok {
-				shouldRedact = true
-				break
-			}
-		}
-		if shouldRedact {
-			switch val.(type) {
-			case string:
-				result[k] = getRedactionForTaint(taints, redactMap)
-			default:
-				result[k] = val
-			}
-		} else {
-			result[k] = val
-		}
+		result[k] = applyFieldRedaction(val, taints, redactRules)
 	}
 	return result, nil
 }
 
-func getRedactionForTaint(taints []string, redactMap map[string]string) string {
+func applyFieldRedaction(val any, taints []string, redactRules map[string]string) any {
+	switch v := val.(type) {
+	case string:
+		replacement := getMostRestrictiveRedaction(taints, redactRules)
+		if replacement != "" {
+			return replacement
+		}
+		return v
+	default:
+		return val
+	}
+}
+
+func getMostRestrictiveRedaction(taints []string, redactRules map[string]string) string {
 	for _, t := range taints {
-		if replacement, ok := redactMap[t]; ok {
+		if replacement, ok := redactRules[t]; ok {
 			return replacement
 		}
 	}
-	return "[REDACTED]"
+	return ""
 }
 
 func getPolicyForbiddenTaints(data any, allowedOnExit []string) []string {
