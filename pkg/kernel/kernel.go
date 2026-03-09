@@ -39,6 +39,8 @@ type Kernel struct {
 	logMu            sync.RWMutex
 	serviceOrder     []string
 	orderMu          sync.RWMutex
+	readyEvents      []string
+	eventsMu         sync.RWMutex
 }
 
 // kernelApplicationContext provides application context with kernel engine access.
@@ -471,6 +473,10 @@ func (k *Kernel) startServiceInOrder(serviceID string) error {
 	k.serviceOrder = append(k.serviceOrder, serviceID)
 	k.orderMu.Unlock()
 
+	k.eventsMu.Lock()
+	k.readyEvents = append(k.readyEvents, serviceID)
+	k.eventsMu.Unlock()
+
 	return nil
 }
 
@@ -480,6 +486,15 @@ func (k *Kernel) GetServiceOrder() []string {
 	defer k.orderMu.RUnlock()
 	result := make([]string, len(k.serviceOrder))
 	copy(result, k.serviceOrder)
+	return result
+}
+
+// GetReadyEvents returns the ready events emitted during bootstrap.
+func (k *Kernel) GetReadyEvents() []string {
+	k.eventsMu.RLock()
+	defer k.eventsMu.RUnlock()
+	result := make([]string, len(k.readyEvents))
+	copy(result, k.readyEvents)
 	return result
 }
 

@@ -764,6 +764,34 @@ func TestKernel_BootstrapSequence(t *testing.T) {
 	}
 }
 
+func TestKernel_ServiceReadyEvents(t *testing.T) {
+	kernel := &Kernel{
+		engine:       statechart.NewEngine(),
+		services:     make(map[string]statechart.RuntimeID),
+		serviceReady: make(map[string]bool),
+		runtimes:     make(map[string]*runtime.ChartRuntime),
+		mailSystem:   communication.NewCommunicationService(),
+	}
+
+	err := kernel.BootstrapServices()
+	if err != nil {
+		t.Fatalf("BootstrapServices() returned error: %v", err)
+	}
+
+	events := kernel.GetReadyEvents()
+	expectedEvents := []string{"sys:security", "sys:communication", "sys:observability", "sys:lifecycle"}
+
+	if len(events) != len(expectedEvents) {
+		t.Fatalf("expected %d events, got %d: %v", len(expectedEvents), len(events), events)
+	}
+
+	for i, expectedEvent := range expectedEvents {
+		if events[i] != expectedEvent {
+			t.Errorf("event[%d]: expected %q, got %q", i, expectedEvent, events[i])
+		}
+	}
+}
+
 func TestKernel_FullE2EBootstrap(t *testing.T) {
 	kernel := New()
 
