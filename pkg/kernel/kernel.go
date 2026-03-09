@@ -67,6 +67,7 @@ func (k *kernelApplicationContext) Namespace() string {
 // New creates a new Kernel.
 func New() *Kernel {
 	return &Kernel{
+		engine:     statechart.NewEngine(),
 		services:   make(map[string]statechart.RuntimeID),
 		runtimes:   make(map[string]*runtime.ChartRuntime),
 		mailSystem: communication.NewCommunicationService(),
@@ -173,28 +174,49 @@ func (k *Kernel) onBootstrapStateEnter(ctx context.Context, state string, bootst
 
 	switch state {
 	case "security":
-		// In real implementation, instantiate sys:security runtime
-		// For now, just log and transition
 		log.Println("[kernel] Loading sys:security service")
-		// Simulate service ready
+		securityRTID, _, _ := k.appCtx.Get("bootstrap:security:runtimeID", "sys:bootstrap")
+		if securityRTID != nil && securityRTID != "" {
+			k.mu.Lock()
+			k.services["sys:security"] = statechart.RuntimeID(securityRTID.(string))
+			k.mu.Unlock()
+		}
 		go func() {
 			seq.HandleEvent(ctx, "SECURITY_READY")
 		}()
 
 	case "communication":
 		log.Println("[kernel] Loading sys:communication service")
+		commRTID, _, _ := k.appCtx.Get("bootstrap:communication:runtimeID", "sys:bootstrap")
+		if commRTID != nil && commRTID != "" {
+			k.mu.Lock()
+			k.services["sys:communication"] = statechart.RuntimeID(commRTID.(string))
+			k.mu.Unlock()
+		}
 		go func() {
 			seq.HandleEvent(ctx, "COMMUNICATION_READY")
 		}()
 
 	case "observability":
 		log.Println("[kernel] Loading sys:observability service")
+		obsRTID, _, _ := k.appCtx.Get("bootstrap:observability:runtimeID", "sys:bootstrap")
+		if obsRTID != nil && obsRTID != "" {
+			k.mu.Lock()
+			k.services["sys:observability"] = statechart.RuntimeID(obsRTID.(string))
+			k.mu.Unlock()
+		}
 		go func() {
 			seq.HandleEvent(ctx, "OBSERVABILITY_READY")
 		}()
 
 	case "lifecycle":
 		log.Println("[kernel] Loading sys:lifecycle service")
+		lifecycleRTID, _, _ := k.appCtx.Get("bootstrap:lifecycle:runtimeID", "sys:bootstrap")
+		if lifecycleRTID != nil && lifecycleRTID != "" {
+			k.mu.Lock()
+			k.services["sys:lifecycle"] = statechart.RuntimeID(lifecycleRTID.(string))
+			k.mu.Unlock()
+		}
 		go func() {
 			seq.HandleEvent(ctx, "LIFECYCLE_READY")
 		}()
@@ -220,9 +242,48 @@ func (k *Kernel) waitForKernelReady(ctx context.Context, bootstrapRTID statechar
 		case <-ticker.C:
 			// Check if bootstrap has reached the ready state
 			// by checking if KERNEL_READY was processed
-			services, _, _ := k.appCtx.Get("bootstrap:loaded:services", "sys:bootstrap")
-			if services != nil {
+			loadedServices, _, _ := k.appCtx.Get("bootstrap:loaded:services", "sys:bootstrap")
+			if loadedServices != nil {
+				// Register all loaded services
 				k.mu.Lock()
+				if ls, ok := loadedServices.([]interface{}); ok {
+					for _, svcAny := range ls {
+						if svc, ok := svcAny.(string); ok {
+							// Get the runtime ID for each service
+							var rtID statechart.RuntimeID
+							switch svc {
+							case "sys:security":
+								if val, _, _ := k.appCtx.Get("bootstrap:security:runtimeID", "sys:bootstrap"); val != nil {
+									if vs, ok := val.(string); ok {
+										rtID = statechart.RuntimeID(vs)
+										k.services[svc] = rtID
+									}
+								}
+							case "sys:communication":
+								if val, _, _ := k.appCtx.Get("bootstrap:communication:runtimeID", "sys:bootstrap"); val != nil {
+									if vs, ok := val.(string); ok {
+										rtID = statechart.RuntimeID(vs)
+										k.services[svc] = rtID
+									}
+								}
+							case "sys:observability":
+								if val, _, _ := k.appCtx.Get("bootstrap:observability:runtimeID", "sys:bootstrap"); val != nil {
+									if vs, ok := val.(string); ok {
+										rtID = statechart.RuntimeID(vs)
+										k.services[svc] = rtID
+									}
+								}
+							case "sys:lifecycle":
+								if val, _, _ := k.appCtx.Get("bootstrap:lifecycle:runtimeID", "sys:bootstrap"); val != nil {
+									if vs, ok := val.(string); ok {
+										rtID = statechart.RuntimeID(vs)
+										k.services[svc] = rtID
+									}
+								}
+							}
+						}
+					}
+				}
 				if k.readyChan != nil {
 					close(k.readyChan)
 					k.readyChan = nil

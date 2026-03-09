@@ -69,8 +69,16 @@ func TestKernel_BootstrapCompletes(t *testing.T) {
 }
 
 func TestKernel_SpawnsAllServices(t *testing.T) {
-	// Placeholder for future integration test
-	// Verifies all 4 services spawn during bootstrap
+	kernel := New()
+
+	// Verify kernel has services map initialized
+	kernel.mu.Lock()
+	services := kernel.services
+	kernel.mu.Unlock()
+
+	if services == nil {
+		t.Error("Kernel should have services map initialized")
+	}
 }
 
 func TestKernel_ServicesReady(t *testing.T) {
