@@ -38,7 +38,7 @@ func TestCommunicationService_HandleMailReturnsNil(t *testing.T) {
 func TestCommunicationService_PublishReturnsNil(t *testing.T) {
 	svc := NewCommunicationService()
 
-	err := svc.Publish(mail.Mail{})
+	_, err := svc.Publish(mail.Mail{})
 
 	if err != nil {
 		t.Errorf("Expected Publish to return nil, got %v", err)
@@ -102,7 +102,7 @@ func TestCommunicationService_PubSub(t *testing.T) {
 	}
 
 	mail := mail.Mail{Source: "test", Target: "test-topic"}
-	err = svc.Publish(mail)
+	_, err = svc.Publish(mail)
 	if err != nil {
 		t.Errorf("Publish should return nil, got: %v", err)
 	}
@@ -124,7 +124,7 @@ func TestCommunicationService_RoutesMail(t *testing.T) {
 	topicCh, _ := svc.Subscribe("topic:test-topic")
 	sysCh, _ := svc.Subscribe("sys:security")
 
-	err := svc.Publish(mail.Mail{Source: "test", Target: "agent:test-agent"})
+	_, err := svc.Publish(mail.Mail{Source: "test", Target: "agent:test-agent"})
 	if err != nil {
 		t.Errorf("Publish to agent failed: %v", err)
 	}
@@ -135,7 +135,7 @@ func TestCommunicationService_RoutesMail(t *testing.T) {
 		t.Error("Timeout waiting for agent mail")
 	}
 
-	err = svc.Publish(mail.Mail{Source: "test", Target: "topic:test-topic"})
+	_, err = svc.Publish(mail.Mail{Source: "test", Target: "topic:test-topic"})
 	if err != nil {
 		t.Errorf("Publish to topic failed: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestCommunicationService_RoutesMail(t *testing.T) {
 		t.Error("Timeout waiting for topic mail")
 	}
 
-	err = svc.Publish(mail.Mail{Source: "test", Target: "sys:security"})
+	_, err = svc.Publish(mail.Mail{Source: "test", Target: "sys:security"})
 	if err != nil {
 		t.Errorf("Publish to sys failed: %v", err)
 	}

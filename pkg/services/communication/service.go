@@ -25,20 +25,20 @@ func (c *CommunicationService) HandleMail(mail mail.Mail) error {
 	return nil
 }
 
-func (c *CommunicationService) Publish(mail mail.Mail) error {
+func (c *CommunicationService) Publish(m mail.Mail) (mail.Ack, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	target := mail.Target
+	target := m.Target
 	if target == "" {
-		target = mail.Source
+		target = m.Source
 	}
 	for _, ch := range c.subscribers[target] {
 		select {
-		case ch <- mail:
+		case ch <- m:
 		default:
 		}
 	}
-	return nil
+	return mail.Ack{}, nil
 }
 
 func (c *CommunicationService) Subscribe(address string) (<-chan mail.Mail, error) {
