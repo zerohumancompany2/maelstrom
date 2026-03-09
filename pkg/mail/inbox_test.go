@@ -69,3 +69,34 @@ func TestAgentInbox_Subscribe(t *testing.T) {
 		t.Error("Expected channel to receive message without blocking")
 	}
 }
+
+func TestServiceInbox_PushPop(t *testing.T) {
+	inbox := &ServiceInbox{ID: "test-service"}
+
+	mail := Mail{ID: "msg-001", Type: MailTypeHeartbeat}
+	err := inbox.Push(mail)
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	popped, err := inbox.Pop()
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if popped.ID != "msg-001" {
+		t.Errorf("Expected msg-001, got %s", popped.ID)
+	}
+
+	inbox.Push(Mail{ID: "msg-002"})
+	inbox.Push(Mail{ID: "msg-003"})
+
+	popped, _ = inbox.Pop()
+	if popped.ID != "msg-002" {
+		t.Errorf("Expected msg-002, got %s", popped.ID)
+	}
+
+	popped, _ = inbox.Pop()
+	if popped.ID != "msg-003" {
+		t.Errorf("Expected msg-003, got %s", popped.ID)
+	}
+}
