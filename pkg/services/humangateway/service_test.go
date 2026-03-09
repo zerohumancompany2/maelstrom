@@ -1,8 +1,11 @@
 package humangateway
 
 import (
-	"github.com/maelstrom/v3/pkg/mail"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/maelstrom/v3/pkg/mail"
 )
 
 func TestHumanGatewayService_HandleChat(t *testing.T) {
@@ -114,5 +117,18 @@ func TestHumanGatewayService_SanitizedContext(t *testing.T) {
 	sanitizedOuter := SanitizeContextForBoundary(ctx, mail.OuterBoundary)
 	if len(sanitizedOuter) != len(ctx) {
 		t.Errorf("Expected %d keys, got %d", len(ctx), len(sanitizedOuter))
+	}
+}
+
+func TestHumanGatewayService_ChatEndpoint(t *testing.T) {
+	svc := NewHumanGatewayService()
+
+	req, _ := http.NewRequest(http.MethodGet, "/chat", nil)
+	rr := httptest.NewRecorder()
+
+	svc.ChatEndpoint(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, rr.Code)
 	}
 }

@@ -2,7 +2,10 @@ package humangateway
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
+	"net/http"
+
 	"github.com/maelstrom/v3/pkg/mail"
 	"sync"
 )
@@ -69,4 +72,11 @@ func (h *HumanGatewayService) CreateSession(agentID string) *ChatSession {
 	}
 	h.sessions[agentID] = session
 	return session
+}
+
+func (h *HumanGatewayService) ChatEndpoint(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status": "ok",
+	})
 }
