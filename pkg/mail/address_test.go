@@ -121,6 +121,30 @@ func TestMail_Structure(t *testing.T) {
 	}
 }
 
+func TestAck_Structure(t *testing.T) {
+	now := time.Now()
+	ack := Ack{
+		CorrelationID: "corr-001",
+		DeliveredAt:   now,
+	}
+
+	if ack.CorrelationID != "corr-001" {
+		t.Errorf("Expected CorrelationID 'corr-001', got '%s'", ack.CorrelationID)
+	}
+	if !ack.DeliveredAt.Equal(now) {
+		t.Errorf("Expected DeliveredAt %v, got %v", now, ack.DeliveredAt)
+	}
+
+	// Test zero value
+	zeroAck := Ack{}
+	if zeroAck.CorrelationID != "" {
+		t.Error("Expected zero value CorrelationID to be empty string")
+	}
+	if !zeroAck.DeliveredAt.IsZero() {
+		t.Error("Expected zero value DeliveredAt to be zero time")
+	}
+}
+
 func TestMail_AddressFormats(t *testing.T) {
 	// Test agent:<id> format
 	if !IsValidAgentAddress("agent:recommendation-agent") {
