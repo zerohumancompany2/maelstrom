@@ -5,20 +5,22 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"sync/atomic"
 )
 
 // Sequence orchestrates the bootstrap state machine.
 type Sequence struct {
-	kernel        interface{}
-	mu            sync.RWMutex
-	currentState  string
-	services      map[string]bool // Track loaded services
-	onStateEnter  func(state string) error
-	onComplete    func()
-	statesEntered []string
-	statesMu      sync.RWMutex
-	eventsHandled []string
-	eventsMu      sync.RWMutex
+	kernel             interface{}
+	mu                 sync.RWMutex
+	currentState       string
+	services           map[string]bool // Track loaded services
+	onStateEnter       func(state string) error
+	onComplete         func()
+	statesEntered      []string
+	statesMu           sync.RWMutex
+	eventsHandled      []string
+	eventsMu           sync.RWMutex
+	kernelReadyEmitted atomic.Bool
 }
 
 // NewSequence creates a new bootstrap sequence starting at "initializing".
@@ -76,6 +78,11 @@ func (s *Sequence) HandleEvent(ctx context.Context, event string) error {
 	s.eventsMu.Lock()
 	s.eventsHandled = append(s.eventsHandled, event)
 	s.eventsMu.Unlock()
+
+	// Track KERNEL_READY specifically
+	if event == "KERNEL_READY" {
+		s.kernelReadyEmitted.Store(true)
+	}
 
 	// State machine transitions
 	transitions := map[string]map[string]string{
@@ -162,4 +169,9 @@ func (s *Sequence) GetEventsHandled() []string {
 	result := make([]string, len(s.eventsHandled))
 	copy(result, s.eventsHandled)
 	return result
+}
+
+// GetKernelReadyEmitted returns true if KERNEL_READY event was emitted.
+func (s *Sequence) GetKernelReadyEmitted() bool {
+	return s.kernelReadyEmitted.Load()
 }

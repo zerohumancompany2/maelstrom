@@ -506,3 +506,65 @@ func TestKernel_AllServicesEmitReadyEvents(t *testing.T) {
 		}
 	}
 }
+
+func TestKernel_KernelReadyEventEmitted(t *testing.T) {
+	kernel := New()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Start kernel
+	done := make(chan error)
+	go func() {
+		done <- kernel.Start(ctx)
+	}()
+
+	// Wait for KERNEL_READY event to be emitted
+	kernelReadyReceived := make(chan struct{})
+	timeout := time.After(2 * time.Second)
+
+	for {
+		select {
+		case <-timeout:
+			t.Fatal("timeout waiting for KERNEL_READY event")
+		case <-done:
+		default:
+		}
+
+		seq := kernel.GetSequence()
+		if seq != nil && seq.GetKernelReadyEmitted() {
+			close(kernelReadyReceived)
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Verify KERNEL_READY was emitted after LIFECYCLE_READY
+	seq := kernel.GetSequence()
+	if seq == nil {
+		t.Fatal("sequence should not be nil")
+	}
+
+	events := seq.GetEventsHandled()
+	lifecycleReadyIdx := -1
+	kernelReadyIdx := -1
+
+	for i, event := range events {
+		if event == "LIFECYCLE_READY" {
+			lifecycleReadyIdx = i
+		}
+		if event == "KERNEL_READY" {
+			kernelReadyIdx = i
+		}
+	}
+
+	if lifecycleReadyIdx == -1 {
+		t.Error("LIFECYCLE_READY event should be present")
+	}
+	if kernelReadyIdx == -1 {
+		t.Error("KERNEL_READY event should be present")
+	}
+	if lifecycleReadyIdx != -1 && kernelReadyIdx != -1 && kernelReadyIdx <= lifecycleReadyIdx {
+		t.Error("KERNEL_READY should be emitted after LIFECYCLE_READY")
+	}
+}
