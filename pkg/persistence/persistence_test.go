@@ -1,8 +1,10 @@
 package persistence
 
 import (
-	"github.com/maelstrom/v3/pkg/security"
 	"testing"
+
+	"github.com/maelstrom/v3/pkg/datasource"
+	"github.com/maelstrom/v3/pkg/security"
 )
 
 func TestPersistence_RefusesBoundaryViolation(t *testing.T) {
@@ -54,5 +56,29 @@ func TestPersistence_EnforcesTaintPolicy(t *testing.T) {
 }
 
 func TestPersistence_AllowsCompliantWrites(t *testing.T) {
-	panic("not implemented")
+	ds := datasource.NewInMemoryDataSource()
+
+	p := &Persistence{
+		taintPolicy: &security.TaintPolicy{
+			AllowedForBoundary: []security.BoundaryType{security.OuterBoundary},
+		},
+		dataSource: ds,
+	}
+
+	data := map[string]interface{}{"key": "value"}
+	taints := []string{"USER_SUPPLIED"}
+
+	err := p.Write(data, taints)
+	if err != nil {
+		t.Fatalf("Write() unexpected error: %v", err)
+	}
+
+	retrievedTaints, err := ds.GetTaints("key")
+	if err != nil {
+		t.Fatalf("GetTaints() unexpected error: %v", err)
+	}
+
+	if len(retrievedTaints) != 1 || retrievedTaints[0] != "USER_SUPPLIED" {
+		t.Fatalf("expected taints [USER_SUPPLIED], got: %v", retrievedTaints)
+	}
 }
