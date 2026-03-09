@@ -1,9 +1,12 @@
 package datasource
 
 import (
+	"encoding/json"
 	"github.com/maelstrom/v3/pkg/security"
 	"os"
 	"path/filepath"
+
+	"golang.org/x/sys/unix"
 )
 
 type localDisk struct {
@@ -34,6 +37,16 @@ func (d *localDisk) TagOnWrite(path string, taints []string) error {
 		return err
 	}
 
+	jsonData, err := json.Marshal(taints)
+	if err != nil {
+		return err
+	}
+
+	attrName := d.xattrNamespace + ".taints"
+	if err := unix.Lsetxattr(path, attrName, jsonData, 0); err != nil {
+		return d.writeSidecar(path, taints)
+	}
+
 	return nil
 }
 
@@ -43,6 +56,14 @@ func (d *localDisk) GetTaints(path string) ([]string, error) {
 
 func (d *localDisk) ValidateAccess(boundary security.BoundaryType) error {
 	return nil
+}
+
+func (d *localDisk) writeSidecar(path string, taints []string) error {
+	jsonData, err := json.Marshal(taints)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path+".maelstrom", jsonData, 0644)
 }
 
 func init() {
