@@ -77,3 +77,27 @@ func (g *GatewayService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		handler.ServeHTTP(w, r)
 	}
 }
+
+func (g *GatewayService) GetOpenAPISpec() *OpenAPISpec {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	spec := &OpenAPISpec{
+		OpenAPI: "3.0.0",
+		Info: Info{
+			Title:   "Gateway API",
+			Version: "1.0.0",
+		},
+		Paths: make(map[string]interface{}),
+	}
+
+	for path := range g.endpoints {
+		spec.Paths[path] = map[string]interface{}{
+			"get": map[string]interface{}{
+				"summary": "Endpoint at " + path,
+			},
+		}
+	}
+
+	return spec
+}

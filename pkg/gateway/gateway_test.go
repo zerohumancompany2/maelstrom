@@ -196,3 +196,24 @@ func (t *testResponseWriter) Write([]byte) (int, error) {
 func (t *testResponseWriter) WriteHeader(code int) {
 	t.code = code
 }
+
+func TestGatewayService_OpenAPIRegistration(t *testing.T) {
+	gw := NewGatewayService()
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+
+	err := gw.RegisterHTTPEndpoint("/api/test", handler)
+	if err != nil {
+		t.Fatalf("Expected nil error, got %v", err)
+	}
+
+	spec := gw.GetOpenAPISpec()
+
+	if spec == nil {
+		t.Fatal("Expected non-nil OpenAPI spec")
+	}
+
+	if _, ok := spec.Paths["/api/test"]; !ok {
+		t.Error("Expected /api/test in OpenAPI paths")
+	}
+}
