@@ -189,6 +189,22 @@ func TestLifecycleService_ControlStop(t *testing.T) {
 	}
 }
 
+func TestLifecycleService_ControlNotFoundReturnsError(t *testing.T) {
+	engine := statechart.NewEngine()
+	svc := NewLifecycleService(engine)
+
+	err := svc.Control(statechart.RuntimeID("non-existent"), statechart.CmdStart)
+	if err == nil {
+		t.Error("Expected Control with non-existent ID to return error")
+	}
+
+	svcNoEngine := NewLifecycleServiceWithoutEngine()
+	err = svcNoEngine.Control(statechart.RuntimeID("any"), statechart.CmdStart)
+	if err == nil {
+		t.Error("Expected Control without engine to return error")
+	}
+}
+
 func TestLifecycleService_StartReturnsNil(t *testing.T) {
 	svc := NewLifecycleServiceWithoutEngine()
 
