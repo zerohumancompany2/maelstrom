@@ -12,6 +12,16 @@ func TestObservabilityService_NewObservabilityServiceReturnsNonNil(t *testing.T)
 	}
 }
 
+func TestObservabilityService_IDReturnsCorrectString(t *testing.T) {
+	svc := NewObservabilityService()
+
+	id := svc.ID()
+
+	if id != "sys:observability" {
+		t.Errorf("Expected ID sys:observability, got %s", id)
+	}
+}
+
 func TestObservabilityService_BootstrapChart(t *testing.T) {
 	chart := BootstrapChart()
 
