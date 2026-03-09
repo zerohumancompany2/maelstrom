@@ -172,3 +172,28 @@ func (l *LifecycleService) getSavedState(serviceID string) string {
 	defer l.mu.Unlock()
 	return l.savedStates[serviceID]
 }
+
+func (l *LifecycleService) rollbackReload(serviceID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	savedState, exists := l.savedStates[serviceID]
+	if !exists {
+		return statechart.ErrRuntimeNotFound
+	}
+	runtime, exists := l.runtimes[statechart.RuntimeID(serviceID)]
+	if !exists {
+		return statechart.ErrRuntimeNotFound
+	}
+	fromState := ""
+	if len(runtime.ActiveStates) > 0 {
+		fromState = runtime.ActiveStates[0]
+	}
+	runtime.ActiveStates = []string{savedState}
+	l.runtimes[statechart.RuntimeID(serviceID)] = runtime
+	l.stateHistory[serviceID] = append(l.stateHistory[serviceID], StateTransition{
+		From:      fromState,
+		To:        savedState,
+		Timestamp: time.Now(),
+	})
+	return nil
+}

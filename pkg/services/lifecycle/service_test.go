@@ -400,3 +400,40 @@ func TestLifecycleService_HotReloadFailure(t *testing.T) {
 		t.Errorf("Expected ErrRuntimeNotFound, got %v", err)
 	}
 }
+
+func TestLifecycleService_HotReloadRollback(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+	}
+
+	rtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	svc.updateRuntimeState(string(rtID), "running")
+
+	err = svc.preserveState(string(rtID))
+	if err != nil {
+		t.Fatalf("Expected preserveState to return nil, got %v", err)
+	}
+
+	svc.updateRuntimeState(string(rtID), "failed")
+
+	err = svc.rollbackReload(string(rtID))
+	if err != nil {
+		t.Errorf("Expected rollbackReload to return nil, got %v", err)
+	}
+
+	list, _ := svc.List()
+	if len(list) != 1 {
+		t.Errorf("Expected 1 runtime, got %d", len(list))
+	}
+	if list[0].ActiveStates[0] != "running" {
+		t.Errorf("Expected state restored to 'running', got %s", list[0].ActiveStates[0])
+	}
+}
