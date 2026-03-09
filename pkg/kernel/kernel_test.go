@@ -322,3 +322,25 @@ func TestKernel_GetServiceRuntimeID_ReturnsCorrectID(t *testing.T) {
 		t.Error("expected consistent RuntimeID across multiple calls")
 	}
 }
+
+func TestKernel_Start_WithEngine_SpawnsAndControls(t *testing.T) {
+	engine := statechart.NewEngine()
+	k := NewWithEngine(engine)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	go func() {
+		_ = k.Start(ctx)
+	}()
+
+	time.Sleep(200 * time.Millisecond)
+
+	rtID, ok := k.GetServiceRuntimeID("sys:bootstrap")
+	if !ok {
+		t.Error("expected sys:bootstrap service to be tracked")
+	}
+	if rtID == "" {
+		t.Error("expected non-empty RuntimeID for spawned bootstrap")
+	}
+}
