@@ -1061,3 +1061,51 @@ func TestToolTaintOutput_AutoAttach(t *testing.T) {
 		t.Errorf("Expected taint 'TOOL_OUTPUT', got %v", resultMail.Metadata.Taints)
 	}
 }
+
+func TestToolTaintOutput_InheritBoundary(t *testing.T) {
+	registry := NewToolRegistry()
+	registry.RegisterTool(&ToolConfig{
+		Name:        "innerDbQuery",
+		Boundary:    mail.InnerBoundary,
+		TaintOutput: []string{"TOOL_OUTPUT", "INNER_ONLY"},
+	})
+
+	resultMail := &mail.Mail{
+		ID:     "result-2",
+		Type:   mail.MailTypeToolResult,
+		Source: "sys:tools",
+		Target: "agent:user",
+		Content: map[string]interface{}{
+			"query": "SELECT * FROM users",
+			"data":  "db results",
+		},
+		Metadata: mail.MailMetadata{
+			Taints: []string{},
+		},
+	}
+
+	result, err := AttachToolTaints("innerDbQuery", resultMail, registry)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	resultMail, ok := result.(*mail.Mail)
+	if !ok {
+		t.Fatalf("Expected *mail.Mail, got %T", result)
+	}
+
+	if resultMail.Metadata.Boundary != mail.InnerBoundary {
+		t.Errorf("Expected boundary 'inner', got %v", resultMail.Metadata.Boundary)
+	}
+
+	if len(resultMail.Metadata.Taints) != 2 {
+		t.Errorf("Expected 2 taints, got %d: %v", len(resultMail.Metadata.Taints), resultMail.Metadata.Taints)
+	}
+
+	expectedTaints := map[string]bool{"TOOL_OUTPUT": true, "INNER_ONLY": true}
+	for _, taint := range resultMail.Metadata.Taints {
+		if !expectedTaints[taint] {
+			t.Errorf("Unexpected taint %q", taint)
+		}
+	}
+}
