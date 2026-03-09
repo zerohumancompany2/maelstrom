@@ -388,3 +388,15 @@ func TestLifecycleService_HotReloadStatePreservation(t *testing.T) {
 		t.Errorf("Expected saved state 'running', got %s", savedState)
 	}
 }
+
+func TestLifecycleService_HotReloadFailure(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	err := svc.HotReload("non-existent-runtime")
+	if err == nil {
+		t.Error("Expected HotReload to return error for non-existent runtime")
+	}
+	if err != statechart.ErrRuntimeNotFound {
+		t.Errorf("Expected ErrRuntimeNotFound, got %v", err)
+	}
+}
