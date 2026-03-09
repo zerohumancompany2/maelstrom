@@ -147,3 +147,53 @@ func TestBootstrapChartYAML_HasSuccessTransitions(t *testing.T) {
 	checkTransition("sys:bootstrap/observability", "OBSERVABILITY_READY", "sys:bootstrap/lifecycle")
 	checkTransition("sys:bootstrap/lifecycle", "LIFECYCLE_READY", "sys:bootstrap/ready")
 }
+
+func TestBootstrapChartYAML_HasErrorTransitions(t *testing.T) {
+	def, err := LoadBootstrapChart()
+	if err != nil {
+		t.Fatalf("failed to load bootstrap chart: %v", err)
+	}
+
+	states, ok := def.Spec["states"].(map[string]interface{})
+	if !ok {
+		t.Fatal("states should be a map")
+	}
+
+	checkErrorTransition := func(fromState, event string) {
+		t.Helper()
+		state, ok := states[fromState]
+		if !ok {
+			t.Errorf("state %s not found", fromState)
+			return
+		}
+		stateMap, ok := state.(map[string]interface{})
+		if !ok {
+			t.Errorf("state %s should be a map", fromState)
+			return
+		}
+		transitions, ok := stateMap["transitions"].([]interface{})
+		if !ok {
+			t.Errorf("state %s should have transitions", fromState)
+			return
+		}
+		found := false
+		for _, trans := range transitions {
+			transMap, ok := trans.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if transMap["event"] == event && transMap["target"] == "sys:bootstrap/failed" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("missing error transition: %s --(%s)--> sys:bootstrap/failed", fromState, event)
+		}
+	}
+
+	checkErrorTransition("sys:bootstrap/security", "securityFailed")
+	checkErrorTransition("sys:bootstrap/communication", "communicationFailed")
+	checkErrorTransition("sys:bootstrap/observability", "observabilityFailed")
+	checkErrorTransition("sys:bootstrap/lifecycle", "lifecycleFailed")
+}
