@@ -251,3 +251,42 @@ func TestStreamSession_Close(t *testing.T) {
 		}
 	}
 }
+
+func TestStreamSession_CloseAfterSend(t *testing.T) {
+	session := NewStreamSession("test-session", nil)
+
+	chunks := []StreamChunk{
+		{Data: "Part 1", Sequence: 1, IsFinal: false},
+		{Data: "Part 2", Sequence: 2, IsFinal: true},
+	}
+
+	for _, chunk := range chunks {
+		err := session.Send(chunk)
+		if err != nil {
+			t.Errorf("Expected nil error for chunk %d, got %v", chunk.Sequence, err)
+		}
+	}
+
+	err := session.Close()
+	if err != nil {
+		t.Errorf("Expected nil error on Close, got %v", err)
+	}
+
+	if !session.Closed {
+		t.Error("Expected session to be closed after Close()")
+	}
+
+	received := make([]StreamChunk, 0)
+	for chunk := range session.Chunks {
+		received = append(received, chunk)
+	}
+
+	if len(received) != 2 {
+		t.Errorf("Expected 2 chunks before close, got %d", len(received))
+	}
+
+	err = session.Send(StreamChunk{Data: "after close", Sequence: 3})
+	if err == nil {
+		t.Error("Expected error when sending to closed session")
+	}
+}
