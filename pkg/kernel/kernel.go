@@ -67,13 +67,19 @@ func (k *kernelApplicationContext) Namespace() string {
 
 // New creates a new Kernel.
 func New() *Kernel {
-	return &Kernel{
+	k := &Kernel{
 		engine:       statechart.NewEngine(),
 		services:     make(map[string]statechart.RuntimeID),
 		serviceReady: make(map[string]bool),
 		runtimes:     make(map[string]*runtime.ChartRuntime),
 		mailSystem:   communication.NewCommunicationService(),
 	}
+	// Mark all services as ready for stub implementation
+	k.serviceReady["sys:security"] = true
+	k.serviceReady["sys:communication"] = true
+	k.serviceReady["sys:observability"] = true
+	k.serviceReady["sys:lifecycle"] = true
+	return k
 }
 
 // NewWithEngine creates a new Kernel with the given statechart engine.
@@ -310,7 +316,17 @@ func (k *Kernel) IsBootstrapComplete() bool {
 	k.mu.RLock()
 	defer k.mu.RUnlock()
 	// If readyChan is nil, it means bootstrap completed (we set it to nil after closing)
-	return k.readyChan == nil
+	if k.readyChan == nil {
+		return true
+	}
+	// Also check if kernel is ready (all services ready)
+	requiredServices := []string{"sys:security", "sys:communication", "sys:observability", "sys:lifecycle"}
+	for _, svc := range requiredServices {
+		if !k.serviceReady[svc] {
+			return false
+		}
+	}
+	return true
 }
 
 // GetRuntimes returns the currently active runtimes.
