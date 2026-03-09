@@ -4,6 +4,14 @@ import (
 	"testing"
 )
 
+func TestLifecycleService_NewLifecycleServiceReturnsNonNil(t *testing.T) {
+	svc := NewLifecycleService()
+
+	if svc == nil {
+		t.Error("Expected NewLifecycleService to return non-nil")
+	}
+}
+
 func TestLifecycleService_BootstrapChart(t *testing.T) {
 	chart := BootstrapChart()
 
