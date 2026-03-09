@@ -1,6 +1,7 @@
 package datasource
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/maelstrom/v3/pkg/security"
@@ -52,6 +53,11 @@ func TestS3DataSource_ValidateAccess_Allowed(t *testing.T) {
 	if err != nil {
 		t.Errorf("ValidateAccess should allow dmz boundary, got error: %v", err)
 	}
+
+	err = ds.ValidateAccess(security.InnerBoundary)
+	if err != nil {
+		t.Errorf("ValidateAccess should allow inner boundary, got error: %v", err)
+	}
 }
 
 func TestS3DataSource_ValidateAccess_Denied(t *testing.T) {
@@ -69,6 +75,25 @@ func TestS3DataSource_ValidateAccess_Denied(t *testing.T) {
 	err = ds.ValidateAccess(security.OuterBoundary)
 	if err == nil {
 		t.Error("ValidateAccess should deny outer boundary, got no error")
+	} else if !strings.Contains(err.Error(), "outer") {
+		t.Errorf("error message should contain boundary info, got: %v", err)
+	}
+}
+
+func TestS3DataSource_ValidateAccess_NoRestriction(t *testing.T) {
+	config := map[string]any{
+		"bucket": "my-bucket",
+		"region": "us-east-1",
+	}
+
+	ds, err := NewS3DataSource(config)
+	if err != nil {
+		t.Fatalf("NewS3DataSource failed: %v", err)
+	}
+
+	err = ds.ValidateAccess(security.OuterBoundary)
+	if err != nil {
+		t.Errorf("ValidateAccess should allow all boundaries when no restriction, got error: %v", err)
 	}
 }
 

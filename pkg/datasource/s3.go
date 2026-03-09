@@ -50,7 +50,15 @@ func (s *s3DataSource) GetTaints(key string) ([]string, error) {
 }
 
 func (s *s3DataSource) ValidateAccess(boundary security.BoundaryType) error {
-	return fmt.Errorf("not implemented")
+	if len(s.allowedForBoundary) == 0 {
+		return nil
+	}
+	for _, allowed := range s.allowedForBoundary {
+		if allowed == boundary {
+			return nil
+		}
+	}
+	return fmt.Errorf("boundary %s not allowed for this datasource", boundary)
 }
 
 func init() {
