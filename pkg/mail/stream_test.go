@@ -226,3 +226,28 @@ func TestStreamSession_SendMultiple(t *testing.T) {
 		}
 	}
 }
+
+func TestStreamSession_Close(t *testing.T) {
+	session := NewStreamSession("test-session", nil)
+
+	err := session.Close()
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	if !session.Closed {
+		t.Error("Expected session to be closed")
+	}
+
+	select {
+	case _, ok := <-session.Chunks:
+		if ok {
+			t.Error("Expected channel to be closed")
+		}
+	default:
+		// Channel may have no data, check if closed
+		if !session.Closed {
+			t.Error("Expected session to be marked as closed")
+		}
+	}
+}

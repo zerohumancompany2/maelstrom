@@ -39,8 +39,15 @@ func (s *StreamSession) Send(chunk StreamChunk) error {
 }
 
 // Close closes the session
-func (s *StreamSession) Close() {
-	panic("not implemented")
+func (s *StreamSession) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.Closed {
+		return nil
+	}
+	s.Closed = true
+	close(s.Chunks)
+	return nil
 }
 
 // UpgradeToStream upgrades a connection to streaming mode
