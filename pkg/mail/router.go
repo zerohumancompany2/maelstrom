@@ -74,20 +74,6 @@ func (r *MailRouter) SubscribeService(name string, inbox *ServiceInbox) error {
 	return nil
 }
 
-// Stub types for TDD workflow
-type AgentInbox struct {
-	ID       string
-	Messages []Mail
-	mu       sync.RWMutex
-}
-
-func (ai *AgentInbox) Push(mail Mail) error {
-	ai.mu.Lock()
-	defer ai.mu.Unlock()
-	ai.Messages = append(ai.Messages, mail)
-	return nil
-}
-
 type Topic struct {
 	Name        string
 	Subscribers []chan Mail
@@ -95,19 +81,5 @@ type Topic struct {
 }
 
 func (t *Topic) Publish(mail Mail) error {
-	// TODO: implement
-	return nil
-}
-
-type ServiceInbox struct {
-	ID       string
-	Messages []Mail
-	mu       sync.RWMutex
-}
-
-func (si *ServiceInbox) Push(mail Mail) error {
-	si.mu.Lock()
-	defer si.mu.Unlock()
-	si.Messages = append(si.Messages, mail)
 	return nil
 }
