@@ -3,6 +3,7 @@ package datasource
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/maelstrom/v3/pkg/security"
@@ -139,5 +140,24 @@ func TestLocalDisk_ValidateAccess_Allowed(t *testing.T) {
 	err = ds.ValidateAccess(security.DMZBoundary)
 	if err != nil {
 		t.Errorf("ValidateAccess should allow dmz boundary, got error: %v", err)
+	}
+}
+
+func TestLocalDisk_ValidateAccess_Denied(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	ds, err := NewLocalDisk(map[string]any{
+		"path":               tmpDir,
+		"allowedForBoundary": []security.BoundaryType{security.InnerBoundary},
+	})
+	if err != nil {
+		t.Fatalf("NewLocalDisk failed: %v", err)
+	}
+
+	err = ds.ValidateAccess(security.OuterBoundary)
+	if err == nil {
+		t.Error("ValidateAccess should deny outer boundary, got no error")
+	} else if !strings.Contains(err.Error(), "outer") {
+		t.Errorf("error message should contain boundary info, got: %v", err)
 	}
 }
