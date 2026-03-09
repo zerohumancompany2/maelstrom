@@ -267,3 +267,25 @@ func TestKernel_IsBootstrapComplete_AfterBootstrap(t *testing.T) {
 		t.Fatal("timeout waiting for kernel")
 	}
 }
+
+func TestKernel_Shutdown_ContextCancellation(t *testing.T) {
+	engine := statechart.NewEngine()
+	k := NewWithEngine(engine)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	go func() {
+		_ = k.Start(ctx)
+	}()
+
+	time.Sleep(200 * time.Millisecond)
+
+	cancelCtx, cancelFunc := context.WithCancel(context.Background())
+	cancelFunc()
+
+	err := k.Shutdown(cancelCtx)
+	if err != context.Canceled {
+		t.Errorf("expected context.Canceled error, got %v", err)
+	}
+}
