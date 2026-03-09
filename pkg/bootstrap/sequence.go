@@ -9,6 +9,7 @@ import (
 
 // Sequence orchestrates the bootstrap state machine.
 type Sequence struct {
+	kernel       interface{}
 	mu           sync.RWMutex
 	currentState string
 	services     map[string]bool // Track loaded services
@@ -19,6 +20,15 @@ type Sequence struct {
 // NewSequence creates a new bootstrap sequence starting at "initializing".
 func NewSequence() *Sequence {
 	return &Sequence{
+		currentState: "initializing",
+		services:     make(map[string]bool),
+	}
+}
+
+// NewSequenceWithKernel creates a new bootstrap sequence with kernel reference.
+func NewSequenceWithKernel(kernel interface{}) *Sequence {
+	return &Sequence{
+		kernel:       kernel,
 		currentState: "initializing",
 		services:     make(map[string]bool),
 	}

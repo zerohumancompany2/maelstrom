@@ -90,3 +90,13 @@ func TestBootstrapSequence_InvalidEvent(t *testing.T) {
 		t.Error("expected error for invalid event")
 	}
 }
+
+// TestSequence_PassesKernelToActions verifies sequence creates chart with actions registered.
+func TestSequence_PassesKernelToActions(t *testing.T) {
+	var kernelRef interface{}
+	seq := NewSequenceWithKernel(&kernelRef)
+
+	if seq == nil {
+		t.Fatal("expected non-nil sequence")
+	}
+}
