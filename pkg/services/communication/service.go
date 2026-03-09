@@ -1,6 +1,7 @@
 package communication
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"time"
@@ -8,12 +9,18 @@ import (
 	"github.com/maelstrom/v3/pkg/mail"
 )
 
+type pendingReply struct {
+	ch        chan *mail.Mail
+	createdAt time.Time
+}
+
 type CommunicationService struct {
 	id               string
 	router           *mail.MailRouter
 	publisher        mail.Publisher
 	subscribers      map[string][]chan mail.Mail
 	deliveryAttempts map[string]int
+	pendingReplies   map[string]pendingReply
 	mu               sync.RWMutex
 }
 
@@ -25,6 +32,7 @@ func NewCommunicationService() *CommunicationService {
 		publisher:        mail.NewRouterPublisher(router),
 		subscribers:      make(map[string][]chan mail.Mail),
 		deliveryAttempts: make(map[string]int),
+		pendingReplies:   make(map[string]pendingReply),
 	}
 }
 
@@ -149,4 +157,23 @@ func (c *CommunicationService) trackDeliveryAttempt(correlationID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.deliveryAttempts[correlationID]++
+}
+
+func (c *CommunicationService) Request(replyChan chan *mail.Mail, timeout time.Duration) (*mail.Mail, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	select {
+	case reply, ok := <-replyChan:
+		if !ok {
+			return nil, errors.New("reply channel closed")
+		}
+		return reply, nil
+	case <-ctx.Done():
+		return nil, errors.New("request timeout")
+	}
+}
+
+func (c *CommunicationService) matchReply(correlationID string, mail *mail.Mail) bool {
+	return mail.CorrelationID == correlationID
 }

@@ -346,3 +346,58 @@ func TestCommunicationService_DeliveryTracking(t *testing.T) {
 	svc.trackDeliveryAttempt(correlationID)
 	svc.trackDeliveryAttempt(correlationID)
 }
+
+func TestCommunicationService_RequestReply(t *testing.T) {
+	svc := NewCommunicationService()
+
+	mailChan, err := svc.Subscribe("agent:reply")
+	if err != nil {
+		t.Fatalf("Subscribe failed: %v", err)
+	}
+
+	replyChan := make(chan *mail.Mail)
+	go func() {
+		for m := range mailChan {
+			replyChan <- &m
+		}
+	}()
+
+	correlationID := "test-correlation-456"
+	requestMail := mail.Mail{
+		ID:            "request-1",
+		CorrelationID: correlationID,
+		Source:        "agent:requester",
+		Target:        "agent:handler",
+		Type:          mail.MailTypeUser,
+		Content:       "test request",
+	}
+
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		replyMail := mail.Mail{
+			ID:            "reply-1",
+			CorrelationID: correlationID,
+			Source:        "agent:handler",
+			Target:        "agent:reply",
+			Type:          mail.MailTypeAssistant,
+			Content:       "test reply",
+		}
+		_, _ = svc.Publish(replyMail)
+	}()
+
+	reply, err := svc.Request(replyChan, 1*time.Second)
+
+	if err != nil {
+		t.Errorf("Request failed: %v", err)
+	}
+	if reply == nil {
+		t.Error("Expected non-nil reply")
+	}
+	if reply.CorrelationID != correlationID {
+		t.Errorf("Expected CorrelationID %s, got %s", correlationID, reply.CorrelationID)
+	}
+	if reply.Content != "test reply" {
+		t.Errorf("Expected content 'test reply', got %v", reply.Content)
+	}
+	_ = requestMail
+}
