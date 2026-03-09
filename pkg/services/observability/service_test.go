@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/maelstrom/v3/pkg/mail"
+	"github.com/maelstrom/v3/pkg/services"
 )
 
 func TestObservabilityService_NewObservabilityServiceReturnsNonNil(t *testing.T) {
@@ -31,6 +32,16 @@ func TestObservabilityService_HandleMailReturnsNil(t *testing.T) {
 
 	if err != nil {
 		t.Errorf("Expected HandleMail to return nil, got %v", err)
+	}
+}
+
+func TestObservabilityService_EmitTraceReturnsNil(t *testing.T) {
+	svc := NewObservabilityService()
+
+	err := svc.EmitTrace(services.Trace{})
+
+	if err != nil {
+		t.Errorf("Expected EmitTrace to return nil, got %v", err)
 	}
 }
 
