@@ -1,6 +1,9 @@
 package security
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestValidateBoundary_Valid(t *testing.T) {
 	tests := []BoundaryType{InnerBoundary, DMZBoundary, OuterBoundary}
@@ -95,5 +98,16 @@ func TestTransition_InnerToOuter(t *testing.T) {
 		if result[i] != v {
 			t.Errorf("EnforceTransition(InnerBoundary, OuterBoundary, %v)[%d] = %v, want %v", taints, i, result[i], v)
 		}
+	}
+}
+
+func TestTransition_OuterToInner(t *testing.T) {
+	taints := []string{"USER_SUPPLIED", "PII"}
+	_, err := EnforceTransition(OuterBoundary, InnerBoundary, taints)
+	if err == nil {
+		t.Fatalf("EnforceTransition(OuterBoundary, InnerBoundary, %v) returned nil error, want error for PII", taints)
+	}
+	if !strings.Contains(err.Error(), "PII") {
+		t.Errorf("EnforceTransition error = %v, want error mentioning PII", err)
 	}
 }
