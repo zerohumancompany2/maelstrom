@@ -30,7 +30,9 @@ func TaintSubAgentReturn(data any, subAgentBoundary BoundaryType) (any, error) {
 }
 
 func CheckSubAgentElevation(parentBoundary, childBoundary BoundaryType) bool {
-	panic("not implemented")
+	parentLevel := getBoundaryLevel(parentBoundary)
+	childLevel := getBoundaryLevel(childBoundary)
+	return childLevel > parentLevel
 }
 
 func EmitSubAgentViolation(runtimeId string, violation SubAgentViolation) error {
