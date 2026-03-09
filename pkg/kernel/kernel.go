@@ -209,3 +209,28 @@ func (k *Kernel) GetServiceRuntimeID(name string) (statechart.RuntimeID, bool) {
 	id, ok := k.services[name]
 	return id, ok
 }
+
+// Shutdown stops all services.
+func (k *Kernel) Shutdown(ctx context.Context) error {
+	if k.engine == nil {
+		return nil
+	}
+	k.mu.RLock()
+	services := make(map[string]statechart.RuntimeID, len(k.services))
+	for name, id := range k.services {
+		services[name] = id
+	}
+	k.mu.RUnlock()
+
+	for name, id := range services {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		if err := k.engine.Control(id, statechart.CmdStop); err != nil {
+			log.Printf("[kernel] failed to stop %s: %v", name, err)
+		}
+	}
+	return nil
+}

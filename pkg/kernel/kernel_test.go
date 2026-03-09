@@ -172,3 +172,20 @@ func TestKernel_Start_WaitsForKernelReady(t *testing.T) {
 		t.Fatal("timeout waiting for kernel ready")
 	}
 }
+
+func TestKernel_Shutdown_StopsAllServices(t *testing.T) {
+	engine := statechart.NewEngine()
+	k := NewWithEngine(engine)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	go func() {
+		_ = k.Start(ctx)
+	}()
+	time.Sleep(200 * time.Millisecond)
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer shutdownCancel()
+	err := k.Shutdown(shutdownCtx)
+	if err != nil {
+		t.Errorf("Shutdown failed: %v", err)
+	}
+}
