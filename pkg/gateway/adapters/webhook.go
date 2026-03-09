@@ -1,6 +1,10 @@
 package adapters
 
 import (
+	"crypto/rand"
+	"encoding/json"
+	"fmt"
+
 	"github.com/maelstrom/v3/pkg/mail"
 )
 
@@ -9,17 +13,42 @@ type WebhookAdapter struct {
 }
 
 func NewWebhookAdapter() *WebhookAdapter {
-	panic("not implemented")
+	return &WebhookAdapter{name: "webhook"}
 }
 
 func (a *WebhookAdapter) Name() string {
-	panic("not implemented")
+	return a.name
 }
 
 func (a *WebhookAdapter) NormalizeInbound(data []byte) (mail.Mail, error) {
-	panic("not implemented")
+	var payload map[string]any
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return mail.Mail{}, err
+	}
+
+	return mail.Mail{
+		ID:      generateID(),
+		Type:    mail.MailTypeMailReceived,
+		Source:  "gateway:webhook",
+		Target:  "agent:default",
+		Content: payload,
+		Metadata: mail.MailMetadata{
+			Boundary: mail.OuterBoundary,
+			Taints:   []string{"USER_SUPPLIED"},
+		},
+	}, nil
 }
 
 func (a *WebhookAdapter) NormalizeOutbound(mail mail.Mail) ([]byte, error) {
-	panic("not implemented")
+	return json.Marshal(map[string]any{
+		"type":    mail.Type,
+		"content": mail.Content,
+		"source":  mail.Source,
+	})
+}
+
+func generateID() string {
+	b := make([]byte, 8)
+	rand.Read(b)
+	return fmt.Sprintf("webhook-%x", b)
 }
