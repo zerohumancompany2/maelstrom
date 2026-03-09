@@ -1,6 +1,7 @@
 package communication
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -473,5 +474,66 @@ func TestCommunicationService_RequestTimeout(t *testing.T) {
 	}
 	if err.Error() != "request timeout" {
 		t.Errorf("Expected 'request timeout' error, got %v", err)
+	}
+}
+
+func TestCommunicationService_MultipleRequests(t *testing.T) {
+	svc := NewCommunicationService()
+
+	numRequests := 5
+	results := make(chan string, numRequests)
+
+	for i := 0; i < numRequests; i++ {
+		correlationID := fmt.Sprintf("multi-corr-%d", i)
+
+		mailChan, err := svc.Subscribe(fmt.Sprintf("agent:multi-reply-%d", i))
+		if err != nil {
+			t.Fatalf("Subscribe failed: %v", err)
+		}
+
+		replyChan := make(chan *mail.Mail)
+		go func() {
+			for m := range mailChan {
+				replyChan <- &m
+			}
+		}()
+
+		go func() {
+			time.Sleep(10 * time.Millisecond)
+			replyMail := mail.Mail{
+				ID:            fmt.Sprintf("reply-%d", i),
+				CorrelationID: correlationID,
+				Source:        "agent:handler",
+				Target:        fmt.Sprintf("agent:multi-reply-%d", i),
+				Type:          mail.MailTypeAssistant,
+				Content:       fmt.Sprintf("reply-%d", i),
+			}
+			_, _ = svc.Publish(replyMail)
+		}()
+
+		go func() {
+			reply, err := svc.Request(replyChan, 1*time.Second)
+			if err != nil {
+				results <- fmt.Sprintf("error-%d", i)
+				return
+			}
+			if reply.CorrelationID != correlationID {
+				results <- fmt.Sprintf("wrong-corr-%d", i)
+				return
+			}
+			results <- fmt.Sprintf("success-%d", i)
+		}()
+	}
+
+	successCount := 0
+	for i := 0; i < numRequests; i++ {
+		result := <-results
+		if strings.HasPrefix(result, "success-") {
+			successCount++
+		}
+	}
+
+	if successCount != numRequests {
+		t.Errorf("Expected %d successful requests, got %d", numRequests, successCount)
 	}
 }
