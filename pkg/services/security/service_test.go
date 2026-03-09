@@ -12,6 +12,16 @@ func TestSecurityService_NewSecurityServiceReturnsNonNil(t *testing.T) {
 	}
 }
 
+func TestSecurityService_IDReturnsCorrectString(t *testing.T) {
+	svc := NewSecurityService()
+
+	id := svc.ID()
+
+	if id != "sys:security" {
+		t.Errorf("Expected ID sys:security, got %s", id)
+	}
+}
+
 func TestSecurityService_BootstrapChart(t *testing.T) {
 	chart := BootstrapChart()
 
