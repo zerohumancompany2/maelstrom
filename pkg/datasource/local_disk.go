@@ -6,6 +6,7 @@ import (
 	"github.com/maelstrom/v3/pkg/security"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/sys/unix"
 )
@@ -14,6 +15,8 @@ type localDisk struct {
 	path               string
 	xattrNamespace     string
 	allowedForBoundary []security.BoundaryType
+	taintMode          string
+	alwaysTaintAs      []string
 }
 
 func NewLocalDisk(config map[string]any) (DataSource, error) {
@@ -28,10 +31,26 @@ func NewLocalDisk(config map[string]any) (DataSource, error) {
 		allowedForBoundary = allowed
 	}
 
+	taintMode := "inheritFromXattr"
+	if tm, ok := config["taintMode"].(string); ok {
+		taintMode = tm
+	}
+
+	alwaysTaintAs := []string{}
+	if taintMode != "" && strings.HasPrefix(taintMode, "alwaysTaintAs=") {
+		taintValue := strings.TrimPrefix(taintMode, "alwaysTaintAs=")
+		alwaysTaintAs = strings.Split(taintValue, ",")
+		for i := range alwaysTaintAs {
+			alwaysTaintAs[i] = strings.TrimSpace(alwaysTaintAs[i])
+		}
+	}
+
 	return &localDisk{
 		path:               path,
 		xattrNamespace:     xattrNS,
 		allowedForBoundary: allowedForBoundary,
+		taintMode:          taintMode,
+		alwaysTaintAs:      alwaysTaintAs,
 	}, nil
 }
 
@@ -59,6 +78,14 @@ func (d *localDisk) TagOnWrite(path string, taints []string) error {
 }
 
 func (d *localDisk) GetTaints(path string) ([]string, error) {
+	if d.taintMode == "none" {
+		return []string{}, nil
+	}
+
+	if d.taintMode != "" && strings.HasPrefix(d.taintMode, "alwaysTaintAs=") {
+		return d.alwaysTaintAs, nil
+	}
+
 	attrName := d.xattrNamespace + ".taints"
 	dest := make([]byte, 4096)
 	n, err := unix.Lgetxattr(path, attrName, dest)

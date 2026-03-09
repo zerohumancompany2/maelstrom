@@ -161,3 +161,32 @@ func TestLocalDisk_ValidateAccess_Denied(t *testing.T) {
 		t.Errorf("error message should contain boundary info, got: %v", err)
 	}
 }
+
+func TestDataSource_AlwaysTaintAsMode_ReturnsConfiguredTaints(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	ds, err := NewLocalDisk(map[string]any{
+		"path":      tmpDir,
+		"taintMode": "alwaysTaintAs=INNER_ONLY",
+	})
+	if err != nil {
+		t.Fatalf("NewLocalDisk failed: %v", err)
+	}
+
+	testFile := tmpDir + "/test.txt"
+	taints, err := ds.GetTaints(testFile)
+	if err != nil {
+		t.Fatalf("GetTaints failed: %v", err)
+	}
+
+	expected := []string{"INNER_ONLY"}
+	if len(taints) != len(expected) {
+		t.Errorf("taint length mismatch: got %d, want %d", len(taints), len(expected))
+	}
+
+	for i, exp := range expected {
+		if taints[i] != exp {
+			t.Errorf("taint[%d] mismatch: got %q, want %q", i, taints[i], exp)
+		}
+	}
+}
