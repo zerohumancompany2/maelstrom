@@ -187,3 +187,42 @@ func TestStreamSession_Send(t *testing.T) {
 		t.Errorf("Expected sequence 1, got %d", received.Sequence)
 	}
 }
+
+func TestStreamSession_SendMultiple(t *testing.T) {
+	session := NewStreamSession("test-session", nil)
+	chunks := []StreamChunk{
+		{Data: "Part 1", Sequence: 1, IsFinal: false},
+		{Data: "Part 2", Sequence: 2, IsFinal: false},
+		{Data: "Part 3", Sequence: 3, IsFinal: true},
+	}
+
+	for _, chunk := range chunks {
+		err := session.Send(chunk)
+		if err != nil {
+			t.Errorf("Expected nil error for chunk %d, got %v", chunk.Sequence, err)
+		}
+	}
+
+	received := make([]StreamChunk, 0, 3)
+	for i := 0; i < 3; i++ {
+		receivedChunk, ok := <-session.Chunks
+		if !ok {
+			t.Errorf("Expected to receive chunk %d but channel was closed", i+1)
+			break
+		}
+		received = append(received, receivedChunk)
+	}
+
+	if len(received) != 3 {
+		t.Errorf("Expected 3 chunks, got %d", len(received))
+	}
+
+	for i, chunk := range chunks {
+		if received[i].Data != chunk.Data {
+			t.Errorf("Chunk %d: Expected data '%s', got '%s'", i+1, chunk.Data, received[i].Data)
+		}
+		if received[i].Sequence != chunk.Sequence {
+			t.Errorf("Chunk %d: Expected sequence %d, got %d", i+1, chunk.Sequence, received[i].Sequence)
+		}
+	}
+}
