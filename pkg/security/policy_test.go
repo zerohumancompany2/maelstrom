@@ -145,3 +145,44 @@ func TestPolicyEnforcement_AllowedOnExit(t *testing.T) {
 		t.Errorf("Expected tool_result unchanged (TOOL_OUTPUT is allowed), got '%v'", resultMap["tool_result"])
 	}
 }
+
+func TestPolicyEnforcement_MultipleRedactRules(t *testing.T) {
+	ClearAuditLog()
+
+	// Given: A TaintPolicy with enforcement: redact and multiple redactRules
+	policy := TaintPolicyConfig{
+		Enforcement: EnforcementRedact,
+		RedactRules: []RedactRule{
+			{Taint: "SECRET", Replacement: "[REDACTED]"},
+			{Taint: "PII", Replacement: "[PERSONAL_INFO]"},
+		},
+	}
+
+	// Test SECRET taint
+	secretData := map[string]interface{}{
+		"password": "secret123",
+		"_taints":  []string{"SECRET"},
+	}
+	secretResult, err := EnforcePolicy(secretData, policy, OuterBoundary)
+	if err != nil {
+		t.Fatalf("Expected no error for SECRET, got %v", err)
+	}
+	secretMap := secretResult.(map[string]interface{})
+	if secretMap["password"] != "[REDACTED]" {
+		t.Errorf("Expected SECRET redacted to '[REDACTED]', got '%v'", secretMap["password"])
+	}
+
+	// Test PII taint
+	piiData := map[string]interface{}{
+		"email":   "user@example.com",
+		"_taints": []string{"PII"},
+	}
+	piiResult, err := EnforcePolicy(piiData, policy, OuterBoundary)
+	if err != nil {
+		t.Fatalf("Expected no error for PII, got %v", err)
+	}
+	piiMap := piiResult.(map[string]interface{})
+	if piiMap["email"] != "[PERSONAL_INFO]" {
+		t.Errorf("Expected PII redacted to '[PERSONAL_INFO]', got '%v'", piiMap["email"])
+	}
+}
