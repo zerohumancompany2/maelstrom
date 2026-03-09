@@ -44,3 +44,17 @@ func TestBootstrapChart_HasSecurityState(t *testing.T) {
 		t.Error("bootstrap chart missing 'security' state")
 	}
 }
+
+func TestBootstrapChartYAML_ParsesWithoutError(t *testing.T) {
+	def, err := LoadBootstrapChart()
+	if err != nil {
+		t.Fatalf("BootstrapChartYAML failed to parse: %v", err)
+	}
+
+	if def.ID != "sys:bootstrap" {
+		t.Errorf("expected ID 'sys:bootstrap', got %q", def.ID)
+	}
+	if def.Version != "1.0.0" {
+		t.Errorf("expected Version '1.0.0', got %q", def.Version)
+	}
+}
