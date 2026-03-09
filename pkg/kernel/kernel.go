@@ -9,6 +9,7 @@ import (
 
 	"github.com/maelstrom/v3/pkg/bootstrap"
 	"github.com/maelstrom/v3/pkg/runtime"
+	"github.com/maelstrom/v3/pkg/services/communication"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
 
@@ -20,15 +21,16 @@ type KernelConfig struct {
 
 // Kernel orchestrates bootstrap and hands off to ChartRegistry.
 type Kernel struct {
-	engine    statechart.Library
-	config    KernelConfig
-	factory   *runtime.Factory
-	sequence  *bootstrap.Sequence
-	services  map[string]statechart.RuntimeID
-	runtimes  map[string]*runtime.ChartRuntime
-	appCtx    statechart.ApplicationContext
-	mu        sync.RWMutex
-	readyChan chan struct{}
+	engine     statechart.Library
+	config     KernelConfig
+	factory    *runtime.Factory
+	sequence   *bootstrap.Sequence
+	services   map[string]statechart.RuntimeID
+	runtimes   map[string]*runtime.ChartRuntime
+	appCtx     statechart.ApplicationContext
+	mailSystem *communication.CommunicationService
+	mu         sync.RWMutex
+	readyChan  chan struct{}
 }
 
 // kernelApplicationContext provides application context with kernel engine access.
@@ -65,8 +67,9 @@ func (k *kernelApplicationContext) Namespace() string {
 // New creates a new Kernel.
 func New() *Kernel {
 	return &Kernel{
-		services: make(map[string]statechart.RuntimeID),
-		runtimes: make(map[string]*runtime.ChartRuntime),
+		services:   make(map[string]statechart.RuntimeID),
+		runtimes:   make(map[string]*runtime.ChartRuntime),
+		mailSystem: communication.NewCommunicationService(),
 	}
 }
 
@@ -256,6 +259,13 @@ func (k *Kernel) GetServiceRuntimeID(name string) (statechart.RuntimeID, bool) {
 	defer k.mu.RUnlock()
 	id, ok := k.services[name]
 	return id, ok
+}
+
+// MailSystem returns the mail system (CommunicationService).
+func (k *Kernel) MailSystem() *communication.CommunicationService {
+	k.mu.RLock()
+	defer k.mu.RUnlock()
+	return k.mailSystem
 }
 
 // Shutdown stops all services.

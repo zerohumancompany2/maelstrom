@@ -84,8 +84,10 @@ func TestKernel_KernelReadyEvent(t *testing.T) {
 }
 
 func TestKernel_MailSystemRequired(t *testing.T) {
-	// Placeholder for future integration test
-	// Verifies mail system exists before services spawn
+	kernel := New()
+	if kernel.MailSystem() == nil {
+		t.Error("Mail system should exist in kernel")
+	}
 }
 
 func TestKernelConfig_DefaultValues(t *testing.T) {
