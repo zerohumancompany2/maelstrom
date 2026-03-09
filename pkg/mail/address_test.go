@@ -172,3 +172,47 @@ func TestMail_AddressFormats(t *testing.T) {
 		t.Error("Expected invalid-format to be rejected")
 	}
 }
+
+func TestAddress_ParseAddress(t *testing.T) {
+	// Test agent address parsing
+	addrType, id, err := ParseAddress("agent:recommendation-agent")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if addrType != AddressTypeAgent {
+		t.Errorf("Expected AddressTypeAgent, got %v", addrType)
+	}
+	if id != "recommendation-agent" {
+		t.Errorf("Expected id 'recommendation-agent', got '%s'", id)
+	}
+
+	// Test topic address parsing
+	addrType, id, err = ParseAddress("topic:market-data")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if addrType != AddressTypeTopic {
+		t.Errorf("Expected AddressTypeTopic, got %v", addrType)
+	}
+	if id != "market-data" {
+		t.Errorf("Expected id 'market-data', got '%s'", id)
+	}
+
+	// Test sys address parsing
+	addrType, id, err = ParseAddress("sys:heartbeat")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if addrType != AddressTypeSys {
+		t.Errorf("Expected AddressTypeSys, got %v", addrType)
+	}
+	if id != "heartbeat" {
+		t.Errorf("Expected id 'heartbeat', got '%s'", id)
+	}
+
+	// Test invalid format
+	_, _, err = ParseAddress("invalid-format")
+	if err == nil {
+		t.Error("Expected error for invalid format")
+	}
+}

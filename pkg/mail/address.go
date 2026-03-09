@@ -1,6 +1,9 @@
 package mail
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 type AddressType int
 
@@ -24,4 +27,17 @@ func IsValidSysAddress(addr string) bool {
 
 func isValidAddressWithPrefix(addr, prefix string) bool {
 	return strings.HasPrefix(addr, prefix) && len(addr) > len(prefix)
+}
+
+func ParseAddress(addr string) (AddressType, string, error) {
+	switch {
+	case strings.HasPrefix(addr, "agent:"):
+		return AddressTypeAgent, strings.TrimPrefix(addr, "agent:"), nil
+	case strings.HasPrefix(addr, "topic:"):
+		return AddressTypeTopic, strings.TrimPrefix(addr, "topic:"), nil
+	case strings.HasPrefix(addr, "sys:"):
+		return AddressTypeSys, strings.TrimPrefix(addr, "sys:"), nil
+	default:
+		return 0, "", fmt.Errorf("invalid address format: %s", addr)
+	}
 }
