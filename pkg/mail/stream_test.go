@@ -136,3 +136,32 @@ func TestStreamChunk_IsFinal(t *testing.T) {
 		t.Error("Expected to detect stream completion via IsFinal")
 	}
 }
+
+func TestStreamChunk_Sequence(t *testing.T) {
+	// Test sequence uniqueness
+	chunks := []StreamChunk{
+		{Data: "A", Sequence: 1},
+		{Data: "B", Sequence: 2},
+		{Data: "C", Sequence: 3},
+	}
+
+	seen := make(map[int]bool)
+	for _, chunk := range chunks {
+		if seen[chunk.Sequence] {
+			t.Errorf("Duplicate sequence number: %d", chunk.Sequence)
+		}
+		seen[chunk.Sequence] = true
+	}
+
+	// Test sequence ordering
+	for i := 1; i < len(chunks); i++ {
+		if chunks[i].Sequence <= chunks[i-1].Sequence {
+			t.Errorf("Sequence not in order: %d <= %d", chunks[i].Sequence, chunks[i-1].Sequence)
+		}
+	}
+
+	// Test sequence starts at 1
+	if chunks[0].Sequence != 1 {
+		t.Errorf("Expected first sequence to be 1, got %d", chunks[0].Sequence)
+	}
+}
