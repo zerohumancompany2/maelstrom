@@ -140,3 +140,13 @@ func (l *LifecycleService) getStateHistory(runtimeID string) []StateTransition {
 	defer l.mu.Unlock()
 	return l.stateHistory[runtimeID]
 }
+
+func (l *LifecycleService) HotReload(serviceID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	_, exists := l.runtimes[statechart.RuntimeID(serviceID)]
+	if !exists {
+		return statechart.ErrRuntimeNotFound
+	}
+	return nil
+}

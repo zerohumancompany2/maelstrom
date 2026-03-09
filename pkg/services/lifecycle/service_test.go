@@ -341,3 +341,23 @@ func TestLifecycleService_StateHistory(t *testing.T) {
 		t.Errorf("Expected third transition running -> stopped, got %s -> %s", history[2].From, history[2].To)
 	}
 }
+
+func TestLifecycleService_HotReload(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+	}
+
+	rtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	err = svc.HotReload(string(rtID))
+	if err != nil {
+		t.Errorf("Expected HotReload to return nil, got %v", err)
+	}
+}
