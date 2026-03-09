@@ -46,9 +46,17 @@ func FilterContextBlock(block ContextBlock, boundary BoundaryType) (ContextBlock
 			result.Content = content
 			return result, nil
 		}
+		if block.TaintPolicy.RedactMode == "audit" {
+			logAuditViolation(block, boundary)
+			return block, nil
+		}
 		return block, nil
 	}
 	return ContextBlock{}, nil
+}
+
+func logAuditViolation(block ContextBlock, boundary BoundaryType) {
+	auditLog = append(auditLog, "VIOLATION at "+string(boundary)+": block "+block.Name+" with sensitive data")
 }
 
 func isBoundaryAllowed(allowed []BoundaryType, boundary BoundaryType) bool {

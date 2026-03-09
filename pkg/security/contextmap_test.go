@@ -1,6 +1,7 @@
 package security
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -145,5 +146,39 @@ func TestFilterContextBlock_AllowedForBoundary(t *testing.T) {
 
 	if filtered.Name != "" {
 		t.Errorf("Expected block to be filtered out (dmz not in allowedForBoundary), got name: %s", filtered.Name)
+	}
+}
+
+func TestFilterContextBlock_Audit(t *testing.T) {
+	ClearAuditLog()
+	contextBlockRegistry = make(map[string]BlockTaintInfo)
+
+	block := ContextBlock{
+		Name:    "pii-block",
+		Content: "This contains PII data",
+		TaintPolicy: TaintPolicy{
+			RedactMode: "audit",
+		},
+	}
+
+	filtered, err := FilterContextBlock(block, OuterBoundary)
+
+	if err != nil {
+		t.Fatalf("FilterContextBlock returned error: %v", err)
+	}
+
+	if filtered.Name != "pii-block" {
+		t.Errorf("Expected block to pass through unchanged with audit mode, got name: %s", filtered.Name)
+	}
+	if filtered.Content != "This contains PII data" {
+		t.Errorf("Expected block content to be unchanged with audit mode, got: %s", filtered.Content)
+	}
+
+	lastLog := GetLastAuditLog()
+	if lastLog == "" {
+		t.Errorf("Expected violation to be logged to audit trail, but log is empty")
+	}
+	if !strings.Contains(lastLog, "VIOLATION") {
+		t.Errorf("Expected audit log to contain VIOLATION, got: %s", lastLog)
 	}
 }
