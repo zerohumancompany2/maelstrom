@@ -43,6 +43,9 @@ func (o *ObservabilityService) QueryTraces(filters services.TraceFilters) ([]ser
 		if filters.RuntimeID != "" && trace.RuntimeID != filters.RuntimeID {
 			continue
 		}
+		if filters.EventType != "" && trace.EventType != filters.EventType {
+			continue
+		}
 		result = append(result, trace)
 	}
 	return result, nil

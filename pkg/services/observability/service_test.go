@@ -196,3 +196,39 @@ func TestObservabilityService_QueryTracesWithFilters(t *testing.T) {
 		t.Errorf("Expected 2 traces for runtime-a, got %d", len(traces))
 	}
 }
+
+func TestObservabilityService_QueryTracesByEventType(t *testing.T) {
+	svc := NewObservabilityService()
+
+	trace1 := services.Trace{
+		ID:        "trace-1",
+		RuntimeID: "runtime-1",
+		EventType: "transition",
+		StatePath: "state/1",
+	}
+	trace2 := services.Trace{
+		ID:        "trace-2",
+		RuntimeID: "runtime-1",
+		EventType: "entry",
+		StatePath: "state/2",
+	}
+	trace3 := services.Trace{
+		ID:        "trace-3",
+		RuntimeID: "runtime-1",
+		EventType: "transition",
+		StatePath: "state/3",
+	}
+	svc.EmitTrace(trace1)
+	svc.EmitTrace(trace2)
+	svc.EmitTrace(trace3)
+
+	filters := services.TraceFilters{EventType: "transition"}
+	traces, err := svc.QueryTraces(filters)
+
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if len(traces) != 2 {
+		t.Errorf("Expected 2 transition events, got %d", len(traces))
+	}
+}
