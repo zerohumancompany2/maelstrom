@@ -290,3 +290,44 @@ func TestStreamSession_CloseAfterSend(t *testing.T) {
 		t.Error("Expected error when sending to closed session")
 	}
 }
+
+func TestMailStream_TaintStripping(t *testing.T) {
+	session := NewStreamSession("test-session", nil)
+	chunk := StreamChunk{
+		Data:     "test data",
+		Sequence: 1,
+		Taints:   []string{"USER_SUPPLIED", "TOOL_OUTPUT", "INNER_BOUNDARY"},
+	}
+
+	stripped := session.stripTaints(&chunk)
+
+	if len(stripped.Taints) != 2 {
+		t.Errorf("Expected 2 taints after stripping, got %d", len(stripped.Taints))
+	}
+
+	hasUserSupplied := false
+	hasToolOutput := false
+	for _, t := range stripped.Taints {
+		if t == "USER_SUPPLIED" {
+			hasUserSupplied = true
+		}
+		if t == "TOOL_OUTPUT" {
+			hasToolOutput = true
+		}
+	}
+	if !hasUserSupplied {
+		t.Error("Expected USER_SUPPLIED to be preserved")
+	}
+	if !hasToolOutput {
+		t.Error("Expected TOOL_OUTPUT to be preserved")
+	}
+	hasInnerBoundary := false
+	for _, t := range stripped.Taints {
+		if t == "INNER_BOUNDARY" {
+			hasInnerBoundary = true
+		}
+	}
+	if hasInnerBoundary {
+		t.Error("Expected INNER_BOUNDARY to be stripped")
+	}
+}

@@ -77,3 +77,21 @@ func StripForbiddenTaints(chunk StreamChunk, allowed []string) StreamChunk {
 	chunk.Taints = filtered
 	return chunk
 }
+
+// stripTaints removes forbidden taints from a stream chunk
+func (s *StreamSession) stripTaints(chunk *StreamChunk) *StreamChunk {
+	allowed := []string{"USER_SUPPLIED", "TOOL_OUTPUT"}
+	allowedMap := make(map[string]bool)
+	for _, a := range allowed {
+		allowedMap[a] = true
+	}
+
+	var filtered []string
+	for _, taint := range chunk.Taints {
+		if allowedMap[taint] {
+			filtered = append(filtered, taint)
+		}
+	}
+	chunk.Taints = filtered
+	return chunk
+}
