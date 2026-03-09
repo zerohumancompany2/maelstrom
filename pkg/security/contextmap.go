@@ -33,5 +33,27 @@ func PrepareContextForBoundary(runtimeId string, boundary BoundaryType) error {
 }
 
 func FilterContextBlock(block ContextBlock, boundary BoundaryType) (ContextBlock, error) {
+	if block.TaintPolicy.RedactMode == "redact" {
+		result := block
+		content := result.Content
+		for _, rule := range block.TaintPolicy.RedactRules {
+			content = replaceTaint(content, rule.Taint, rule.Replacement)
+		}
+		result.Content = content
+		return result, nil
+	}
 	return block, nil
+}
+
+func replaceTaint(content, taint, replacement string) string {
+	result := ""
+	for i := 0; i < len(content); i++ {
+		if i+len(taint) <= len(content) && content[i:i+len(taint)] == taint {
+			result += replacement
+			i += len(taint) - 1
+		} else {
+			result += string(content[i])
+		}
+	}
+	return result
 }
