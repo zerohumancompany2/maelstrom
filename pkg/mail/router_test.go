@@ -203,3 +203,17 @@ func TestTopicSubscriber_Interface(t *testing.T) {
 
 	var _ TopicSubscriber = sub
 }
+
+func TestTopicSubscriber_Subscribe(t *testing.T) {
+	sub := &mockTopicSubscriber{ch: make(chan Mail)}
+
+	err := sub.Subscribe("test-topic")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	err = sub.Unsubscribe("test-topic")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+}
