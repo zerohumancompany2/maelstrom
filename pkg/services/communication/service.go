@@ -1,7 +1,7 @@
 package communication
 
 import (
-	"fmt"
+	"errors"
 	"sync"
 	"time"
 
@@ -9,90 +9,112 @@ import (
 )
 
 type CommunicationService struct {
-	mu          sync.Mutex
+	id          string
+	router      *mail.MailRouter
+	publisher   mail.Publisher
 	subscribers map[string][]chan mail.Mail
+	mu          sync.RWMutex
 }
 
 func NewCommunicationService() *CommunicationService {
+	router := mail.NewMailRouter()
 	return &CommunicationService{
+		id:          "sys:communication",
+		router:      router,
+		publisher:   mail.NewRouterPublisher(router),
 		subscribers: make(map[string][]chan mail.Mail),
 	}
 }
 
 func (c *CommunicationService) ID() string {
-	return "sys:communication"
-}
-
-func (c *CommunicationService) HandleMail(mail mail.Mail) error {
-	return nil
+	return c.id
 }
 
 func (c *CommunicationService) Publish(m mail.Mail) (mail.Ack, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	target := m.Target
 	if target == "" {
 		target = m.Source
 	}
-	ack := mail.Ack{
+
+	c.mu.RLock()
+	localSubscribers, localExists := c.subscribers[target]
+	c.mu.RUnlock()
+
+	if localExists && len(localSubscribers) > 0 {
+		ack := mail.Ack{
+			MailID:        m.ID,
+			CorrelationID: m.CorrelationID,
+			DeliveredAt:   time.Now(),
+			Success:       false,
+		}
+		for _, ch := range localSubscribers {
+			select {
+			case ch <- m:
+				ack.Success = true
+			default:
+			}
+		}
+		return ack, nil
+	}
+
+	if mail.IsValidAgentAddress(target) || mail.IsValidTopicAddress(target) || mail.IsValidSysAddress(target) {
+		return c.publisher.Publish(m)
+	}
+
+	return mail.Ack{
 		MailID:        m.ID,
 		CorrelationID: m.CorrelationID,
 		DeliveredAt:   time.Now(),
 		Success:       false,
-	}
-	subscribers, exists := c.subscribers[target]
-	if !exists || len(subscribers) == 0 {
-		ack.ErrorMessage = "no subscribers"
-		return ack, nil
-	}
-	for _, ch := range subscribers {
-		select {
-		case ch <- m:
-			ack.Success = true
-		default:
-		}
-	}
-	return ack, nil
+		ErrorMessage:  "no subscribers",
+	}, nil
 }
 
 func (c *CommunicationService) Subscribe(address string) (chan mail.Mail, error) {
-	ch := make(chan mail.Mail, 10)
+	ch := make(chan mail.Mail, 100)
+
+	if mail.IsValidAgentAddress(address) || mail.IsValidSysAddress(address) {
+		inbox := &mail.AgentInbox{ID: address}
+		c.router.SubscribeAgent(address, inbox)
+	} else if mail.IsValidTopicAddress(address) {
+		topic := &mail.Topic{Name: address}
+		c.router.SubscribeTopic(address, topic)
+	}
+
 	c.mu.Lock()
 	c.subscribers[address] = append(c.subscribers[address], ch)
 	c.mu.Unlock()
+
 	return ch, nil
 }
 
-func (c *CommunicationService) Unsubscribe(address string, ch chan mail.Mail) error {
+func (c *CommunicationService) Unsubscribe(address string, stream chan mail.Mail) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	subscribers, exists := c.subscribers[address]
+	subs, exists := c.subscribers[address]
 	if !exists {
-		return fmt.Errorf("no subscribers for address %s", address)
+		return errors.New("no subscribers for address: " + address)
 	}
 
-	found := false
-	newSubscribers := make([]chan mail.Mail, 0, len(subscribers))
-	for _, subCh := range subscribers {
-		if subCh == ch {
-			found = true
-			close(ch)
-		} else {
-			newSubscribers = append(newSubscribers, subCh)
+	for i, sub := range subs {
+		if sub == stream {
+			c.subscribers[address] = append(subs[:i], subs[i+1:]...)
+			return nil
 		}
 	}
 
-	if !found {
-		return fmt.Errorf("subscriber not found for address %s", address)
-	}
+	return errors.New("stream not found")
+}
 
-	if len(newSubscribers) == 0 {
-		delete(c.subscribers, address)
-	} else {
-		c.subscribers[address] = newSubscribers
-	}
+func (c *CommunicationService) UpgradeToStream(sessionID string, lastEventID *string) (chan mail.StreamChunk, error) {
+	return mail.UpgradeToStream(sessionID, lastEventID)
+}
 
+func (c *CommunicationService) HandleMail(m mail.Mail) error {
+	if mail.IsValidAgentAddress(m.Target) || mail.IsValidTopicAddress(m.Target) || mail.IsValidSysAddress(m.Target) {
+		return c.router.Route(m)
+	}
 	return nil
 }
 
