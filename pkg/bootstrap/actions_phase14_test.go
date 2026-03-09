@@ -157,3 +157,49 @@ func TestLoadSecurityService_DispatchesReadyEvent(t *testing.T) {
 	// and checking the bootstrap transitions to the next state
 	time.Sleep(10 * time.Millisecond)
 }
+
+// TestLoadSecurityService_StoresRuntimeID verifies action stores RTID in appCtx.
+func TestLoadSecurityService_StoresRuntimeID(t *testing.T) {
+	engine := statechart.NewEngine()
+
+	// Load and spawn bootstrap chart
+	bootstrapDef, err := LoadBootstrapChart()
+	if err != nil {
+		t.Fatalf("failed to load bootstrap chart: %v", err)
+	}
+
+	// Create mock appCtx with engine
+	mockCtx := &mockApplicationContext{
+		data: map[string]interface{}{
+			"__engine": engine,
+		},
+	}
+
+	// Spawn and start bootstrap runtime
+	bootstrapRTID, err := engine.Spawn(bootstrapDef, mockCtx)
+	if err != nil {
+		t.Fatalf("failed to spawn bootstrap runtime: %v", err)
+	}
+	if err := engine.Control(bootstrapRTID, statechart.CmdStart); err != nil {
+		t.Fatalf("failed to start bootstrap runtime: %v", err)
+	}
+
+	// Call action
+	err = loadSecurityService(
+		statechart.RuntimeContext{RuntimeID: string(bootstrapRTID)},
+		mockCtx,
+		statechart.Event{},
+	)
+	if err != nil {
+		t.Fatalf("action failed: %v", err)
+	}
+
+	// Verify runtime ID was stored
+	rtID, _, err := mockCtx.Get("bootstrap:security:runtimeID", "sys:bootstrap")
+	if err != nil {
+		t.Errorf("expected runtime ID to be stored, got error: %v", err)
+	}
+	if rtID == "" {
+		t.Error("expected non-empty runtime ID")
+	}
+}
