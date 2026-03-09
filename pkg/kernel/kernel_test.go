@@ -2,6 +2,7 @@ package kernel
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -632,5 +633,36 @@ func TestKernel_OnCompleteCallbackInvoked(t *testing.T) {
 
 	if !kernel.IsBootstrapComplete() {
 		t.Error("IsBootstrapComplete() should return true after onComplete is called")
+	}
+}
+
+func TestKernel_GoesDormant(t *testing.T) {
+	kernel := New()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	done := make(chan error)
+	go func() {
+		done <- kernel.Start(ctx)
+	}()
+
+	// Wait for kernel to complete (which calls onBootstrapComplete)
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for kernel to complete")
+	}
+
+	logs := kernel.GetLogOutput()
+	found := false
+	for _, log := range logs {
+		if strings.Contains(log, "going dormant") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected 'going dormant' in logs. Got: %v", logs)
 	}
 }

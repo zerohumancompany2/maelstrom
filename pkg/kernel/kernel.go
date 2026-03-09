@@ -35,6 +35,8 @@ type Kernel struct {
 	mu               sync.RWMutex
 	readyChan        chan struct{}
 	onCompleteCalled atomic.Bool
+	logOutput        []string
+	logMu            sync.RWMutex
 }
 
 // kernelApplicationContext provides application context with kernel engine access.
@@ -324,12 +326,41 @@ func (k *Kernel) waitForKernelReady(ctx context.Context, bootstrapRTID statechar
 				k.mu.Unlock()
 				return
 			}
+			// Also check if sequence is complete
+			k.mu.RLock()
+			seq := k.sequence
+			k.mu.RUnlock()
+			if seq != nil && seq.IsComplete() {
+				k.mu.Lock()
+				if k.readyChan != nil {
+					close(k.readyChan)
+					k.readyChan = nil
+				}
+				k.mu.Unlock()
+				return
+			}
 		}
 	}
 }
 
+func (k *Kernel) CaptureLog(msg string) {
+	k.logMu.Lock()
+	defer k.logMu.Unlock()
+	k.logOutput = append(k.logOutput, msg)
+}
+
+func (k *Kernel) GetLogOutput() []string {
+	k.logMu.RLock()
+	defer k.logMu.RUnlock()
+	result := make([]string, len(k.logOutput))
+	copy(result, k.logOutput)
+	return result
+}
+
 func (k *Kernel) onBootstrapComplete() {
-	log.Println("[kernel] Kernel going dormant")
+	msg := "[kernel] Kernel going dormant"
+	k.CaptureLog(msg)
+	log.Println(msg)
 	k.onCompleteCalled.Store(true)
 }
 
