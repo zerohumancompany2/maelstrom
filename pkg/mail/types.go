@@ -16,17 +16,30 @@ type Mail struct {
 type MailType string
 
 const (
-	User             MailType = "user"
-	Assistant        MailType = "assistant"
-	ToolResult       MailType = "tool_result"
-	ToolCall         MailType = "tool_call"
-	MailReceived     MailType = "mail_received"
-	Heartbeat        MailType = "heartbeat"
-	Error            MailType = "error"
-	HumanFeedback    MailType = "human_feedback"
-	PartialAssistant MailType = "partial_assistant"
-	SubagentDone     MailType = "subagent_done"
-	TaintViolation   MailType = "taint_violation"
+	MailTypeUser             MailType = "user"
+	MailTypeAssistant        MailType = "assistant"
+	MailTypeToolResult       MailType = "tool_result"
+	MailTypeToolCall         MailType = "tool_call"
+	MailTypeMailReceived     MailType = "mail_received"
+	MailTypeHeartbeat        MailType = "heartbeat"
+	MailTypeError            MailType = "error"
+	MailTypeHumanFeedback    MailType = "human_feedback"
+	MailTypePartialAssistant MailType = "partial_assistant"
+	MailTypeSubagentDone     MailType = "subagent_done"
+	MailTypeTaintViolation   MailType = "taint_violation"
+
+	// Aliases for backward compatibility
+	User             = MailTypeUser
+	Assistant        = MailTypeAssistant
+	ToolResult       = MailTypeToolResult
+	ToolCall         = MailTypeToolCall
+	MailReceived     = MailTypeMailReceived
+	Heartbeat        = MailTypeHeartbeat
+	Error            = MailTypeError
+	HumanFeedback    = MailTypeHumanFeedback
+	PartialAssistant = MailTypePartialAssistant
+	SubagentDone     = MailTypeSubagentDone
+	TaintViolation   = MailTypeTaintViolation
 )
 
 type MailMetadata struct {

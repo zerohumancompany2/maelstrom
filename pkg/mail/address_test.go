@@ -2,6 +2,43 @@ package mail
 
 import "testing"
 
+func TestMail_Types(t *testing.T) {
+	types := []MailType{
+		MailTypeUser,
+		MailTypeAssistant,
+		MailTypeToolResult,
+		MailTypeToolCall,
+		MailTypeMailReceived,
+		MailTypeHeartbeat,
+		MailTypeError,
+		MailTypeHumanFeedback,
+		MailTypePartialAssistant,
+		MailTypeSubagentDone,
+		MailTypeTaintViolation,
+	}
+
+	if len(types) != 11 {
+		t.Errorf("Expected 11 mail types, got %d", len(types))
+	}
+
+	// Verify unique values
+	seen := make(map[MailType]bool)
+	for _, mt := range types {
+		if seen[mt] {
+			t.Errorf("Duplicate mail type: %s", mt)
+		}
+		seen[mt] = true
+	}
+
+	// Verify specific values
+	if MailTypeUser != "user" {
+		t.Errorf("Expected MailTypeUser to be 'user', got '%s'", MailTypeUser)
+	}
+	if MailTypeAssistant != "assistant" {
+		t.Errorf("Expected MailTypeAssistant to be 'assistant', got '%s'", MailTypeAssistant)
+	}
+}
+
 func TestMail_AddressFormats(t *testing.T) {
 	// Test agent:<id> format
 	if !IsValidAgentAddress("agent:recommendation-agent") {
