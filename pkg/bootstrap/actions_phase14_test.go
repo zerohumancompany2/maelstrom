@@ -240,8 +240,169 @@ func TestLoadCommunicationService_SpawnsAndStarts(t *testing.T) {
 		statechart.Event{},
 	)
 
-	// For now, action should return an error since it's not implemented
-	if err == nil {
-		t.Error("expected error from unimplemented action, got nil")
+	// Verify action succeeded
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Verify communication RTID was stored
+	commRTID, _, err := mockCtx.Get("bootstrap:communication:runtimeID", "sys:bootstrap")
+	if err != nil {
+		t.Errorf("expected communication RTID to be stored, got error: %v", err)
+	}
+	if commRTID == "" {
+		t.Error("expected non-empty communication RTID")
+	}
+}
+
+// TestLoadObservabilityService_SpawnsAndStarts verifies observability action spawns and starts runtime.
+func TestLoadObservabilityService_SpawnsAndStarts(t *testing.T) {
+	engine := statechart.NewEngine()
+
+	// Load and spawn bootstrap chart
+	bootstrapDef, err := LoadBootstrapChart()
+	if err != nil {
+		t.Fatalf("failed to load bootstrap chart: %v", err)
+	}
+
+	// Create mock appCtx with engine
+	mockCtx := &mockApplicationContext{
+		data: map[string]interface{}{
+			"__engine": engine,
+		},
+	}
+
+	// Spawn and start bootstrap runtime
+	bootstrapRTID, err := engine.Spawn(bootstrapDef, mockCtx)
+	if err != nil {
+		t.Fatalf("failed to spawn bootstrap runtime: %v", err)
+	}
+	if err := engine.Control(bootstrapRTID, statechart.CmdStart); err != nil {
+		t.Fatalf("failed to start bootstrap runtime: %v", err)
+	}
+
+	// Call action
+	err = loadObservabilityService(
+		statechart.RuntimeContext{RuntimeID: string(bootstrapRTID)},
+		mockCtx,
+		statechart.Event{},
+	)
+
+	// Verify action succeeded
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Verify observability RTID was stored
+	obsRTID, _, err := mockCtx.Get("bootstrap:observability:runtimeID", "sys:bootstrap")
+	if err != nil {
+		t.Errorf("expected observability RTID to be stored, got error: %v", err)
+	}
+	if obsRTID == "" {
+		t.Error("expected non-empty observability RTID")
+	}
+}
+
+// TestLoadLifecycleService_SpawnsAndStarts verifies lifecycle action spawns and starts runtime.
+func TestLoadLifecycleService_SpawnsAndStarts(t *testing.T) {
+	engine := statechart.NewEngine()
+
+	// Load and spawn bootstrap chart
+	bootstrapDef, err := LoadBootstrapChart()
+	if err != nil {
+		t.Fatalf("failed to load bootstrap chart: %v", err)
+	}
+
+	// Create mock appCtx with engine
+	mockCtx := &mockApplicationContext{
+		data: map[string]interface{}{
+			"__engine": engine,
+		},
+	}
+
+	// Spawn and start bootstrap runtime
+	bootstrapRTID, err := engine.Spawn(bootstrapDef, mockCtx)
+	if err != nil {
+		t.Fatalf("failed to spawn bootstrap runtime: %v", err)
+	}
+	if err := engine.Control(bootstrapRTID, statechart.CmdStart); err != nil {
+		t.Fatalf("failed to start bootstrap runtime: %v", err)
+	}
+
+	// Call action
+	err = loadLifecycleService(
+		statechart.RuntimeContext{RuntimeID: string(bootstrapRTID)},
+		mockCtx,
+		statechart.Event{},
+	)
+
+	// Verify action succeeded
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Verify lifecycle RTID was stored
+	lifecycleRTID, _, err := mockCtx.Get("bootstrap:lifecycle:runtimeID", "sys:bootstrap")
+	if err != nil {
+		t.Errorf("expected lifecycle RTID to be stored, got error: %v", err)
+	}
+	if lifecycleRTID == "" {
+		t.Error("expected non-empty lifecycle RTID")
+	}
+}
+
+// TestSignalKernelReady_AggregatesServices verifies signalKernelReady aggregates services.
+func TestSignalKernelReady_AggregatesServices(t *testing.T) {
+	engine := statechart.NewEngine()
+
+	// Load and spawn bootstrap chart
+	bootstrapDef, err := LoadBootstrapChart()
+	if err != nil {
+		t.Fatalf("failed to load bootstrap chart: %v", err)
+	}
+
+	// Create mock appCtx with engine
+	mockCtx := &mockApplicationContext{
+		data: map[string]interface{}{
+			"__engine": engine,
+		},
+	}
+
+	// Spawn and start bootstrap runtime
+	bootstrapRTID, err := engine.Spawn(bootstrapDef, mockCtx)
+	if err != nil {
+		t.Fatalf("failed to spawn bootstrap runtime: %v", err)
+	}
+	if err := engine.Control(bootstrapRTID, statechart.CmdStart); err != nil {
+		t.Fatalf("failed to start bootstrap runtime: %v", err)
+	}
+
+	// Pre-populate all service RTIDs
+	mockCtx.Set("bootstrap:security:runtimeID", "rt-1", nil, "sys:bootstrap")
+	mockCtx.Set("bootstrap:communication:runtimeID", "rt-2", nil, "sys:bootstrap")
+	mockCtx.Set("bootstrap:observability:runtimeID", "rt-3", nil, "sys:bootstrap")
+	mockCtx.Set("bootstrap:lifecycle:runtimeID", "rt-4", nil, "sys:bootstrap")
+
+	// Call action
+	err = signalKernelReady(
+		statechart.RuntimeContext{RuntimeID: string(bootstrapRTID)},
+		mockCtx,
+		statechart.Event{},
+	)
+
+	// Verify action succeeded
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Verify loaded services list was stored
+	services, _, err := mockCtx.Get("bootstrap:loaded:services", "sys:bootstrap")
+	if err != nil {
+		t.Errorf("expected loaded services to be stored: %v", err)
+	}
+
+	serviceList := services.([]string)
+	if len(serviceList) != 4 {
+		t.Errorf("expected 4 services, got %d: %v", len(serviceList), services)
 	}
 }

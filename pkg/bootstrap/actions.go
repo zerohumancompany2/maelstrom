@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/maelstrom/v3/pkg/services/communication"
+	"github.com/maelstrom/v3/pkg/services/lifecycle"
+	"github.com/maelstrom/v3/pkg/services/observability"
 	"github.com/maelstrom/v3/pkg/services/security"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
@@ -176,5 +179,153 @@ func loadSecurityService(runtimeCtx statechart.RuntimeContext, appCtx statechart
 }
 
 func loadCommunicationService(runtimeCtx statechart.RuntimeContext, appCtx statechart.ApplicationContext, event statechart.Event) error {
-	return ErrNotImplemented
+	engine, err := getEngine(appCtx, runtimeCtx.ChartID)
+	if err != nil {
+		return err
+	}
+
+	// Load communication chart definition
+	def := communication.BootstrapChart()
+
+	// Spawn communication runtime
+	commRTID, err := engine.Spawn(def, appCtx)
+	if err != nil {
+		return fmt.Errorf("failed to spawn communication runtime: %w", err)
+	}
+	log.Printf("[bootstrap] Spawned communication runtime: %s", commRTID)
+
+	// Start the runtime
+	if err := engine.Control(commRTID, statechart.CmdStart); err != nil {
+		return fmt.Errorf("failed to start communication runtime: %w", err)
+	}
+	log.Printf("[bootstrap] Started communication runtime: %s", commRTID)
+
+	// Store communication RTID in appCtx
+	if err := appCtx.Set("bootstrap:communication:runtimeID", string(commRTID), nil, runtimeCtx.ChartID); err != nil {
+		return fmt.Errorf("failed to store communication RTID: %w", err)
+	}
+
+	// Dispatch COMMUNICATION_READY event to bootstrap parent
+	if err := engine.Dispatch(statechart.RuntimeID(runtimeCtx.RuntimeID), statechart.Event{Type: "COMMUNICATION_READY"}); err != nil {
+		return fmt.Errorf("failed to dispatch COMMUNICATION_READY: %w", err)
+	}
+	log.Printf("[bootstrap] Dispatched COMMUNICATION_READY event")
+
+	return nil
+}
+
+func loadObservabilityService(runtimeCtx statechart.RuntimeContext, appCtx statechart.ApplicationContext, event statechart.Event) error {
+	engine, err := getEngine(appCtx, runtimeCtx.ChartID)
+	if err != nil {
+		return err
+	}
+
+	// Load observability chart definition
+	def := observability.BootstrapChart()
+
+	// Spawn observability runtime
+	obsRTID, err := engine.Spawn(def, appCtx)
+	if err != nil {
+		return fmt.Errorf("failed to spawn observability runtime: %w", err)
+	}
+	log.Printf("[bootstrap] Spawned observability runtime: %s", obsRTID)
+
+	// Start the runtime
+	if err := engine.Control(obsRTID, statechart.CmdStart); err != nil {
+		return fmt.Errorf("failed to start observability runtime: %w", err)
+	}
+	log.Printf("[bootstrap] Started observability runtime: %s", obsRTID)
+
+	// Store observability RTID in appCtx
+	if err := appCtx.Set("bootstrap:observability:runtimeID", string(obsRTID), nil, runtimeCtx.ChartID); err != nil {
+		return fmt.Errorf("failed to store observability RTID: %w", err)
+	}
+
+	// Dispatch OBSERVABILITY_READY event to bootstrap parent
+	if err := engine.Dispatch(statechart.RuntimeID(runtimeCtx.RuntimeID), statechart.Event{Type: "OBSERVABILITY_READY"}); err != nil {
+		return fmt.Errorf("failed to dispatch OBSERVABILITY_READY: %w", err)
+	}
+	log.Printf("[bootstrap] Dispatched OBSERVABILITY_READY event")
+
+	return nil
+}
+
+func loadLifecycleService(runtimeCtx statechart.RuntimeContext, appCtx statechart.ApplicationContext, event statechart.Event) error {
+	engine, err := getEngine(appCtx, runtimeCtx.ChartID)
+	if err != nil {
+		return err
+	}
+
+	// Load lifecycle chart definition
+	def := lifecycle.BootstrapChart()
+
+	// Spawn lifecycle runtime
+	lifecycleRTID, err := engine.Spawn(def, appCtx)
+	if err != nil {
+		return fmt.Errorf("failed to spawn lifecycle runtime: %w", err)
+	}
+	log.Printf("[bootstrap] Spawned lifecycle runtime: %s", lifecycleRTID)
+
+	// Start the runtime
+	if err := engine.Control(lifecycleRTID, statechart.CmdStart); err != nil {
+		return fmt.Errorf("failed to start lifecycle runtime: %w", err)
+	}
+	log.Printf("[bootstrap] Started lifecycle runtime: %s", lifecycleRTID)
+
+	// Store lifecycle RTID in appCtx
+	if err := appCtx.Set("bootstrap:lifecycle:runtimeID", string(lifecycleRTID), nil, runtimeCtx.ChartID); err != nil {
+		return fmt.Errorf("failed to store lifecycle RTID: %w", err)
+	}
+
+	// Dispatch LIFECYCLE_READY event to bootstrap parent
+	if err := engine.Dispatch(statechart.RuntimeID(runtimeCtx.RuntimeID), statechart.Event{Type: "LIFECYCLE_READY"}); err != nil {
+		return fmt.Errorf("failed to dispatch LIFECYCLE_READY: %w", err)
+	}
+	log.Printf("[bootstrap] Dispatched LIFECYCLE_READY event")
+
+	return nil
+}
+
+func signalKernelReady(runtimeCtx statechart.RuntimeContext, appCtx statechart.ApplicationContext, event statechart.Event) error {
+	engine, err := getEngine(appCtx, runtimeCtx.ChartID)
+	if err != nil {
+		return err
+	}
+
+	// Read all service runtime IDs from appCtx
+	var loadedServices []string
+
+	securityRTID, _, _ := appCtx.Get("bootstrap:security:runtimeID", runtimeCtx.ChartID)
+	if securityRTID != "" && securityRTID != nil {
+		loadedServices = append(loadedServices, "sys:security")
+	}
+
+	commRTID, _, _ := appCtx.Get("bootstrap:communication:runtimeID", runtimeCtx.ChartID)
+	if commRTID != "" && commRTID != nil {
+		loadedServices = append(loadedServices, "sys:communication")
+	}
+
+	obsRTID, _, _ := appCtx.Get("bootstrap:observability:runtimeID", runtimeCtx.ChartID)
+	if obsRTID != "" && obsRTID != nil {
+		loadedServices = append(loadedServices, "sys:observability")
+	}
+
+	lifecycleRTID, _, _ := appCtx.Get("bootstrap:lifecycle:runtimeID", runtimeCtx.ChartID)
+	if lifecycleRTID != "" && lifecycleRTID != nil {
+		loadedServices = append(loadedServices, "sys:lifecycle")
+	}
+
+	// Store loaded services list in appCtx
+	if err := appCtx.Set("bootstrap:loaded:services", loadedServices, nil, runtimeCtx.ChartID); err != nil {
+		return fmt.Errorf("failed to store loaded services: %w", err)
+	}
+	log.Printf("[bootstrap] Stored loaded services: %v", loadedServices)
+
+	// Dispatch KERNEL_READY event to bootstrap parent
+	if err := engine.Dispatch(statechart.RuntimeID(runtimeCtx.RuntimeID), statechart.Event{Type: "KERNEL_READY"}); err != nil {
+		return fmt.Errorf("failed to dispatch KERNEL_READY: %w", err)
+	}
+	log.Printf("[bootstrap] Dispatched KERNEL_READY event")
+
+	return nil
 }
