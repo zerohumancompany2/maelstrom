@@ -165,3 +165,25 @@ func TestStreamChunk_Sequence(t *testing.T) {
 		t.Errorf("Expected first sequence to be 1, got %d", chunks[0].Sequence)
 	}
 }
+
+func TestStreamSession_Send(t *testing.T) {
+	session := NewStreamSession("test-session", nil)
+	chunk := StreamChunk{Data: "test data", Sequence: 1, IsFinal: false}
+
+	err := session.Send(chunk)
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	received, ok := <-session.Chunks
+	if !ok {
+		t.Error("Expected channel to be open and contain chunk")
+	}
+
+	if received.Data != chunk.Data {
+		t.Errorf("Expected data 'test data', got '%s'", received.Data)
+	}
+	if received.Sequence != chunk.Sequence {
+		t.Errorf("Expected sequence 1, got %d", received.Sequence)
+	}
+}

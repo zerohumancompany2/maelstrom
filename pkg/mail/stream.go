@@ -1,6 +1,7 @@
 package mail
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -27,8 +28,14 @@ func NewStreamSession(sessionID string, lastEventID *string) *StreamSession {
 }
 
 // Send sends a chunk to the session
-func (s *StreamSession) Send(chunk StreamChunk) bool {
-	panic("not implemented")
+func (s *StreamSession) Send(chunk StreamChunk) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.Closed {
+		return fmt.Errorf("session is closed")
+	}
+	s.Chunks <- chunk
+	return nil
 }
 
 // Close closes the session
