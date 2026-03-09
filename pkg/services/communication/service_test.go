@@ -12,6 +12,16 @@ func TestCommunicationService_NewCommunicationServiceReturnsNonNil(t *testing.T)
 	}
 }
 
+func TestCommunicationService_IDReturnsCorrectString(t *testing.T) {
+	svc := NewCommunicationService()
+
+	id := svc.ID()
+
+	if id != "sys:communication" {
+		t.Errorf("Expected ID sys:communication, got %s", id)
+	}
+}
+
 func TestCommunicationService_BootstrapChart(t *testing.T) {
 	chart := BootstrapChart()
 
