@@ -666,3 +666,99 @@ func TestKernel_GoesDormant(t *testing.T) {
 		t.Errorf("expected 'going dormant' in logs. Got: %v", logs)
 	}
 }
+
+func assertStatesInOrder(t *testing.T, actual []string) {
+	t.Helper()
+	expected := []string{"security", "communication", "observability", "lifecycle", "handoff", "complete"}
+	if len(actual) != len(expected) {
+		t.Errorf("expected %d states, got %d: %v", len(expected), len(actual), actual)
+		return
+	}
+	for i, expectedState := range expected {
+		if actual[i] != expectedState {
+			t.Errorf("state[%d]: expected %q, got %q", i, expectedState, actual[i])
+		}
+	}
+}
+
+func assertAllEventsReceived(t *testing.T, actual []string) {
+	t.Helper()
+	expectedEvents := []string{"SECURITY_READY", "COMMUNICATION_READY", "OBSERVABILITY_READY", "LIFECYCLE_READY"}
+	for _, expected := range expectedEvents {
+		found := false
+		for _, actualEvent := range actual {
+			if actualEvent == expected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected event %s not found in %v", expected, actual)
+		}
+	}
+}
+
+func assertDormantLogged(t *testing.T, logs []string) {
+	t.Helper()
+	found := false
+	for _, log := range logs {
+		if strings.Contains(log, "going dormant") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Expected 'going dormant' in logs. Got: %v", logs)
+	}
+}
+
+func TestKernel_FullE2EBootstrap(t *testing.T) {
+	kernel := New()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	done := make(chan error)
+	go func() {
+		done <- kernel.Start(ctx)
+	}()
+
+	// Wait for kernel to complete
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for kernel to complete")
+	}
+
+	// Verify states entered in correct order
+	seq := kernel.GetSequence()
+	if seq == nil {
+		t.Fatal("sequence should not be nil")
+	}
+
+	states := seq.GetStatesEntered()
+	assertStatesInOrder(t, states)
+
+	// Verify all READY events received
+	events := seq.GetEventsHandled()
+	assertAllEventsReceived(t, events)
+
+	// Verify KERNEL_READY event was emitted
+	if !seq.GetKernelReadyEmitted() {
+		t.Error("KERNEL_READY event should be emitted")
+	}
+
+	// Verify onComplete callback was invoked
+	if !kernel.GetCompletionStatus() {
+		t.Error("onComplete callback should be invoked")
+	}
+
+	// Verify IsBootstrapComplete returns true
+	if !kernel.IsBootstrapComplete() {
+		t.Error("IsBootstrapComplete should return true")
+	}
+
+	// Verify "going dormant" was logged
+	logs := kernel.GetLogOutput()
+	assertDormantLogged(t, logs)
+}
