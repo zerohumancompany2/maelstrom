@@ -39,7 +39,12 @@ func (c *CommunicationService) Publish(m mail.Mail) (mail.Ack, error) {
 		DeliveredAt:   time.Now(),
 		Success:       false,
 	}
-	for _, ch := range c.subscribers[target] {
+	subscribers, exists := c.subscribers[target]
+	if !exists || len(subscribers) == 0 {
+		ack.ErrorMessage = "no subscribers"
+		return ack, nil
+	}
+	for _, ch := range subscribers {
 		select {
 		case ch <- m:
 			ack.Success = true

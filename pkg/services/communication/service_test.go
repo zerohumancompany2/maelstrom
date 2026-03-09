@@ -206,3 +206,21 @@ func TestCommunicationService_PublishAckHasCorrelationID(t *testing.T) {
 	}
 	_ = ch
 }
+
+func TestCommunicationService_PublishToNonExistentAddress(t *testing.T) {
+	svc := NewCommunicationService()
+
+	m := mail.Mail{Source: "test", Target: "non-existent:address"}
+
+	ack, err := svc.Publish(m)
+
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if ack.Success {
+		t.Error("Expected Success to be false for non-existent address")
+	}
+	if ack.ErrorMessage != "no subscribers" {
+		t.Errorf("Expected ErrorMessage 'no subscribers', got %s", ack.ErrorMessage)
+	}
+}
