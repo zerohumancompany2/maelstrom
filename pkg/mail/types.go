@@ -47,6 +47,13 @@ const (
 	OuterBoundary BoundaryType = "outer"
 )
 
+type StreamChunk struct {
+	Data     string
+	Sequence int
+	IsFinal  bool
+	Taints   []string
+}
+
 type Ack struct {
 	MailID        string
 	CorrelationID string
