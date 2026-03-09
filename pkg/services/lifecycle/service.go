@@ -62,7 +62,17 @@ func (l *LifecycleService) Spawn(def statechart.ChartDefinition) (statechart.Run
 }
 
 func (l *LifecycleService) Stop(id statechart.RuntimeID) error {
-	return nil
+	if l.engine == nil {
+		return statechart.ErrRuntimeNotFound
+	}
+	return l.engine.Control(id, statechart.CmdStop)
+}
+
+func (l *LifecycleService) Control(id statechart.RuntimeID, cmd statechart.ControlCmd) error {
+	if l.engine == nil {
+		return statechart.ErrRuntimeNotFound
+	}
+	return l.engine.Control(id, cmd)
 }
 
 func (l *LifecycleService) List() ([]RuntimeInfo, error) {

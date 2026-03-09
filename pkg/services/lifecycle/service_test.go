@@ -135,6 +135,33 @@ func TestLifecycleService_SpawnTracksRuntime(t *testing.T) {
 	}
 }
 
+func TestLifecycleService_ControlStart(t *testing.T) {
+	engine := statechart.NewEngine()
+	svc := NewLifecycleService(engine)
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+		Root: &statechart.Node{
+			ID: "root",
+			Children: map[string]*statechart.Node{
+				"idle": {ID: "idle"},
+			},
+		},
+	}
+
+	rtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	err = svc.Control(rtID, statechart.CmdStart)
+	if err != nil {
+		t.Errorf("Expected Control(CmdStart) to return nil, got %v", err)
+	}
+}
+
 func TestLifecycleService_StartReturnsNil(t *testing.T) {
 	svc := NewLifecycleServiceWithoutEngine()
 
