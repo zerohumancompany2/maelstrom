@@ -483,3 +483,20 @@ func TestObservabilityService_MetricsAggregation(t *testing.T) {
 		t.Errorf("Expected EventRate 1, got %f", aggregated.EventRate)
 	}
 }
+
+func TestObservabilityService_QueryDeadLettersNoCopy(t *testing.T) {
+	svc := NewObservabilityService()
+
+	mail1 := mail.Mail{ID: "mail-1", Source: "src-1", Target: "tgt-1", Type: mail.Error}
+	svc.LogDeadLetter(mail1, "reason-1")
+
+	filters := &DeadLetterFilters{Reason: "reason-1"}
+	entries := svc.QueryDeadLettersNoCopy(filters)
+
+	if len(entries) != 1 {
+		t.Errorf("Expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].Mail.ID != "mail-1" {
+		t.Errorf("Expected mail ID mail-1, got %s", entries[0].Mail.ID)
+	}
+}

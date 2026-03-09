@@ -144,3 +144,28 @@ func (o *ObservabilityService) aggregateMetrics(duration time.Duration) services
 	}
 	return result
 }
+
+func (o *ObservabilityService) QueryDeadLettersNoCopy(filters *DeadLetterFilters) []*DeadLetterEntry {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	var result []*DeadLetterEntry
+	for i := range o.deadLetters {
+		entry := &o.deadLetters[i]
+		if filters != nil {
+			if filters.Reason != "" && entry.Reason != filters.Reason {
+				continue
+			}
+			if filters.RuntimeID != "" && entry.Mail.Source != filters.RuntimeID {
+				continue
+			}
+			if !filters.FromTime.IsZero() && entry.Logged.Before(filters.FromTime) {
+				continue
+			}
+			if !filters.ToTime.IsZero() && entry.Logged.After(filters.ToTime) {
+				continue
+			}
+		}
+		result = append(result, entry)
+	}
+	return result
+}
