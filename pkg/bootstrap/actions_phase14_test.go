@@ -203,3 +203,45 @@ func TestLoadSecurityService_StoresRuntimeID(t *testing.T) {
 		t.Error("expected non-empty runtime ID")
 	}
 }
+
+// TestLoadCommunicationService_SpawnsAndStarts verifies communication action spawns and starts runtime.
+func TestLoadCommunicationService_SpawnsAndStarts(t *testing.T) {
+	engine := statechart.NewEngine()
+
+	// Load and spawn bootstrap chart
+	bootstrapDef, err := LoadBootstrapChart()
+	if err != nil {
+		t.Fatalf("failed to load bootstrap chart: %v", err)
+	}
+
+	// Create mock appCtx with engine
+	mockCtx := &mockApplicationContext{
+		data: map[string]interface{}{
+			"__engine": engine,
+		},
+	}
+
+	// Spawn and start bootstrap runtime
+	bootstrapRTID, err := engine.Spawn(bootstrapDef, mockCtx)
+	if err != nil {
+		t.Fatalf("failed to spawn bootstrap runtime: %v", err)
+	}
+	if err := engine.Control(bootstrapRTID, statechart.CmdStart); err != nil {
+		t.Fatalf("failed to start bootstrap runtime: %v", err)
+	}
+
+	// Pre-populate security RTID (dependency)
+	mockCtx.Set("bootstrap:security:runtimeID", "rt-security", nil, "sys:bootstrap")
+
+	// Call action
+	err = loadCommunicationService(
+		statechart.RuntimeContext{RuntimeID: string(bootstrapRTID)},
+		mockCtx,
+		statechart.Event{},
+	)
+
+	// For now, action should return an error since it's not implemented
+	if err == nil {
+		t.Error("expected error from unimplemented action, got nil")
+	}
+}

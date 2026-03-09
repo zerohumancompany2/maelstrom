@@ -19,6 +19,21 @@ const (
 	ActionSignalKernelReady        = "signalKernelReady"
 )
 
+func getEngine(appCtx statechart.ApplicationContext, chartID string) (statechart.Library, error) {
+	engineAny, _, err := appCtx.Get("__engine", chartID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get engine: %w", err)
+	}
+	if engineAny == nil {
+		return nil, fmt.Errorf("engine not found in appCtx")
+	}
+	engine, ok := engineAny.(statechart.Library)
+	if !ok {
+		return nil, fmt.Errorf("invalid engine type in appCtx")
+	}
+	return engine, nil
+}
+
 // securityBootstrap is the entry action for the security state.
 func securityBootstrap(runtimeCtx statechart.RuntimeContext, appCtx statechart.ApplicationContext, event statechart.Event) error {
 	boundaries, _, err := appCtx.Get("boundaries", "bootstrap")
@@ -125,17 +140,9 @@ func panicAction(runtimeCtx statechart.RuntimeContext, appCtx statechart.Applica
 }
 
 func loadSecurityService(runtimeCtx statechart.RuntimeContext, appCtx statechart.ApplicationContext, event statechart.Event) error {
-	// Get engine from appCtx
-	engineAny, _, err := appCtx.Get("__engine", runtimeCtx.ChartID)
+	engine, err := getEngine(appCtx, runtimeCtx.ChartID)
 	if err != nil {
-		return fmt.Errorf("failed to get engine: %w", err)
-	}
-	if engineAny == nil {
-		return fmt.Errorf("engine not found in appCtx")
-	}
-	engine, ok := engineAny.(statechart.Library)
-	if !ok {
-		return fmt.Errorf("invalid engine type in appCtx")
+		return err
 	}
 
 	// Load security chart definition
@@ -166,4 +173,8 @@ func loadSecurityService(runtimeCtx statechart.RuntimeContext, appCtx statechart
 	log.Printf("[bootstrap] Dispatched SECURITY_READY event")
 
 	return nil
+}
+
+func loadCommunicationService(runtimeCtx statechart.RuntimeContext, appCtx statechart.ApplicationContext, event statechart.Event) error {
+	return ErrNotImplemented
 }
