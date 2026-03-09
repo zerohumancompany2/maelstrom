@@ -8,11 +8,22 @@ import (
 )
 
 type LifecycleService struct {
-	mu sync.Mutex
+	mu       sync.Mutex
+	engine   statechart.Library
+	runtimes map[statechart.RuntimeID]RuntimeInfo
 }
 
-func NewLifecycleService() *LifecycleService {
-	return &LifecycleService{}
+func NewLifecycleService(engine statechart.Library) *LifecycleService {
+	return &LifecycleService{
+		engine:   engine,
+		runtimes: make(map[statechart.RuntimeID]RuntimeInfo),
+	}
+}
+
+func NewLifecycleServiceWithoutEngine() *LifecycleService {
+	return &LifecycleService{
+		runtimes: make(map[statechart.RuntimeID]RuntimeInfo),
+	}
 }
 
 func (l *LifecycleService) ID() string {
