@@ -175,3 +175,27 @@ func TestSecurityService_PrepareContextForBoundaryNoOp(t *testing.T) {
 		t.Errorf("Expected PrepareContextForBoundary to return nil for OuterBoundary, got %v", err)
 	}
 }
+
+func TestSecurityService_ValidateAndSanitize_innerToOuter(t *testing.T) {
+	svc := NewSecurityService()
+
+	inputMail := mail.Mail{
+		ID:     "test-mail-inner-outer",
+		Source: "agent:test",
+		Target: "sys:security",
+		Metadata: mail.MailMetadata{
+			Boundary: mail.InnerBoundary,
+			Taints:   []string{"INTERNAL"},
+		},
+	}
+
+	result, err := svc.ValidateAndSanitize(inputMail, mail.InnerBoundary, mail.OuterBoundary)
+
+	if err != nil {
+		t.Errorf("Expected inner→outer transition to be allowed, got error: %v", err)
+	}
+
+	if result.Metadata.Boundary != mail.OuterBoundary {
+		t.Errorf("Expected boundary to be updated to OuterBoundary, got: %s", result.Metadata.Boundary)
+	}
+}

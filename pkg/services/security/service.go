@@ -27,8 +27,15 @@ func (s *SecurityService) ValidateBoundary(source, target mail.BoundaryType) err
 	return nil
 }
 
-func (s *SecurityService) ValidateAndSanitize(mail mail.Mail, sourceBoundary, targetBoundary mail.BoundaryType) (mail.Mail, error) {
-	return mail, nil
+func (s *SecurityService) ValidateAndSanitize(m mail.Mail, sourceBoundary, targetBoundary mail.BoundaryType) (mail.Mail, error) {
+	result := m
+	result.Metadata.Boundary = targetBoundary
+
+	if sourceBoundary == mail.InnerBoundary && targetBoundary == mail.OuterBoundary {
+		return result, nil
+	}
+
+	return result, nil
 }
 
 func (s *SecurityService) TaintPropagate(obj any, newTaints []string) (any, error) {
