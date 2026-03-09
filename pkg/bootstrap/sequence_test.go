@@ -170,3 +170,45 @@ func TestErrorPath_TriggersFailedState(t *testing.T) {
 		t.Errorf("expected [security], got %v", enteredStates)
 	}
 }
+
+// TestSuccessPath_TriggersReadyState verifies success path triggers ready state.
+func TestSuccessPath_TriggersReadyState(t *testing.T) {
+	kernel := &MockKernel{
+		services: make(map[string]interface{}),
+	}
+	seq := NewSequenceWithKernel(kernel)
+
+	var enteredStates []string
+	seq.OnStateEnter(func(state string) error {
+		enteredStates = append(enteredStates, state)
+		return nil
+	})
+
+	var completeCalled bool
+	seq.OnComplete(func() {
+		completeCalled = true
+	})
+
+	ctx := context.Background()
+	seq.Start(ctx)
+
+	events := []string{"SECURITY_READY", "COMMUNICATION_READY", "OBSERVABILITY_READY", "LIFECYCLE_READY", "KERNEL_READY"}
+	for _, event := range events {
+		if err := seq.HandleEvent(ctx, event); err != nil {
+			t.Fatalf("failed to handle %s: %v", event, err)
+		}
+	}
+
+	expected := []string{"security", "communication", "observability", "lifecycle", "handoff", "complete"}
+	if len(enteredStates) != len(expected) {
+		t.Errorf("expected %d states, got %d: %v", len(expected), len(enteredStates), enteredStates)
+	}
+
+	if !completeCalled {
+		t.Error("OnComplete callback was not called")
+	}
+
+	if !seq.IsComplete() {
+		t.Error("IsComplete should return true")
+	}
+}
