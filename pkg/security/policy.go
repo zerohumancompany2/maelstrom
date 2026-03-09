@@ -23,7 +23,64 @@ func EnforcePolicy(data any, policy TaintPolicyConfig, boundary BoundaryType) (a
 			return nil, fmt.Errorf("forbidden taints: %v", forbidden)
 		}
 	}
+	if policy.Enforcement == EnforcementRedact {
+		return applyRedaction(data, policy.RedactRules)
+	}
 	return data, nil
+}
+
+func applyRedaction(data any, rules []RedactRule) (any, error) {
+	switch v := data.(type) {
+	case map[string]interface{}:
+		return redactMap(v, rules)
+	}
+	return data, nil
+}
+
+func redactMap(m map[string]interface{}, rules []RedactRule) (map[string]interface{}, error) {
+	taints, hasTaints := m["_taints"].([]string)
+	if !hasTaints {
+		return m, nil
+	}
+
+	redactMap := make(map[string]string)
+	for _, rule := range rules {
+		redactMap[rule.Taint] = rule.Replacement
+	}
+
+	result := make(map[string]interface{})
+	for k, val := range m {
+		if k == "_taints" {
+			continue
+		}
+		shouldRedact := false
+		for _, t := range taints {
+			if _, ok := redactMap[t]; ok {
+				shouldRedact = true
+				break
+			}
+		}
+		if shouldRedact {
+			switch val.(type) {
+			case string:
+				result[k] = getRedactionForTaint(taints, redactMap)
+			default:
+				result[k] = val
+			}
+		} else {
+			result[k] = val
+		}
+	}
+	return result, nil
+}
+
+func getRedactionForTaint(taints []string, redactMap map[string]string) string {
+	for _, t := range taints {
+		if replacement, ok := redactMap[t]; ok {
+			return replacement
+		}
+	}
+	return "[REDACTED]"
 }
 
 func getPolicyForbiddenTaints(data any, allowedOnExit []string) []string {
