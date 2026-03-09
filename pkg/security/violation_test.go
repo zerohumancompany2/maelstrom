@@ -66,3 +66,62 @@ func TestReportViolation_DeadLetter(t *testing.T) {
 		t.Errorf("Expected Mail type to be MailTypeTaintViolation, got %v", receivedMail.Type)
 	}
 }
+
+func TestReportViolation_Details(t *testing.T) {
+	// Given
+	violation := TaintViolation{
+		RuntimeID:       "agent-789",
+		SourceBoundary:  OuterBoundary,
+		TargetBoundary:  InnerBoundary,
+		ForbiddenTaints: []string{"PII", "SECRET"},
+		Timestamp:       time.Now(),
+	}
+
+	router := mail.NewMailRouter()
+	observabilityInbox := &mail.ServiceInbox{ID: "observability"}
+	router.SubscribeService("observability", observabilityInbox)
+	SetViolationRouter(router)
+
+	// When
+	err := ReportViolation("agent-789", violation)
+
+	// Then
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	receivedMail, err := observabilityInbox.Pop()
+	if err != nil {
+		t.Fatalf("Expected to receive mail in observability inbox, got error: %v", err)
+	}
+
+	content, ok := receivedMail.Content.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected content to be map[string]interface{}, got %T", receivedMail.Content)
+	}
+
+	if content["runtimeId"] != "agent-789" {
+		t.Errorf("Expected runtimeId to be 'agent-789', got %v", content["runtimeId"])
+	}
+
+	if content["sourceBoundary"] != "outer" {
+		t.Errorf("Expected sourceBoundary to be 'outer', got %v", content["sourceBoundary"])
+	}
+
+	if content["targetBoundary"] != "inner" {
+		t.Errorf("Expected targetBoundary to be 'inner', got %v", content["targetBoundary"])
+	}
+
+	forbiddenTaints, ok := content["forbiddenTaints"].([]interface{})
+	if !ok {
+		t.Fatalf("Expected forbiddenTaints to be []interface{}, got %T", content["forbiddenTaints"])
+	}
+
+	if len(forbiddenTaints) != 2 {
+		t.Errorf("Expected 2 forbidden taints, got %d", len(forbiddenTaints))
+	}
+
+	if _, ok := content["timestamp"]; !ok {
+		t.Error("Expected timestamp to be present in content")
+	}
+}

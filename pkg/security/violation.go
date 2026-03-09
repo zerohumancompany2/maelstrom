@@ -50,9 +50,21 @@ func GetViolationCount(runtimeId string) int {
 }
 
 func createViolationMail(violation TaintViolation) mail.Mail {
+	forbiddenTaints := make([]interface{}, len(violation.ForbiddenTaints))
+	for i, taint := range violation.ForbiddenTaints {
+		forbiddenTaints[i] = taint
+	}
+
 	return mail.Mail{
 		Type:   mail.MailTypeTaintViolation,
 		Source: "sys:security",
 		Target: "sys:observability",
+		Content: map[string]interface{}{
+			"runtimeId":       violation.RuntimeID,
+			"sourceBoundary":  string(violation.SourceBoundary),
+			"targetBoundary":  string(violation.TargetBoundary),
+			"forbiddenTaints": forbiddenTaints,
+			"timestamp":       violation.Timestamp,
+		},
 	}
 }
