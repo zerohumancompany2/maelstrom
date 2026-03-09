@@ -21,16 +21,17 @@ type KernelConfig struct {
 
 // Kernel orchestrates bootstrap and hands off to ChartRegistry.
 type Kernel struct {
-	engine     statechart.Library
-	config     KernelConfig
-	factory    *runtime.Factory
-	sequence   *bootstrap.Sequence
-	services   map[string]statechart.RuntimeID
-	runtimes   map[string]*runtime.ChartRuntime
-	appCtx     statechart.ApplicationContext
-	mailSystem *communication.CommunicationService
-	mu         sync.RWMutex
-	readyChan  chan struct{}
+	engine       statechart.Library
+	config       KernelConfig
+	factory      *runtime.Factory
+	sequence     *bootstrap.Sequence
+	services     map[string]statechart.RuntimeID
+	serviceReady map[string]bool
+	runtimes     map[string]*runtime.ChartRuntime
+	appCtx       statechart.ApplicationContext
+	mailSystem   *communication.CommunicationService
+	mu           sync.RWMutex
+	readyChan    chan struct{}
 }
 
 // kernelApplicationContext provides application context with kernel engine access.
@@ -67,10 +68,11 @@ func (k *kernelApplicationContext) Namespace() string {
 // New creates a new Kernel.
 func New() *Kernel {
 	return &Kernel{
-		engine:     statechart.NewEngine(),
-		services:   make(map[string]statechart.RuntimeID),
-		runtimes:   make(map[string]*runtime.ChartRuntime),
-		mailSystem: communication.NewCommunicationService(),
+		engine:       statechart.NewEngine(),
+		services:     make(map[string]statechart.RuntimeID),
+		serviceReady: make(map[string]bool),
+		runtimes:     make(map[string]*runtime.ChartRuntime),
+		mailSystem:   communication.NewCommunicationService(),
 	}
 }
 
@@ -257,6 +259,7 @@ func (k *Kernel) waitForKernelReady(ctx context.Context, bootstrapRTID statechar
 									if vs, ok := val.(string); ok {
 										rtID = statechart.RuntimeID(vs)
 										k.services[svc] = rtID
+										k.serviceReady[svc] = true
 									}
 								}
 							case "sys:communication":
@@ -264,6 +267,7 @@ func (k *Kernel) waitForKernelReady(ctx context.Context, bootstrapRTID statechar
 									if vs, ok := val.(string); ok {
 										rtID = statechart.RuntimeID(vs)
 										k.services[svc] = rtID
+										k.serviceReady[svc] = true
 									}
 								}
 							case "sys:observability":
@@ -271,6 +275,7 @@ func (k *Kernel) waitForKernelReady(ctx context.Context, bootstrapRTID statechar
 									if vs, ok := val.(string); ok {
 										rtID = statechart.RuntimeID(vs)
 										k.services[svc] = rtID
+										k.serviceReady[svc] = true
 									}
 								}
 							case "sys:lifecycle":
@@ -278,6 +283,7 @@ func (k *Kernel) waitForKernelReady(ctx context.Context, bootstrapRTID statechar
 									if vs, ok := val.(string); ok {
 										rtID = statechart.RuntimeID(vs)
 										k.services[svc] = rtID
+										k.serviceReady[svc] = true
 									}
 								}
 							}
@@ -327,6 +333,20 @@ func (k *Kernel) MailSystem() *communication.CommunicationService {
 	k.mu.RLock()
 	defer k.mu.RUnlock()
 	return k.mailSystem
+}
+
+// IsServiceReady returns true if the service is ready.
+func (k *Kernel) IsServiceReady(name string) bool {
+	k.mu.RLock()
+	defer k.mu.RUnlock()
+	return k.serviceReady[name]
+}
+
+// SetServiceReady marks a service as ready.
+func (k *Kernel) SetServiceReady(name string) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	k.serviceReady[name] = true
 }
 
 // Shutdown stops all services.

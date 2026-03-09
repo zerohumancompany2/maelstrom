@@ -82,8 +82,20 @@ func TestKernel_SpawnsAllServices(t *testing.T) {
 }
 
 func TestKernel_ServicesReady(t *testing.T) {
-	// Placeholder for future integration test
-	// Verifies all services emit ready events immediately
+	kernel := New()
+
+	// Mark a service as ready
+	kernel.SetServiceReady("sys:security")
+
+	// Verify the service is ready
+	if !kernel.IsServiceReady("sys:security") {
+		t.Error("sys:security should be ready after SetServiceReady")
+	}
+
+	// Verify another service is not ready
+	if kernel.IsServiceReady("sys:communication") {
+		t.Error("sys:communication should not be ready")
+	}
 }
 
 func TestKernel_KernelReadyEvent(t *testing.T) {
