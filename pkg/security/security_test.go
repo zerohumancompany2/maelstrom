@@ -163,6 +163,20 @@ func TestTaintEngine_CheckViolation_INNER_ONLY_on_DMZ(t *testing.T) {
 	}
 }
 
+func TestTaintEngine_CheckViolation_SECRET_on_Outer(t *testing.T) {
+	engine := NewTaintEngine()
+
+	err := engine.CheckForbidden([]string{"SECRET"}, OuterBoundary)
+	if err == nil {
+		t.Error("Expected error for SECRET taint on Outer boundary, got nil")
+	}
+
+	expectedMsg := "taint SECRET is forbidden on boundary outer"
+	if err != nil && err.Error() != expectedMsg {
+		t.Errorf("Expected error message %q, got %q", expectedMsg, err.Error())
+	}
+}
+
 func TestTaintEngine_Redaction(t *testing.T) {
 	engine := NewTaintEngine()
 
