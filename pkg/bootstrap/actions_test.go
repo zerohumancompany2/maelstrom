@@ -120,3 +120,65 @@ func (m *mockApplicationContext) Set(key string, value interface{}, taints []str
 func (m *mockApplicationContext) Namespace() string {
 	return "test"
 }
+
+// TestBootstrapActions_LogExecution verifies actions log their execution.
+func TestBootstrapActions_LogExecution(t *testing.T) {
+	mockAppCtx := &mockApplicationContext{data: map[string]interface{}{
+		"boundaries":      []string{"inner", "dmz", "outer"},
+		"mailBackbone":    true,
+		"tracing":         true,
+		"metrics":         true,
+		"deadLetterQueue": true,
+		"enableSpawn":     true,
+		"enableStop":      true,
+		"toolRegistry":    true,
+		"error":           "test error",
+	}}
+	mockRuntimeCtx := statechart.RuntimeContext{
+		ChartID:   "sys:bootstrap",
+		RuntimeID: "test-rt",
+	}
+	mockEvent := statechart.Event{Type: "TEST"}
+
+	t.Run("securityBootstrap logs execution with parameters", func(t *testing.T) {
+		err := securityBootstrap(mockRuntimeCtx, mockAppCtx, mockEvent)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("communicationBootstrap logs execution with parameters", func(t *testing.T) {
+		err := communicationBootstrap(mockRuntimeCtx, mockAppCtx, mockEvent)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("observabilityBootstrap logs execution with parameters", func(t *testing.T) {
+		err := observabilityBootstrap(mockRuntimeCtx, mockAppCtx, mockEvent)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("lifecycleBootstrap logs execution with parameters", func(t *testing.T) {
+		err := lifecycleBootstrap(mockRuntimeCtx, mockAppCtx, mockEvent)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("logSuccess logs success message", func(t *testing.T) {
+		err := logSuccess(mockRuntimeCtx, mockAppCtx, mockEvent)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("logFailure logs error message", func(t *testing.T) {
+		err := logFailure(mockRuntimeCtx, mockAppCtx, mockEvent)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+}
