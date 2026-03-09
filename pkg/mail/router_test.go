@@ -174,3 +174,10 @@ func TestParseAddress_sys(t *testing.T) {
 		t.Errorf("Expected id 'heartbeat', got %v", id)
 	}
 }
+
+func TestParseAddress_invalid(t *testing.T) {
+	_, _, err := ParseAddress("invalid-format")
+	if err == nil {
+		t.Error("Expected error for invalid format")
+	}
+}
