@@ -169,3 +169,9 @@ func (o *ObservabilityService) QueryDeadLettersNoCopy(filters *DeadLetterFilters
 	}
 	return result
 }
+
+func (o *ObservabilityService) getMemoryUsage() uint64 {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return uint64(len(o.deadLetters) * 100)
+}

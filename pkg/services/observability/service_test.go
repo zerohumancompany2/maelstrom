@@ -1,6 +1,7 @@
 package observability
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -498,5 +499,20 @@ func TestObservabilityService_QueryDeadLettersNoCopy(t *testing.T) {
 	}
 	if entries[0].Mail.ID != "mail-1" {
 		t.Errorf("Expected mail ID mail-1, got %s", entries[0].Mail.ID)
+	}
+}
+
+func TestObservabilityService_QueryDeadLettersMemory(t *testing.T) {
+	svc := NewObservabilityService()
+
+	for i := 0; i < 100; i++ {
+		mail := mail.Mail{ID: fmt.Sprintf("mail-%d", i), Source: "src", Target: "tgt", Type: mail.Error}
+		svc.LogDeadLetter(mail, "reason")
+	}
+
+	memoryUsage := svc.getMemoryUsage()
+
+	if memoryUsage == 0 {
+		t.Error("Expected memory usage to be greater than 0")
 	}
 }
