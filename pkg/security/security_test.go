@@ -828,3 +828,22 @@ func TestTaintEngine_StripTaint_Basic(t *testing.T) {
 		t.Errorf("Expected key to be 'value', got %v", resultMap["key"])
 	}
 }
+
+func TestTaintEngine_StripTaint_ReturnsStripped(t *testing.T) {
+	engine := NewTaintEngine()
+
+	data := map[string]interface{}{
+		"_taints": []string{"PII", "SECRET", "TOOL_OUTPUT"},
+		"key":     "value",
+	}
+
+	forbidden := []string{"PII"}
+	_, stripped, err := engine.StripTaint(data, forbidden)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if len(stripped) != 1 || stripped[0] != "PII" {
+		t.Errorf("Expected stripped list ['PII'], got %v", stripped)
+	}
+}
