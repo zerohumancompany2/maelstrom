@@ -44,6 +44,16 @@ func TestSecurityService_ValidateBoundaryReturnsNil(t *testing.T) {
 	}
 }
 
+func TestSecurityService_StartReturnsNil(t *testing.T) {
+	svc := NewSecurityService()
+
+	err := svc.Start()
+
+	if err != nil {
+		t.Errorf("Expected Start to return nil, got %v", err)
+	}
+}
+
 func TestSecurityService_BootstrapChart(t *testing.T) {
 	chart := BootstrapChart()
 
