@@ -35,3 +35,37 @@ Follow this exactly. No exceptions.
 ## TOOLS
 
 Prefer Lumora tools over equiivalent tools, when available.
+
+## DEVELOPMENT STANDARDS
+
+**Agent Spawning Protocol**
+
+- Spawn explore agents for ALL discovery: specs, codebase, patterns
+- Never read files yourself; delegate to agents exclusively
+- Each agent has single focused objective with clear deliverable
+- Agents quote line numbers and provide concrete evidence
+- Recursive decomposition: agents spawn sub-agents for subtasks
+
+**Task Decomposition Rules**
+
+- Break work until: 2-10 tests per phase, 1 test = 1 commit
+- Each phase: single coherent behavior, not multiple features
+- Sub-phases address atomic requirements from spec
+- Decomposition stops when phase has ≤6 tests ideal
+- Recursive breakdown continues until testable units emerge
+
+**Plan Document Standards**
+
+- Quote arch-v1.md line numbers for ALL requirements
+- Map each test to specific spec requirement explicitly
+- Include acceptance criteria as executable test descriptions
+- Reference satisfied requirements from Layers 2-3 dependencies
+- Auditor agent validates all plans before implementation begins
+
+**Style & Granularity**
+
+- Follow existing patterns: gap remediation phase structure exactly
+- Test names: `Test[Component]_[Behavior]_[ExpectedResult]` format
+- Commit messages: `feat(layer-4/[component]): one-line description`
+- Branch names: `feat/[group/category]-[component]` or `fix/[group/category]-[issue]`
+- 1:1 test-to-commit ratio, never bundle multiple tests

@@ -407,3 +407,155 @@ See [`../gaps/layer-01-minor-gaps.md`](../gaps/layer-01-minor-gaps.md) for:
 
 **Document Status:** Complete  
 **Last Updated:** 2026-03-09
+
+---
+
+# Layer 4: Security & Boundary Enforcement (Planning Complete)
+
+**Status:** ✅ Planning Complete, Ready for Implementation
+
+## Overview
+
+Layer 4 implements the security boundary enforcement system with taint tracking, DataSource abstraction, and ContextMap filtering.
+
+**Key Guarantee:** "Never allow outer/DMZ ContextMap to contain untagged inner data"
+
+## Planning Documents
+
+### spec-extraction.md
+**Complete Layer 4 specification from arch-v1.md**
+
+- 592 lines
+- All components, interfaces, workflows extracted
+- Line number references to arch-v1.md
+- Dependencies on Layers 0, 2, 3 mapped
+
+### implementation-assessment.md
+**Current implementation state analysis**
+
+- 567 lines
+- What exists: types/interfaces (stubs)
+- What's missing: enforcement logic
+- Gap analysis vs spec
+
+### implementation-patterns.md
+**Style and granularity guidelines**
+
+- 883 lines
+- Documentation templates
+- Test naming conventions
+- Commit patterns
+- Code style examples
+
+### phase-breakdown.md
+**Master phase breakdown**
+
+- 1501 lines
+- 19 sub-phases, 88 tests
+- Dependency graph
+- Execution order
+
+### audit-report.md
+**Plan validation report**
+
+- ✅ PASS with minor issues
+- 1 minor issue (line reference fix needed)
+- Go/No-Go: ✅ GO
+
+### INDEX.md
+**Layer 4 documentation navigation**
+
+- Overview and quick start
+- Document links
+- Phase summary table
+- Execution order diagram
+
+---
+
+## Phase Plans (19 documents)
+
+All plans in `docs/layer-4/plans/`
+
+### P1: Taint Engine Core (16 tests)
+
+| Plan | Tests | Status |
+|------|-------|--------|
+| [P1.1-AttachTaint.md](plans/P1.1-AttachTaint.md) | 4 | ✅ Ready |
+| [P1.2-PropagateTaint.md](plans/P1.2-PropagateTaint.md) | 5 | ✅ Ready |
+| [P1.3-StripTaint.md](plans/P1.3-StripTaint.md) | 4 | ✅ Ready |
+| [P1.4-TaintSet.md](plans/P1.4-TaintSet.md) | 3 | ✅ Ready |
+
+### P2: DataSource (15 tests)
+
+| Plan | Tests | Status |
+|------|-------|--------|
+| [P2.1-LocalDisk.md](plans/P2.1-LocalDisk.md) | 5 | ✅ Ready |
+| [P2.2-S3.md](plans/P2.2-S3.md) | 4 | ✅ Ready |
+| [P2.3-InMemory.md](plans/P2.3-InMemory.md) | 3 | ✅ Ready |
+| [P2.4-Registry.md](plans/P2.4-Registry.md) | 3 | ✅ Ready |
+
+### P3: Boundary Enforcement (15 tests)
+
+| Plan | Tests | Status |
+|------|-------|--------|
+| [P3.1-BoundaryValidation.md](plans/P3.1-BoundaryValidation.md) | 5 | ✅ Ready |
+| [P3.2-BoundaryTransitions.md](plans/P3.2-BoundaryTransitions.md) | 6 | ✅ Ready |
+| [P3.3-ViolationReporting.md](plans/P3.3-ViolationReporting.md) | 4 | ✅ Ready |
+
+### P4: ContextMap Filtering (14 tests)
+
+| Plan | Tests | Status |
+|------|-------|--------|
+| [P4.1-TaintPolicyModes.md](plans/P4.1-TaintPolicyModes.md) | 5 | ⚠️ Fix line ref |
+| [P4.2-ContextBlockFiltering.md](plans/P4.2-ContextBlockFiltering.md) | 6 | ✅ Ready |
+| [P4.3-IsolationHooks.md](plans/P4.3-IsolationHooks.md) | 3 | ✅ Ready |
+
+### P5: Stream Integration (8 tests)
+
+| Plan | Tests | Status |
+|------|-------|--------|
+| [P5.1-StreamTaintStripping.md](plans/P5.1-StreamTaintStripping.md) | 4 | ✅ Ready |
+| [P5.2-StreamBoundaryEnforcement.md](plans/P5.2-StreamBoundaryEnforcement.md) | 4 | ✅ Ready |
+
+### P6: Service Wiring (13 tests)
+
+| Plan | Tests | Status |
+|------|-------|--------|
+| [P6.1-SecurityServiceIntegration.md](plans/P6.1-SecurityServiceIntegration.md) | 5 | ✅ Ready |
+| [P6.2-MailRouterHooks.md](plans/P6.2-MailRouterHooks.md) | 4 | ✅ Ready |
+| [P6.3-ApplicationContextWiring.md](plans/P6.3-ApplicationContextWiring.md) | 4 | ✅ Ready |
+
+---
+
+## Execution Order
+
+```
+P1 (Foundation) → P2 (DataSource) → P3 (Boundary) → P4 (ContextMap) → P5 (Stream) → P6 (Wiring)
+```
+
+---
+
+## Quick Start
+
+1. **Fix P4.1 line reference** (minor issue from audit)
+2. **Create branch:** `git checkout -b feat/layer-4-taint-engine`
+3. **Start with P1.1:** TaintEngine AttachTaint (4 tests)
+4. **Follow TDD workflow:** 1 test → RED → GREEN → commit
+5. **Commit format:** `feat(layer-4/taint-engine): one-line description`
+
+---
+
+## Summary Statistics
+
+| Metric | Value |
+|--------|-------|
+| Total Phases | 19 |
+| Total Tests | 88 |
+| Total Commits (planned) | 88 |
+| Files to Modify | ~40 |
+| Planning Documents | 26 |
+
+---
+
+**Document Status:** Planning Complete  
+**Last Updated:** 2026-03-09

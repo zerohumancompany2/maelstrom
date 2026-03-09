@@ -457,3 +457,38 @@ func TestTaintEngine_AttachTaint_Empty(t *testing.T) {
 		t.Errorf("Expected nil result for nil input, got %v", nilResult)
 	}
 }
+
+func TestTaintEngine_PropagateTaint_MapMerge(t *testing.T) {
+	engine := NewTaintEngine()
+
+	data := map[string]interface{}{
+		"_taints": []string{"PII"},
+		"key":     "value",
+	}
+
+	result, err := engine.Propagate(data, []string{"TOOL_OUTPUT"})
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected map[string]interface{}, got %T", result)
+	}
+
+	taints, ok := resultMap["_taints"].([]string)
+	if !ok {
+		t.Fatalf("Expected _taints key with []string value, got %T", resultMap["_taints"])
+	}
+
+	if len(taints) != 2 {
+		t.Errorf("Expected 2 taints, got %d", len(taints))
+	}
+
+	expectedTaints := map[string]bool{"PII": true, "TOOL_OUTPUT": true}
+	for _, taint := range taints {
+		if !expectedTaints[taint] {
+			t.Errorf("Unexpected taint %q", taint)
+		}
+	}
+}

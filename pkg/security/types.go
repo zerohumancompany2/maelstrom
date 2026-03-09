@@ -184,7 +184,46 @@ func (e *taintEngineImpl) MarkRead(path string, taints []string) ([]string, erro
 }
 
 func (e *taintEngineImpl) Propagate(obj any, newTaints []string) (any, error) {
-	return obj, nil
+	if obj == nil {
+		return nil, fmt.Errorf("cannot propagate taints to nil object")
+	}
+
+	switch v := obj.(type) {
+	case map[string]interface{}:
+		return e.propagateTaintToMap(v, newTaints)
+	default:
+		return obj, nil
+	}
+}
+
+func (e *taintEngineImpl) propagateTaintToMap(m map[string]interface{}, newTaints []string) (map[string]interface{}, error) {
+	result := make(map[string]interface{})
+
+	existingTaints := make(map[string]bool)
+	if existing, ok := m["_taints"].([]string); ok {
+		for _, t := range existing {
+			existingTaints[t] = true
+		}
+	}
+
+	for _, t := range newTaints {
+		existingTaints[t] = true
+	}
+
+	merged := make([]string, 0, len(existingTaints))
+	for t := range existingTaints {
+		merged = append(merged, t)
+	}
+
+	for k, val := range m {
+		if k == "_taints" {
+			result[k] = merged
+			continue
+		}
+		result[k] = val
+	}
+
+	return result, nil
 }
 
 func (e *taintEngineImpl) CheckForbidden(taints []string, boundary BoundaryType) error {
