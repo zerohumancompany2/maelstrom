@@ -4,6 +4,14 @@ import (
 	"testing"
 )
 
+func TestSecurityService_NewSecurityServiceReturnsNonNil(t *testing.T) {
+	svc := NewSecurityService()
+
+	if svc == nil {
+		t.Error("Expected NewSecurityService to return non-nil")
+	}
+}
+
 func TestSecurityService_BootstrapChart(t *testing.T) {
 	chart := BootstrapChart()
 
