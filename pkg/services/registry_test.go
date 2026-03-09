@@ -184,6 +184,44 @@ func TestServiceRegistry_UpdateState(t *testing.T) {
 	}
 }
 
+func TestServiceRegistry_QueryByState(t *testing.T) {
+	sr := NewServiceRegistry()
+
+	svc1 := &mockService{id: "test:service1"}
+	svc2 := &mockService{id: "test:service2"}
+	svc3 := &mockService{id: "test:service3"}
+
+	sr.RegisterWithState(svc1, "registered")
+	sr.RegisterWithState(svc2, "running")
+	sr.RegisterWithState(svc3, "running")
+
+	services := sr.QueryByState("running")
+	if len(services) != 2 {
+		t.Fatalf("QueryByState() returned %d services, want 2", len(services))
+	}
+
+	running := make(map[string]bool)
+	for _, s := range services {
+		running[s.ID()] = true
+	}
+	if !running["test:service2"] || !running["test:service3"] {
+		t.Fatal("QueryByState() returned wrong services")
+	}
+
+	services = sr.QueryByState("registered")
+	if len(services) != 1 {
+		t.Fatalf("QueryByState() returned %d services, want 1", len(services))
+	}
+	if services[0].ID() != "test:service1" {
+		t.Fatalf("QueryByState() returned wrong service ID")
+	}
+
+	services = sr.QueryByState("stopped")
+	if len(services) != 0 {
+		t.Fatalf("QueryByState() returned %d services, want 0", len(services))
+	}
+}
+
 func TestAllServicesIntegrateViaRegistry(t *testing.T) {
 	sr := NewServiceRegistry()
 

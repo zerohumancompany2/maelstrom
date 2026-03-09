@@ -86,6 +86,19 @@ func (sr *ServiceRegistry) UpdateState(serviceID string, newState string) error 
 	return nil
 }
 
+// QueryByState returns all services matching the given lifecycle state.
+func (sr *ServiceRegistry) QueryByState(state string) []Service {
+	sr.mu.RLock()
+	defer sr.mu.RUnlock()
+	result := make([]Service, 0)
+	for id, s := range sr.services {
+		if sr.lifecycles[id] == state {
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
 // Get retrieves a service by name.
 // Returns service and true if found, nil and false otherwise.
 func (sr *ServiceRegistry) Get(name string) (Service, bool) {
