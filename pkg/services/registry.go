@@ -74,6 +74,18 @@ func (sr *ServiceRegistry) GetState(serviceID string) (string, bool) {
 	return state, ok
 }
 
+// UpdateState updates the lifecycle state of a service.
+// Returns ErrNotFound if service is not registered.
+func (sr *ServiceRegistry) UpdateState(serviceID string, newState string) error {
+	sr.mu.Lock()
+	defer sr.mu.Unlock()
+	if _, exists := sr.lifecycles[serviceID]; !exists {
+		return ErrNotFound
+	}
+	sr.lifecycles[serviceID] = newState
+	return nil
+}
+
 // Get retrieves a service by name.
 // Returns service and true if found, nil and false otherwise.
 func (sr *ServiceRegistry) Get(name string) (Service, bool) {

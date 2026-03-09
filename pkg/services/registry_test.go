@@ -156,6 +156,34 @@ func TestServiceRegistry_RegisterWithState(t *testing.T) {
 	}
 }
 
+func TestServiceRegistry_UpdateState(t *testing.T) {
+	sr := NewServiceRegistry()
+	svc := &mockService{id: "test:service"}
+
+	err := sr.RegisterWithState(svc, "registered")
+	if err != nil {
+		t.Fatalf("RegisterWithState() returned error: %v", err)
+	}
+
+	err = sr.UpdateState(svc.ID(), "running")
+	if err != nil {
+		t.Fatalf("UpdateState() returned error: %v", err)
+	}
+
+	state, ok := sr.GetState(svc.ID())
+	if !ok {
+		t.Fatal("GetState() returned false after update")
+	}
+	if state != "running" {
+		t.Fatalf("GetState() returned %q, want %q", state, "running")
+	}
+
+	err = sr.UpdateState("nonexistent", "running")
+	if err != ErrNotFound {
+		t.Fatalf("UpdateState() returned %v, want %v", err, ErrNotFound)
+	}
+}
+
 func TestAllServicesIntegrateViaRegistry(t *testing.T) {
 	sr := NewServiceRegistry()
 
