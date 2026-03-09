@@ -67,3 +67,50 @@ func TestLoadSecurityService_SpawnsRuntime(t *testing.T) {
 		t.Error("expected non-empty runtime ID")
 	}
 }
+
+// TestLoadSecurityService_StartsRuntime verifies action starts the spawned runtime.
+func TestLoadSecurityService_StartsRuntime(t *testing.T) {
+	engine := statechart.NewEngine()
+
+	// Load and spawn bootstrap chart first
+	bootstrapDef, err := LoadBootstrapChart()
+	if err != nil {
+		t.Fatalf("failed to load bootstrap chart: %v", err)
+	}
+
+	// Create mock appCtx with engine
+	mockCtx := &mockApplicationContext{
+		data: map[string]interface{}{
+			"__engine": engine,
+		},
+	}
+
+	// Spawn and start bootstrap runtime
+	bootstrapRTID, err := engine.Spawn(bootstrapDef, mockCtx)
+	if err != nil {
+		t.Fatalf("failed to spawn bootstrap runtime: %v", err)
+	}
+	if err := engine.Control(bootstrapRTID, statechart.CmdStart); err != nil {
+		t.Fatalf("failed to start bootstrap runtime: %v", err)
+	}
+
+	// Call action
+	err = loadSecurityService(
+		statechart.RuntimeContext{RuntimeID: string(bootstrapRTID)},
+		mockCtx,
+		statechart.Event{},
+	)
+	if err != nil {
+		t.Fatalf("action failed: %v", err)
+	}
+
+	// Get the security runtime ID
+	securityRTIDStr, _, _ := mockCtx.Get("bootstrap:security:runtimeID", "sys:bootstrap")
+
+	// Verify the security runtime is in running state
+	// We do this by checking that we can dispatch events to it
+	err = engine.Dispatch(statechart.RuntimeID(securityRTIDStr.(string)), statechart.Event{Type: "TEST"})
+	if err != nil {
+		t.Errorf("expected security runtime to be running, got error: %v", err)
+	}
+}
