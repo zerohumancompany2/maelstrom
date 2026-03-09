@@ -9,6 +9,8 @@ type MemoryService interface {
 	QueryByQuery(query string, topK int, boundaryFilter string) ([]MemoryResult, error)
 	Delete(memoryId string) error
 	List(runtimeId string) ([]MemoryResult, error)
+	StoreKey(key string, value interface{}) error
+	QueryKey(key string) (interface{}, error)
 }
 
 // MemoryResult represents a memory entry
