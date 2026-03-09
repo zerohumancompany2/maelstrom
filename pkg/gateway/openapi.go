@@ -56,5 +56,20 @@ func GenerateOpenAPIFromChart(chart *Chart) (*OpenAPISpec, error) {
 }
 
 func GenerateHTTPExposureSpec(chart *Chart) (*HTTPSpec, error) {
-	return nil, nil
+	if chart == nil {
+		return nil, nil
+	}
+
+	spec := &HTTPSpec{
+		Endpoints: []HTTPEndpoint{
+			{
+				Path:     "/" + chart.ID + "/health",
+				Method:   "GET",
+				Boundary: mail.OuterBoundary,
+				Auth:     false,
+			},
+		},
+	}
+
+	return spec, nil
 }
