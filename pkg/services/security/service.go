@@ -39,6 +39,10 @@ func (s *SecurityService) ReportTaints(runtimeId string) (security.TaintMap, err
 	return security.TaintMap{}, nil
 }
 
+func (s *SecurityService) PrepareContextForBoundary(runtimeId string, boundary mail.BoundaryType) error {
+	return nil
+}
+
 func (s *SecurityService) Start() error {
 	return nil
 }

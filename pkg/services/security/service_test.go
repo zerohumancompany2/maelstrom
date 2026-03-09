@@ -159,3 +159,19 @@ func TestSecurityService_ReportTaintsReturnsEmptyMap(t *testing.T) {
 		t.Errorf("Expected empty TaintMap, got %d entries", len(result))
 	}
 }
+
+func TestSecurityService_PrepareContextForBoundaryNoOp(t *testing.T) {
+	svc := NewSecurityService()
+
+	err := svc.PrepareContextForBoundary("runtime-123", mail.InnerBoundary)
+
+	if err != nil {
+		t.Errorf("Expected PrepareContextForBoundary to return nil for InnerBoundary, got %v", err)
+	}
+
+	err = svc.PrepareContextForBoundary("runtime-123", mail.OuterBoundary)
+
+	if err != nil {
+		t.Errorf("Expected PrepareContextForBoundary to return nil for OuterBoundary, got %v", err)
+	}
+}
