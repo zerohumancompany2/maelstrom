@@ -2,6 +2,8 @@ package communication
 
 import (
 	"testing"
+
+	"github.com/maelstrom/v3/pkg/mail"
 )
 
 func TestCommunicationService_NewCommunicationServiceReturnsNonNil(t *testing.T) {
@@ -19,6 +21,16 @@ func TestCommunicationService_IDReturnsCorrectString(t *testing.T) {
 
 	if id != "sys:communication" {
 		t.Errorf("Expected ID sys:communication, got %s", id)
+	}
+}
+
+func TestCommunicationService_HandleMailReturnsNil(t *testing.T) {
+	svc := NewCommunicationService()
+
+	err := svc.HandleMail(mail.Mail{})
+
+	if err != nil {
+		t.Errorf("Expected HandleMail to return nil, got %v", err)
 	}
 }
 
