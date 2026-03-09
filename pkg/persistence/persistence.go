@@ -1,6 +1,8 @@
 package persistence
 
 import (
+	"fmt"
+
 	"github.com/maelstrom/v3/pkg/datasource"
 	"github.com/maelstrom/v3/pkg/security"
 )
@@ -26,5 +28,16 @@ func (p *Persistence) Read(key string) (any, []string, error) {
 }
 
 func (p *Persistence) ValidateTaintPolicy(taints []string, boundary security.BoundaryType) error {
-	panic("not implemented")
+	for _, taint := range taints {
+		if taint == "INNER_ONLY" && (boundary == security.DMZBoundary || boundary == security.OuterBoundary) {
+			return fmt.Errorf("taint %s is forbidden on boundary %s", taint, boundary)
+		}
+		if taint == "SECRET" && (boundary == security.DMZBoundary || boundary == security.OuterBoundary) {
+			return fmt.Errorf("taint %s is forbidden on boundary %s", taint, boundary)
+		}
+		if taint == "PII" && boundary == security.OuterBoundary {
+			return fmt.Errorf("taint %s is forbidden on boundary %s", taint, boundary)
+		}
+	}
+	return nil
 }
