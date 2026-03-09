@@ -1,6 +1,9 @@
 package mail
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestAgentInbox_PushPop(t *testing.T) {
 	inbox := &AgentInbox{ID: "test-agent"}
@@ -41,5 +44,28 @@ func TestAgentInbox_PushPop(t *testing.T) {
 	_, err = inbox.Pop()
 	if err == nil {
 		t.Error("Expected error for empty inbox")
+	}
+}
+
+func TestAgentInbox_Subscribe(t *testing.T) {
+	inbox := &AgentInbox{ID: "test-agent"}
+
+	mail := Mail{ID: "msg-001", Type: MailTypeUser}
+	inbox.Push(mail)
+
+	ch := inbox.Subscribe()
+	if ch == nil {
+		t.Error("Expected non-nil channel")
+	}
+
+	time.Sleep(10 * time.Millisecond)
+
+	select {
+	case received := <-ch:
+		if received.ID != "msg-001" {
+			t.Errorf("Expected msg-001, got %s", received.ID)
+		}
+	default:
+		t.Error("Expected channel to receive message without blocking")
 	}
 }

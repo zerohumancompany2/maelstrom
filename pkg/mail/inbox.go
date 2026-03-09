@@ -35,6 +35,16 @@ func (a *AgentInbox) Pop() (Mail, error) {
 
 func (a *AgentInbox) Subscribe() <-chan Mail {
 	ch := make(chan Mail, 100)
+	go func() {
+		a.mu.Lock()
+		for _, m := range a.Messages {
+			select {
+			case ch <- m:
+			default:
+			}
+		}
+		a.mu.Unlock()
+	}()
 	return ch
 }
 
