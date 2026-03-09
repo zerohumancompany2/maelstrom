@@ -33,3 +33,42 @@ func TestHumanGatewayService_HandleChat(t *testing.T) {
 		t.Error("Expected message preserved in content")
 	}
 }
+
+func TestHumanGatewayService_ParseActionItem(t *testing.T) {
+	svc := NewHumanGatewayService()
+
+	items, err := svc.ParseActionItem("Please @pause processing")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	if len(items) != 1 {
+		t.Errorf("Expected 1 action item, got %d", len(items))
+	}
+	if items[0].Type != "pause" {
+		t.Errorf("Expected type 'pause', got '%s'", items[0].Type)
+	}
+
+	items, err = svc.ParseActionItem("@inject-memory This is important")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	if len(items) != 1 {
+		t.Errorf("Expected 1 action item, got %d", len(items))
+	}
+	if items[0].Type != "inject-memory" {
+		t.Errorf("Expected type 'inject-memory', got '%s'", items[0].Type)
+	}
+	if items[0].Payload != "This is important" {
+		t.Errorf("Expected payload 'This is important', got '%v'", items[0].Payload)
+	}
+
+	items, err = svc.ParseActionItem("Just a normal message")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if len(items) != 0 {
+		t.Errorf("Expected 0 action items, got %d", len(items))
+	}
+}

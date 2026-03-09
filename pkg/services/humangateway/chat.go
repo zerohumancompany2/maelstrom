@@ -31,7 +31,7 @@ func (h *HumanGatewayService) ParseActionItem(message string) ([]ActionItem, err
 	}
 
 	if idx := strings.Index(message, "@inject-memory"); idx >= 0 {
-		content := strings.TrimSpace(message[idx+16:])
+		content := strings.TrimSpace(message[idx+14:])
 		items = append(items, ActionItem{
 			Type:    "inject-memory",
 			Target:  "",
