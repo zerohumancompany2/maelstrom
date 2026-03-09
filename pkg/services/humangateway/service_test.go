@@ -1,112 +1,118 @@
 package humangateway
 
 import (
+	"github.com/maelstrom/v3/pkg/mail"
 	"testing"
 )
 
-func TestHumanGateway_OpenSession(t *testing.T) {
-	// Test: Open chat session for agent
+func TestHumanGatewayService_HandleChat(t *testing.T) {
 	svc := NewHumanGatewayService()
 
-	// Open a session for an agent
-	sessionID, err := svc.OpenSession("agent-001")
+	m, err := svc.HandleChat("recommendation-agent", "What do you think?")
 	if err != nil {
-		t.Fatalf("Failed to open session: %v", err)
+		t.Errorf("Expected nil error, got %v", err)
 	}
 
-	if sessionID == "" {
-		t.Fatal("Session ID is empty")
+	if m.Type != mail.MailTypeUser {
+		t.Errorf("Expected MailTypeUser, got %s", m.Type)
 	}
 
-	// Verify session was created
-	exists := svc.SessionExists(sessionID)
-	if !exists {
-		t.Error("Session should exist after opening")
+	if m.Source != "human:recommendation-agent" {
+		t.Errorf("Expected source 'human:recommendation-agent', got '%s'", m.Source)
+	}
+
+	if m.Target != "agent:recommendation-agent" {
+		t.Errorf("Expected target 'agent:recommendation-agent', got '%s'", m.Target)
+	}
+
+	content, ok := m.Content.(map[string]any)
+	if !ok {
+		t.Error("Expected content to be map[string]any")
+	}
+	if content["message"] != "What do you think?" {
+		t.Error("Expected message preserved in content")
 	}
 }
 
-func TestHumanGateway_SendMessage(t *testing.T) {
-	// Test: Send message to agent
+func TestHumanGatewayService_ParseActionItem(t *testing.T) {
 	svc := NewHumanGatewayService()
 
-	// Open a session
-	sessionID, err := svc.OpenSession("agent-002")
+	items, err := svc.ParseActionItem("Please @pause processing")
 	if err != nil {
-		t.Fatalf("Failed to open session: %v", err)
+		t.Errorf("Expected nil error, got %v", err)
 	}
 
-	// Send a message
-	content := "Hello, agent!"
-	err = svc.SendMessage(string(sessionID), content)
-	if err != nil {
-		t.Fatalf("Failed to send message: %v", err)
+	if len(items) != 1 {
+		t.Errorf("Expected 1 action item, got %d", len(items))
+	}
+	if items[0].Type != "pause" {
+		t.Errorf("Expected type 'pause', got '%s'", items[0].Type)
 	}
 
-	// Verify session exists
-	if !svc.SessionExists(sessionID) {
-		t.Error("Session should still exist after sending message")
+	items, err = svc.ParseActionItem("@inject-memory This is important")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	if len(items) != 1 {
+		t.Errorf("Expected 1 action item, got %d", len(items))
+	}
+	if items[0].Type != "inject-memory" {
+		t.Errorf("Expected type 'inject-memory', got '%s'", items[0].Type)
+	}
+	if items[0].Payload != "This is important" {
+		t.Errorf("Expected payload 'This is important', got '%v'", items[0].Payload)
+	}
+
+	items, err = svc.ParseActionItem("Just a normal message")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if len(items) != 0 {
+		t.Errorf("Expected 0 action items, got %d", len(items))
 	}
 }
 
-func TestHumanGateway_StreamResponse(t *testing.T) {
-	// Test: Stream agent response
+func TestHumanGatewayService_SessionManagement(t *testing.T) {
 	svc := NewHumanGatewayService()
 
-	// Open a session
-	sessionID, err := svc.OpenSession("agent-003")
-	if err != nil {
-		t.Fatalf("Failed to open session: %v", err)
+	session := svc.CreateSession("test-agent")
+	if session == nil {
+		t.Error("Expected non-nil session")
 	}
 
-	// Stream response
-	ch, err := svc.StreamResponse(string(sessionID))
-	if err != nil {
-		t.Fatalf("Failed to stream response: %v", err)
+	if session.AgentID != "test-agent" {
+		t.Errorf("Expected AgentID 'test-agent', got '%s'", session.AgentID)
 	}
 
-	if ch == nil {
-		t.Fatal("Stream channel should not be nil")
+	retrieved := svc.GetSession("test-agent")
+	if retrieved == nil {
+		t.Error("Expected non-nil retrieved session")
+	}
+	if retrieved != session {
+		t.Error("Expected same session instance")
 	}
 
-	// Verify session still exists
-	if !svc.SessionExists(sessionID) {
-		t.Error("Session should exist during streaming")
+	missing := svc.GetSession("non-existent")
+	if missing != nil {
+		t.Error("Expected nil for non-existent session")
 	}
 }
 
-func TestHumanGateway_BoundaryOuter(t *testing.T) {
-	// Test: Human gateway only accessible from outer
-	svc := NewHumanGatewayService()
-
-	// Open session (outer boundary operation)
-	sessionID, err := svc.OpenSession("agent-004")
-	if err != nil {
-		t.Fatalf("Failed to open session: %v", err)
+func TestHumanGatewayService_SanitizedContext(t *testing.T) {
+	ctx := ContextMapSnapshot{
+		"conversation": []any{"msg1", "msg2"},
+		"memory":       "important data",
+		"internal":     "secret data",
 	}
 
-	// Send message (outer boundary operation)
-	err = svc.SendMessage(string(sessionID), "Hello from outer")
-	if err != nil {
-		t.Fatalf("Failed to send message: %v", err)
+	sanitized := SanitizeContextForBoundary(ctx, mail.InnerBoundary)
+	if len(sanitized) != len(ctx) {
+		t.Errorf("Expected %d keys, got %d", len(ctx), len(sanitized))
 	}
 
-	// Stream response (outer boundary operation)
-	ch, err := svc.StreamResponse(string(sessionID))
-	if err != nil {
-		t.Fatalf("Failed to stream: %v", err)
-	}
-
-	// Verify we can receive from stream
-	<-ch
-
-	// Close session (outer boundary operation)
-	err = svc.CloseSession(string(sessionID))
-	if err != nil {
-		t.Fatalf("Failed to close session: %v", err)
-	}
-
-	// Session should be closed (not active)
-	if svc.SessionActive(sessionID) {
-		t.Error("Session should be closed after CloseSession")
+	sanitizedOuter := SanitizeContextForBoundary(ctx, mail.OuterBoundary)
+	if len(sanitizedOuter) != len(ctx) {
+		t.Errorf("Expected %d keys, got %d", len(ctx), len(sanitizedOuter))
 	}
 }

@@ -1,67 +1,72 @@
 package humangateway
 
-// HumanGatewayService interface defines the human gateway service API
-type HumanGatewayService interface {
-	OpenSession(agentId string) (SessionID, error)
-	SendMessage(sessionId string, content string) error
-	StreamResponse(sessionId string) (<-chan StreamChunk, error)
-	CloseSession(sessionId string) error
-	SessionExists(sessionID SessionID) bool
-	SessionActive(sessionID SessionID) bool
+import (
+	"crypto/rand"
+	"fmt"
+	"github.com/maelstrom/v3/pkg/mail"
+	"sync"
+)
+
+type HumanGatewayService struct {
+	id       string
+	sessions map[string]*ChatSession
+	mu       sync.RWMutex
 }
 
-// humanGatewayService implements HumanGatewayService
-type humanGatewayService struct {
-	sessionMgr *sessionManager
-}
-
-// NewHumanGatewayService creates a new human gateway service instance
-func NewHumanGatewayService() HumanGatewayService {
-	return &humanGatewayService{
-		sessionMgr: NewSessionManager(),
+func NewHumanGatewayService() *HumanGatewayService {
+	return &HumanGatewayService{
+		id:       "sys:human-gateway",
+		sessions: make(map[string]*ChatSession),
 	}
 }
 
-// OpenSession opens a chat session for an agent
-func (h *humanGatewayService) OpenSession(agentId string) (SessionID, error) {
-	return h.sessionMgr.CreateSession(agentId), nil
+func (h *HumanGatewayService) ID() string {
+	return h.id
 }
 
-// SendMessage sends a message to a session
-func (h *humanGatewayService) SendMessage(sessionId string, content string) error {
-	return nil
-}
+func (h *HumanGatewayService) HandleChat(agentID, message string) (mail.Mail, error) {
+	b := make([]byte, 8)
+	rand.Read(b)
+	id := fmt.Sprintf("human-gateway-%x", b)
 
-// StreamResponse streams a response from an agent
-func (h *humanGatewayService) StreamResponse(sessionId string) (<-chan StreamChunk, error) {
-	ch := make(chan StreamChunk, 10)
-	go func() {
-		ch <- StreamChunk{
-			Data:     "Stream started",
-			Sequence: 0,
-			IsFinal:  false,
-		}
-		close(ch)
-	}()
-	return ch, nil
-}
+	actionItems, _ := h.ParseActionItem(message)
 
-// CloseSession closes a chat session
-func (h *humanGatewayService) CloseSession(sessionId string) error {
-	h.sessionMgr.CloseSession(SessionID(sessionId))
-	return nil
-}
-
-// SessionExists checks if a session exists
-func (h *humanGatewayService) SessionExists(sessionID SessionID) bool {
-	return h.sessionMgr.SessionExists(sessionID)
-}
-
-// SessionActive checks if a session is active
-func (h *humanGatewayService) SessionActive(sessionID SessionID) bool {
-	session, ok := h.sessionMgr.GetSession(sessionID)
-	if !ok {
-		return false
+	mailType := mail.MailTypeUser
+	if len(actionItems) > 0 {
+		mailType = mail.MailTypeHumanFeedback
 	}
-	return session.Active
+
+	return mail.Mail{
+		ID:     id,
+		Type:   mailType,
+		Source: "human:" + agentID,
+		Target: "agent:" + agentID,
+		Content: map[string]any{
+			"message":     message,
+			"actionItems": actionItems,
+		},
+		Metadata: mail.MailMetadata{
+			Boundary: mail.InnerBoundary,
+			Taints:   []string{"USER_SUPPLIED"},
+		},
+	}, nil
+}
+
+func (h *HumanGatewayService) GetSession(agentID string) *ChatSession {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.sessions[agentID]
+}
+
+func (h *HumanGatewayService) CreateSession(agentID string) *ChatSession {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	session := &ChatSession{
+		AgentID:    agentID,
+		Messages:   make([]mail.Mail, 0),
+		ContextMap: make(ContextMapSnapshot),
+	}
+	h.sessions[agentID] = session
+	return session
 }

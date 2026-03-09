@@ -288,3 +288,166 @@ func TestMail_DeadLetterDeferred(t *testing.T) {
 	}
 	_ = mail
 }
+
+func TestFullMailFlow(t *testing.T) {
+	// Setup
+	router := NewMailRouter()
+	publisher := NewRouterPublisher(router)
+
+	// Create subscriber inbox
+	inbox := &AgentInbox{ID: "test-agent"}
+	router.SubscribeAgent("test-agent", inbox)
+
+	// Create mail with all fields
+	originalMail := Mail{
+		ID:            "msg-001",
+		CorrelationID: "corr-001",
+		Type:          MailTypeUser,
+		CreatedAt:     time.Now(),
+		Source:        "agent:user-agent",
+		Target:        "agent:test-agent",
+		Content:       map[string]any{"text": "hello"},
+		Metadata: MailMetadata{
+			Tokens:   10,
+			Model:    "gpt-4",
+			Cost:     0.01,
+			Boundary: OuterBoundary,
+			Taints:   []string{"USER_SUPPLIED"},
+		},
+	}
+
+	// Publish
+	ack, err := publisher.Publish(originalMail)
+	if err != nil {
+		t.Fatalf("Publish failed: %v", err)
+	}
+
+	// Verify Ack
+	if ack.CorrelationID != originalMail.CorrelationID {
+		t.Errorf("Expected CorrelationID '%s', got '%s'",
+			originalMail.CorrelationID, ack.CorrelationID)
+	}
+
+	if ack.DeliveredAt.IsZero() {
+		t.Error("Expected DeliveredAt to be set")
+	}
+
+	// Verify delivery to inbox
+	inbox.mu.RLock()
+	if len(inbox.Messages) != 1 {
+		t.Errorf("Expected 1 message in inbox, got %d", len(inbox.Messages))
+	}
+	deliveredMail := inbox.Messages[0]
+	inbox.mu.RUnlock()
+
+	// Verify mail integrity
+	if deliveredMail.ID != originalMail.ID {
+		t.Errorf("Expected ID '%s', got '%s'", originalMail.ID, deliveredMail.ID)
+	}
+	if deliveredMail.Type != originalMail.Type {
+		t.Errorf("Expected Type '%s', got '%s'", originalMail.Type, deliveredMail.Type)
+	}
+	if deliveredMail.Source != originalMail.Source {
+		t.Errorf("Expected Source '%s', got '%s'", originalMail.Source, deliveredMail.Source)
+	}
+}
+
+func TestCommunicationService_Integration(t *testing.T) {
+	// Test agent-to-agent routing
+	router := NewMailRouter()
+
+	agent1 := &AgentInbox{ID: "agent1"}
+	agent2 := &AgentInbox{ID: "agent2"}
+	router.SubscribeAgent("agent1", agent1)
+	router.SubscribeAgent("agent2", agent2)
+
+	mail1 := Mail{
+		ID:     "msg-001",
+		Source: "agent:agent1",
+		Target: "agent:agent2",
+		Type:   MailTypeUser,
+	}
+
+	err := router.Route(mail1)
+	if err != nil {
+		t.Fatalf("Route failed: %v", err)
+	}
+
+	agent2.mu.RLock()
+	if len(agent2.Messages) != 1 {
+		t.Errorf("Expected 1 message, got %d", len(agent2.Messages))
+	}
+	agent2.mu.RUnlock()
+
+	// Test topic publishing
+	topic := &Topic{Name: "events"}
+	router.SubscribeTopic("events", topic)
+
+	sub1Ch := make(chan Mail, 10)
+	sub2Ch := make(chan Mail, 10)
+	sub1 := &topicSubscriberWrapper{ch: sub1Ch}
+	sub2 := &topicSubscriberWrapper{ch: sub2Ch}
+	topic.Subscribe(sub1)
+	topic.Subscribe(sub2)
+
+	mail2 := Mail{
+		ID:     "msg-002",
+		Source: "sys:events",
+		Target: "topic:events",
+		Type:   MailTypeAssistant,
+	}
+
+	err = router.Route(mail2)
+	if err != nil {
+		t.Fatalf("Topic route failed: %v", err)
+	}
+
+	// Verify both subscribers received the mail
+	select {
+	case received := <-sub1.ch:
+		if received.ID != "msg-002" {
+			t.Errorf("Expected msg-002, got %s", received.ID)
+		}
+	default:
+		t.Error("Subscriber 1 did not receive mail")
+	}
+
+	select {
+	case received := <-sub2.ch:
+		if received.ID != "msg-002" {
+			t.Errorf("Expected msg-002, got %s", received.ID)
+		}
+	default:
+		t.Error("Subscriber 2 did not receive mail")
+	}
+
+	// Test sys service routing
+	serviceInbox := &ServiceInbox{ID: "heartbeat"}
+	router.SubscribeService("heartbeat", serviceInbox)
+
+	mail3 := Mail{
+		ID:     "msg-003",
+		Source: "agent:scheduler",
+		Target: "sys:heartbeat",
+		Type:   MailTypeHeartbeat,
+	}
+
+	err = router.Route(mail3)
+	if err != nil {
+		t.Fatalf("Service route failed: %v", err)
+	}
+
+	serviceInbox.mu.RLock()
+	if len(serviceInbox.Messages) != 1 {
+		t.Errorf("Expected 1 message in service inbox, got %d", len(serviceInbox.Messages))
+	}
+	serviceInbox.mu.RUnlock()
+}
+
+type topicSubscriberWrapper struct {
+	ch chan Mail
+}
+
+func (t *topicSubscriberWrapper) Receive() chan Mail {
+	return t.ch
+}
