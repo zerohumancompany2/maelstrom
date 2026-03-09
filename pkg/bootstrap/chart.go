@@ -29,7 +29,7 @@ spec:
     sys:bootstrap/security:
       type: atomic
       entryActions:
-        - securityBootstrap
+        - loadSecurityService
       transitions:
         - event: SECURITY_READY
           target: sys:bootstrap/communication
@@ -39,7 +39,7 @@ spec:
     sys:bootstrap/communication:
       type: atomic
       entryActions:
-        - communicationBootstrap
+        - loadCommunicationService
       transitions:
         - event: COMMUNICATION_READY
           target: sys:bootstrap/observability
@@ -49,7 +49,7 @@ spec:
     sys:bootstrap/observability:
       type: atomic
       entryActions:
-        - observabilityBootstrap
+        - loadObservabilityService
       transitions:
         - event: OBSERVABILITY_READY
           target: sys:bootstrap/lifecycle
@@ -59,7 +59,7 @@ spec:
     sys:bootstrap/lifecycle:
       type: atomic
       entryActions:
-        - lifecycleBootstrap
+        - loadLifecycleService
       transitions:
         - event: LIFECYCLE_READY
           target: sys:bootstrap/ready
@@ -69,6 +69,7 @@ spec:
     sys:bootstrap/ready:
       type: final
       entryActions:
+        - signalKernelReady
         - logSuccess
 
     sys:bootstrap/failed:

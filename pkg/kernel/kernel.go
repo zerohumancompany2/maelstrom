@@ -29,6 +29,37 @@ type Kernel struct {
 	readyChan chan struct{}
 }
 
+// kernelApplicationContext provides application context with kernel engine access.
+type kernelApplicationContext struct {
+	kernel *Kernel
+	data   map[string]interface{}
+	mu     sync.RWMutex
+}
+
+func (k *kernelApplicationContext) Get(key string, callerBoundary string) (interface{}, []string, error) {
+	k.mu.RLock()
+	defer k.mu.RUnlock()
+	if key == "__engine" {
+		return k.kernel.engine, nil, nil
+	}
+	val, ok := k.data[key]
+	if !ok {
+		return nil, nil, nil
+	}
+	return val, nil, nil
+}
+
+func (k *kernelApplicationContext) Set(key string, value interface{}, taints []string, callerBoundary string) error {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	k.data[key] = value
+	return nil
+}
+
+func (k *kernelApplicationContext) Namespace() string {
+	return "sys:kernel"
+}
+
 // New creates a new Kernel.
 func New() *Kernel {
 	return &Kernel{
@@ -52,15 +83,17 @@ func (k *Kernel) WithConfig(cfg KernelConfig) *Kernel {
 	return k
 }
 
-// RegisterBootstrapActions registers the four bootstrap actions.
+// RegisterBootstrapActions registers the bootstrap actions.
 func (k *Kernel) RegisterBootstrapActions() {
 	if k.engine == nil {
 		return
 	}
-	k.engine.RegisterAction("securityBootstrap", securityBootstrap)
-	k.engine.RegisterAction("communicationBootstrap", communicationBootstrap)
-	k.engine.RegisterAction("observabilityBootstrap", observabilityBootstrap)
-	k.engine.RegisterAction("lifecycleBootstrap", lifecycleBootstrap)
+	// Register the new service-loading actions
+	k.engine.RegisterAction(bootstrap.ActionLoadSecurityService, bootstrap.LoadSecurityService)
+	k.engine.RegisterAction(bootstrap.ActionLoadCommunicationService, bootstrap.LoadCommunicationService)
+	k.engine.RegisterAction(bootstrap.ActionLoadObservabilityService, bootstrap.LoadObservabilityService)
+	k.engine.RegisterAction(bootstrap.ActionLoadLifecycleService, bootstrap.LoadLifecycleService)
+	k.engine.RegisterAction(bootstrap.ActionSignalKernelReady, bootstrap.SignalKernelReady)
 }
 
 // Start begins the bootstrap sequence and transitions to runtime.
@@ -81,7 +114,12 @@ func (k *Kernel) Start(ctx context.Context) error {
 	// Spawn bootstrap runtime if engine is available
 	var bootstrapRTID statechart.RuntimeID
 	if k.engine != nil {
-		bootstrapRTID, err = k.engine.Spawn(def, nil)
+		// Create appCtx with engine reference for actions to use
+		appCtx := &kernelApplicationContext{
+			kernel: k,
+			data:   make(map[string]interface{}),
+		}
+		bootstrapRTID, err = k.engine.Spawn(def, appCtx)
 		if err != nil {
 			return fmt.Errorf("failed to spawn bootstrap runtime: %w", err)
 		}

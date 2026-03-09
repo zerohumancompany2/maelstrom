@@ -142,7 +142,8 @@ func panicAction(runtimeCtx statechart.RuntimeContext, appCtx statechart.Applica
 	panic("bootstrap failed")
 }
 
-func loadSecurityService(runtimeCtx statechart.RuntimeContext, appCtx statechart.ApplicationContext, event statechart.Event) error {
+// LoadSecurityService is the entry action for the security state.
+func LoadSecurityService(runtimeCtx statechart.RuntimeContext, appCtx statechart.ApplicationContext, event statechart.Event) error {
 	engine, err := getEngine(appCtx, runtimeCtx.ChartID)
 	if err != nil {
 		return err
@@ -178,7 +179,8 @@ func loadSecurityService(runtimeCtx statechart.RuntimeContext, appCtx statechart
 	return nil
 }
 
-func loadCommunicationService(runtimeCtx statechart.RuntimeContext, appCtx statechart.ApplicationContext, event statechart.Event) error {
+// LoadCommunicationService is the entry action for the communication state.
+func LoadCommunicationService(runtimeCtx statechart.RuntimeContext, appCtx statechart.ApplicationContext, event statechart.Event) error {
 	engine, err := getEngine(appCtx, runtimeCtx.ChartID)
 	if err != nil {
 		return err
@@ -214,7 +216,8 @@ func loadCommunicationService(runtimeCtx statechart.RuntimeContext, appCtx state
 	return nil
 }
 
-func loadObservabilityService(runtimeCtx statechart.RuntimeContext, appCtx statechart.ApplicationContext, event statechart.Event) error {
+// LoadObservabilityService is the entry action for the observability state.
+func LoadObservabilityService(runtimeCtx statechart.RuntimeContext, appCtx statechart.ApplicationContext, event statechart.Event) error {
 	engine, err := getEngine(appCtx, runtimeCtx.ChartID)
 	if err != nil {
 		return err
@@ -250,7 +253,8 @@ func loadObservabilityService(runtimeCtx statechart.RuntimeContext, appCtx state
 	return nil
 }
 
-func loadLifecycleService(runtimeCtx statechart.RuntimeContext, appCtx statechart.ApplicationContext, event statechart.Event) error {
+// LoadLifecycleService is the entry action for the lifecycle state.
+func LoadLifecycleService(runtimeCtx statechart.RuntimeContext, appCtx statechart.ApplicationContext, event statechart.Event) error {
 	engine, err := getEngine(appCtx, runtimeCtx.ChartID)
 	if err != nil {
 		return err
@@ -286,7 +290,8 @@ func loadLifecycleService(runtimeCtx statechart.RuntimeContext, appCtx statechar
 	return nil
 }
 
-func signalKernelReady(runtimeCtx statechart.RuntimeContext, appCtx statechart.ApplicationContext, event statechart.Event) error {
+// SignalKernelReady is the entry action for the ready state.
+func SignalKernelReady(runtimeCtx statechart.RuntimeContext, appCtx statechart.ApplicationContext, event statechart.Event) error {
 	engine, err := getEngine(appCtx, runtimeCtx.ChartID)
 	if err != nil {
 		return err
@@ -329,3 +334,12 @@ func signalKernelReady(runtimeCtx statechart.RuntimeContext, appCtx statechart.A
 
 	return nil
 }
+
+// Aliases for backward compatibility with tests
+var (
+	loadSecurityService      = LoadSecurityService
+	loadCommunicationService = LoadCommunicationService
+	loadObservabilityService = LoadObservabilityService
+	loadLifecycleService     = LoadLifecycleService
+	signalKernelReady        = SignalKernelReady
+)
