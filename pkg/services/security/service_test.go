@@ -54,6 +54,16 @@ func TestSecurityService_StartReturnsNil(t *testing.T) {
 	}
 }
 
+func TestSecurityService_StopReturnsNil(t *testing.T) {
+	svc := NewSecurityService()
+
+	err := svc.Stop()
+
+	if err != nil {
+		t.Errorf("Expected Stop to return nil, got %v", err)
+	}
+}
+
 func TestSecurityService_BootstrapChart(t *testing.T) {
 	chart := BootstrapChart()
 
