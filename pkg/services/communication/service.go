@@ -22,6 +22,7 @@ type CommunicationService struct {
 	subscribers      map[string][]chan mail.Mail
 	deliveryAttempts map[string]int
 	pendingReplies   map[string]pendingReply
+	seenCorrelations map[string]bool
 	observability    *observability.ObservabilityService
 	mu               sync.RWMutex
 }
@@ -35,6 +36,7 @@ func NewCommunicationService() *CommunicationService {
 		subscribers:      make(map[string][]chan mail.Mail),
 		deliveryAttempts: make(map[string]int),
 		pendingReplies:   make(map[string]pendingReply),
+		seenCorrelations: make(map[string]bool),
 	}
 }
 
@@ -160,6 +162,7 @@ func (c *CommunicationService) trackDeliveryAttempt(correlationID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.deliveryAttempts[correlationID]++
+	c.seenCorrelations[correlationID] = true
 }
 
 func (c *CommunicationService) Request(replyChan chan *mail.Mail, timeout time.Duration) (*mail.Mail, error) {
@@ -189,4 +192,10 @@ func (c *CommunicationService) sendToDeadLetter(mail *mail.Mail, reason string) 
 	if c.observability != nil {
 		c.observability.LogDeadLetter(*mail, reason)
 	}
+}
+
+func (c *CommunicationService) isDuplicate(correlationID string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.seenCorrelations[correlationID]
 }

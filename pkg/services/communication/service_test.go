@@ -616,3 +616,26 @@ func TestCommunicationService_DeadLetterAfterMaxRetries(t *testing.T) {
 		t.Errorf("Expected reason 'delivery failed after max retries', got %s", entries[0].Reason)
 	}
 }
+
+func TestCommunicationService_Deduplication(t *testing.T) {
+	svc := NewCommunicationService()
+
+	correlationID := "dedup-test-123"
+	m1 := mail.Mail{ID: "mail-1", Source: "test", Target: "test-topic", CorrelationID: correlationID}
+	m2 := mail.Mail{ID: "mail-2", Source: "test", Target: "test-topic", CorrelationID: correlationID}
+
+	isDup1 := svc.isDuplicate(correlationID)
+	if isDup1 {
+		t.Error("First message should not be a duplicate")
+	}
+
+	svc.trackDeliveryAttempt(correlationID)
+
+	isDup2 := svc.isDuplicate(correlationID)
+	if !isDup2 {
+		t.Error("Second message with same correlationID should be a duplicate")
+	}
+
+	_, _ = svc.Publish(m1)
+	_, _ = svc.Publish(m2)
+}
