@@ -48,7 +48,12 @@ func GenerateOpenAPIFromChart(chart *Chart) (*OpenAPISpec, error) {
 		},
 		Paths: make(map[string]interface{}),
 		Components: Components{
-			SecuritySchemes: make(map[string]interface{}),
+			SecuritySchemes: map[string]interface{}{
+				"bearerAuth": map[string]string{
+					"type":   "http",
+					"scheme": "bearer",
+				},
+			},
 		},
 	}
 
