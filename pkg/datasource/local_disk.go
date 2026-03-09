@@ -51,7 +51,28 @@ func (d *localDisk) TagOnWrite(path string, taints []string) error {
 }
 
 func (d *localDisk) GetTaints(path string) ([]string, error) {
-	return []string{}, nil
+	attrName := d.xattrNamespace + ".taints"
+	dest := make([]byte, 4096)
+	n, err := unix.Lgetxattr(path, attrName, dest)
+	if err != nil {
+		sidecarPath := path + ".maelstrom"
+		jsonData, err := os.ReadFile(sidecarPath)
+		if err != nil {
+			return []string{}, nil
+		}
+		var taints []string
+		if err := json.Unmarshal(jsonData, &taints); err != nil {
+			return []string{}, nil
+		}
+		return taints, nil
+	}
+
+	var taints []string
+	if err := json.Unmarshal(dest[:n], &taints); err != nil {
+		return []string{}, err
+	}
+
+	return taints, nil
 }
 
 func (d *localDisk) ValidateAccess(boundary security.BoundaryType) error {
