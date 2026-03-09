@@ -1,6 +1,7 @@
 package communication
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -269,5 +270,20 @@ unsubscribed:
 			t.Error("Should not receive mail after unsubscribe")
 		}
 	case <-time.After(50 * time.Millisecond):
+	}
+}
+
+func TestCommunicationService_UnsubscribeNotFoundReturnsError(t *testing.T) {
+	svc := NewCommunicationService()
+
+	ch := make(chan mail.Mail)
+
+	err := svc.Unsubscribe("non-existent", ch)
+
+	if err == nil {
+		t.Error("Expected error for non-existent address, got nil")
+	}
+	if !strings.Contains(err.Error(), "no subscribers") {
+		t.Errorf("Expected error mentioning 'no subscribers', got %v", err)
 	}
 }
