@@ -81,7 +81,30 @@ func assembleSession(block *ContextBlock, session *Session) ([]byte, error) {
 }
 
 func assembleMemoryService(block *ContextBlock, memorySvc MemoryService) ([]byte, error) {
-	return nil, nil
+	if memorySvc == nil {
+		return []byte(""), nil
+	}
+
+	query := block.Content
+	topK := block.N
+	if topK <= 0 {
+		topK = 5
+	}
+
+	results, err := memorySvc.Query(query, topK)
+	if err != nil {
+		return nil, err
+	}
+
+	var builder strings.Builder
+	for i, r := range results {
+		if i > 0 {
+			builder.WriteString("\n")
+		}
+		builder.WriteString(r.Content)
+	}
+
+	return []byte(builder.String()), nil
 }
 
 func assembleToolRegistry(block *ContextBlock, toolRegistry *ToolRegistry) ([]byte, error) {

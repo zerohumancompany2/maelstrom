@@ -78,3 +78,63 @@ func TestContextBlockSource_SessionLastN(t *testing.T) {
 		}
 	}
 }
+
+type mockMemoryService struct {
+	results []MemoryResult
+}
+
+func (m *mockMemoryService) Query(query string, topK int) ([]MemoryResult, error) {
+	if topK >= len(m.results) {
+		return m.results, nil
+	}
+	return m.results[:topK], nil
+}
+
+func TestContextBlockSource_MemoryServiceRAG(t *testing.T) {
+	// Given: A ContextBlock with source: memoryService, query: "{{currentGoal}}", topK: 8
+	memorySvc := &mockMemoryService{
+		results: make([]MemoryResult, 15),
+	}
+	for i := 0; i < 15; i++ {
+		memorySvc.results[i] = MemoryResult{
+			Content: fmt.Sprintf("|||MEMORY-%03d|||", i),
+			Score:   float64(100 - i),
+		}
+	}
+
+	block := &ContextBlock{
+		Name:    "memory-context",
+		Source:  string(SourceMemoryService),
+		Content: "{{currentGoal}}",
+		N:       8,
+	}
+
+	// When: AssembleSource is called with currentGoal = "implement feature X"
+	result, err := AssembleSource(block, nil, memorySvc, nil)
+
+	// Then: Block returns top 8 memory results matching the query
+	if err != nil {
+		t.Fatalf("AssembleSource returned error: %v", err)
+	}
+
+	if len(result) == 0 {
+		t.Fatal("Expected result to contain memory results")
+	}
+
+	resultStr := string(result)
+	for i := 0; i < 8; i++ {
+		expectedMem := fmt.Sprintf("|||MEMORY-%03d|||", i)
+		if !strings.Contains(resultStr, expectedMem) {
+			t.Errorf("Expected result to contain top 8 memory results including %s", expectedMem)
+			break
+		}
+	}
+
+	for i := 8; i < 15; i++ {
+		expectedMem := fmt.Sprintf("|||MEMORY-%03d|||", i)
+		if strings.Contains(resultStr, expectedMem) {
+			t.Errorf("Expected result to NOT contain memory results beyond topK including %s", expectedMem)
+			break
+		}
+	}
+}
