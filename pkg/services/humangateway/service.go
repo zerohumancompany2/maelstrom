@@ -53,9 +53,20 @@ func (h *HumanGatewayService) HandleChat(agentID, message string) (mail.Mail, er
 }
 
 func (h *HumanGatewayService) GetSession(agentID string) *ChatSession {
-	panic("not implemented")
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.sessions[agentID]
 }
 
 func (h *HumanGatewayService) CreateSession(agentID string) *ChatSession {
-	panic("not implemented")
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	session := &ChatSession{
+		AgentID:    agentID,
+		Messages:   make([]mail.Mail, 0),
+		ContextMap: make(ContextMapSnapshot),
+	}
+	h.sessions[agentID] = session
+	return session
 }

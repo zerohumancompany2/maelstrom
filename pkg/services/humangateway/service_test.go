@@ -72,3 +72,29 @@ func TestHumanGatewayService_ParseActionItem(t *testing.T) {
 		t.Errorf("Expected 0 action items, got %d", len(items))
 	}
 }
+
+func TestHumanGatewayService_SessionManagement(t *testing.T) {
+	svc := NewHumanGatewayService()
+
+	session := svc.CreateSession("test-agent")
+	if session == nil {
+		t.Error("Expected non-nil session")
+	}
+
+	if session.AgentID != "test-agent" {
+		t.Errorf("Expected AgentID 'test-agent', got '%s'", session.AgentID)
+	}
+
+	retrieved := svc.GetSession("test-agent")
+	if retrieved == nil {
+		t.Error("Expected non-nil retrieved session")
+	}
+	if retrieved != session {
+		t.Error("Expected same session instance")
+	}
+
+	missing := svc.GetSession("non-existent")
+	if missing != nil {
+		t.Error("Expected nil for non-existent session")
+	}
+}
