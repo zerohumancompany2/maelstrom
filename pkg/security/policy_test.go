@@ -72,3 +72,38 @@ func TestPolicyEnforcement_Redact(t *testing.T) {
 		t.Error("Expected _taints to be removed after redaction")
 	}
 }
+
+func TestPolicyEnforcement_Audit(t *testing.T) {
+	// Given: A data object with taints ["PII"]
+	data := map[string]interface{}{
+		"email":   "user@example.com",
+		"_taints": []string{"PII"},
+	}
+
+	// Given: A TaintPolicy with enforcement: audit and allowedOnExit: ["TOOL_OUTPUT"]
+	policy := TaintPolicyConfig{
+		Enforcement:   EnforcementAudit,
+		AllowedOnExit: []string{"TOOL_OUTPUT"},
+	}
+
+	// When: EnforcePolicy is called with the data and policy
+	result, err := EnforcePolicy(data, policy, OuterBoundary)
+
+	// Then: Data passes through unchanged, violation is logged to audit trail
+	if err != nil {
+		t.Fatalf("Expected no error in audit mode, got %v", err)
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected result to be map[string]interface{}")
+	}
+
+	if resultMap["email"] != "user@example.com" {
+		t.Errorf("Expected email unchanged in audit mode, got '%v'", resultMap["email"])
+	}
+
+	if !strings.Contains(GetLastAuditLog(), "PII") {
+		t.Error("Expected violation to be logged to audit trail")
+	}
+}

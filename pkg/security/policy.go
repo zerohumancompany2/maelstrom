@@ -16,6 +16,8 @@ type TaintPolicyConfig struct {
 	RedactRules   []RedactRule
 }
 
+var auditLog []string
+
 func EnforcePolicy(data any, policy TaintPolicyConfig, boundary BoundaryType) (any, error) {
 	if policy.Enforcement == EnforcementStrict {
 		forbidden := getPolicyForbiddenTaints(data, policy.AllowedOnExit)
@@ -26,7 +28,29 @@ func EnforcePolicy(data any, policy TaintPolicyConfig, boundary BoundaryType) (a
 	if policy.Enforcement == EnforcementRedact {
 		return applyRedaction(data, policy.RedactRules)
 	}
+	if policy.Enforcement == EnforcementAudit {
+		logAuditViolations(data, policy.AllowedOnExit, boundary)
+		return data, nil
+	}
 	return data, nil
+}
+
+func logAuditViolations(data any, allowedOnExit []string, boundary BoundaryType) {
+	forbidden := getPolicyForbiddenTaints(data, allowedOnExit)
+	if len(forbidden) > 0 {
+		auditLog = append(auditLog, fmt.Sprintf("VIOLATION at %s: forbidden taints %v", boundary, forbidden))
+	}
+}
+
+func GetLastAuditLog() string {
+	if len(auditLog) == 0 {
+		return ""
+	}
+	return auditLog[len(auditLog)-1]
+}
+
+func ClearAuditLog() {
+	auditLog = []string{}
 }
 
 func applyRedaction(data any, rules []RedactRule) (any, error) {
