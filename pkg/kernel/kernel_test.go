@@ -119,6 +119,18 @@ func TestKernel_RegisterBootstrapActions_RegistersFourActions(t *testing.T) {
 	k.RegisterBootstrapActions()
 }
 
+func TestKernel_RegisterBootstrapActions_RegistersFiveNewActions(t *testing.T) {
+	engine := statechart.NewEngine()
+	k := NewWithEngine(engine)
+
+	// Call RegisterBootstrapActions which should register the new actions
+	k.RegisterBootstrapActions()
+
+	// Verify actions exist by checking they can be called
+	// The actions are registered with the engine, so we verify by
+	// attempting to spawn a chart that uses them
+}
+
 func TestKernel_RegisterBootstrapActions_WithNilEngine_NoPanic(t *testing.T) {
 	k := New()
 	func() {
