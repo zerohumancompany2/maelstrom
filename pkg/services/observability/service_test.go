@@ -448,3 +448,22 @@ func TestObservabilityService_EventRate(t *testing.T) {
 		t.Errorf("Expected EventRate 3, got %f", metrics.EventRate)
 	}
 }
+
+func TestObservabilityService_MetricsCollector(t *testing.T) {
+	svc := NewObservabilityService()
+
+	metrics := svc.GetMetrics()
+
+	if metrics.StateCounts == nil {
+		t.Error("Expected StateCounts to be non-nil")
+	}
+	if metrics.LastUpdate.IsZero() {
+		t.Error("Expected LastUpdate to be set")
+	}
+	if metrics.TransitionRate != 0 {
+		t.Errorf("Expected TransitionRate 0, got %f", metrics.TransitionRate)
+	}
+	if metrics.EventRate != 0 {
+		t.Errorf("Expected EventRate 0, got %f", metrics.EventRate)
+	}
+}
