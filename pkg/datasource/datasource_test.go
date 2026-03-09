@@ -129,3 +129,29 @@ func TestRegistry_Register(t *testing.T) {
 		t.Errorf("Expected 1 source after overwrite, got %d", len(names))
 	}
 }
+
+func TestRegistry_Get(t *testing.T) {
+	registry := NewRegistry()
+
+	registry.Register("localDisk", func(config map[string]any) (DataSource, error) {
+		return &localDisk{path: "/local"}, nil
+	})
+
+	registry.Register("s3", func(config map[string]any) (DataSource, error) {
+		return &localDisk{path: "/s3"}, nil
+	})
+
+	source, err := registry.Get("localDisk", map[string]any{"path": "/local"})
+	if err != nil {
+		t.Fatalf("Expected no error for valid name, got %v", err)
+	}
+
+	if source == nil {
+		t.Error("Expected non-nil source for valid name")
+	}
+
+	_, err = registry.Get("unknown", nil)
+	if err != nil {
+		t.Errorf("Expected no error for unknown name, got %v", err)
+	}
+}
