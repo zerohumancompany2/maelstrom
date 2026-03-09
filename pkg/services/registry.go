@@ -41,15 +41,19 @@ func NewServiceRegistry() *ServiceRegistry {
 // Register registers a service with the registry.
 // Returns error if service name already exists.
 func (sr *ServiceRegistry) Register(name string, svc Service) error {
-	// TODO: implement
+	sr.mu.Lock()
+	defer sr.mu.Unlock()
+	sr.services[name] = svc
 	return nil
 }
 
 // Get retrieves a service by name.
 // Returns service and true if found, nil and false otherwise.
 func (sr *ServiceRegistry) Get(name string) (Service, bool) {
-	// TODO: implement
-	return nil, false
+	sr.mu.RLock()
+	defer sr.mu.RUnlock()
+	svc, ok := sr.services[name]
+	return svc, ok
 }
 
 // List returns all registered service names.
