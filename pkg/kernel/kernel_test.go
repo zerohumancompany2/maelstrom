@@ -289,3 +289,36 @@ func TestKernel_Shutdown_ContextCancellation(t *testing.T) {
 		t.Errorf("expected context.Canceled error, got %v", err)
 	}
 }
+
+func TestKernel_GetServiceRuntimeID_ReturnsCorrectID(t *testing.T) {
+	engine := statechart.NewEngine()
+	k := NewWithEngine(engine)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	go func() {
+		_ = k.Start(ctx)
+	}()
+
+	time.Sleep(200 * time.Millisecond)
+
+	rtID, ok := k.GetServiceRuntimeID("sys:bootstrap")
+	if !ok {
+		t.Error("expected sys:bootstrap service to exist")
+	}
+	if rtID == "" {
+		t.Error("expected non-empty RuntimeID for sys:bootstrap")
+	}
+
+	_, ok = k.GetServiceRuntimeID("nonexistent")
+	if ok {
+		t.Error("expected false for nonexistent service")
+	}
+
+	firstID, _ := k.GetServiceRuntimeID("sys:bootstrap")
+	secondID, _ := k.GetServiceRuntimeID("sys:bootstrap")
+	if firstID != secondID {
+		t.Error("expected consistent RuntimeID across multiple calls")
+	}
+}
