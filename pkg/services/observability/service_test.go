@@ -342,3 +342,16 @@ func TestObservabilityService_QueryDeadLetters(t *testing.T) {
 		t.Errorf("Expected second reason 'reason-2', got %s", entries[1].Reason)
 	}
 }
+
+func TestObservabilityService_GetMetrics(t *testing.T) {
+	svc := NewObservabilityService()
+
+	metrics := svc.GetMetrics()
+
+	if metrics.StateCounts == nil {
+		t.Error("Expected StateCounts to be initialized, got nil")
+	}
+	if metrics.LastUpdate.IsZero() {
+		t.Error("Expected LastUpdate to be set, got zero time")
+	}
+}

@@ -12,10 +12,16 @@ type ObservabilityService struct {
 	mu          sync.Mutex
 	traces      []services.Trace
 	deadLetters []DeadLetterEntry
+	metrics     services.MetricsCollector
 }
 
 func NewObservabilityService() *ObservabilityService {
-	return &ObservabilityService{}
+	return &ObservabilityService{
+		metrics: services.MetricsCollector{
+			StateCounts: make(map[string]int),
+			LastUpdate:  time.Now(),
+		},
+	}
 }
 
 func (o *ObservabilityService) ID() string {
@@ -85,4 +91,15 @@ func (o *ObservabilityService) QueryDeadLetters() ([]DeadLetterEntry, error) {
 	result := make([]DeadLetterEntry, len(o.deadLetters))
 	copy(result, o.deadLetters)
 	return result, nil
+}
+
+func (o *ObservabilityService) GetMetrics() services.MetricsCollector {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	result := o.metrics
+	result.StateCounts = make(map[string]int)
+	for k, v := range o.metrics.StateCounts {
+		result.StateCounts[k] = v
+	}
+	return result
 }
