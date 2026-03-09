@@ -161,3 +161,16 @@ func TestParseAddress_topic(t *testing.T) {
 		t.Errorf("Expected id 'market-data', got %v", id)
 	}
 }
+
+func TestParseAddress_sys(t *testing.T) {
+	addrType, id, err := ParseAddress("sys:heartbeat")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if addrType != AddressTypeSys {
+		t.Errorf("Expected AddressTypeSys, got %v", addrType)
+	}
+	if id != "heartbeat" {
+		t.Errorf("Expected id 'heartbeat', got %v", id)
+	}
+}
