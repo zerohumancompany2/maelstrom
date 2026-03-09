@@ -1109,3 +1109,39 @@ func TestToolTaintOutput_InheritBoundary(t *testing.T) {
 		}
 	}
 }
+
+func TestToolTaintOutput_NoAttach(t *testing.T) {
+	registry := NewToolRegistry()
+	registry.RegisterTool(&ToolConfig{
+		Name:        "safeTool",
+		Boundary:    mail.OuterBoundary,
+		TaintOutput: []string{},
+	})
+
+	resultMail := &mail.Mail{
+		ID:     "result-3",
+		Type:   mail.MailTypeToolResult,
+		Source: "sys:tools",
+		Target: "agent:user",
+		Content: map[string]interface{}{
+			"data": "safe results",
+		},
+		Metadata: mail.MailMetadata{
+			Taints: []string{},
+		},
+	}
+
+	result, err := AttachToolTaints("safeTool", resultMail, registry)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	resultMail, ok := result.(*mail.Mail)
+	if !ok {
+		t.Fatalf("Expected *mail.Mail, got %T", result)
+	}
+
+	if len(resultMail.Metadata.Taints) != 0 {
+		t.Errorf("Expected no automatic taints, got %v", resultMail.Metadata.Taints)
+	}
+}
