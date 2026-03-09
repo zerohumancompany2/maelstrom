@@ -101,3 +101,14 @@ func (g *GatewayService) GetOpenAPISpec() *OpenAPISpec {
 
 	return spec
 }
+
+func (g *GatewayService) checkBoundaryExposure(boundary mail.BoundaryType) bool {
+	switch boundary {
+	case mail.InnerBoundary:
+		return false
+	case mail.DMZBoundary, mail.OuterBoundary:
+		return true
+	default:
+		return false
+	}
+}

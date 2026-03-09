@@ -217,3 +217,22 @@ func TestGatewayService_OpenAPIRegistration(t *testing.T) {
 		t.Error("Expected /api/test in OpenAPI paths")
 	}
 }
+
+func TestGatewayService_BoundaryExposure(t *testing.T) {
+	gw := NewGatewayService()
+
+	innerExposed := gw.checkBoundaryExposure(mail.InnerBoundary)
+	if innerExposed {
+		t.Error("Inner boundary should not be exposed")
+	}
+
+	outerExposed := gw.checkBoundaryExposure(mail.OuterBoundary)
+	if !outerExposed {
+		t.Error("Outer boundary should be exposed")
+	}
+
+	dmzExposed := gw.checkBoundaryExposure(mail.DMZBoundary)
+	if !dmzExposed {
+		t.Error("DMZ boundary should be exposed")
+	}
+}
