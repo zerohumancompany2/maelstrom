@@ -1,10 +1,21 @@
 package bootstrap
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
 	"github.com/maelstrom/v3/pkg/statechart"
+)
+
+var ErrNotImplemented = errors.New("not implemented")
+
+const (
+	ActionLoadSecurityService      = "loadSecurityService"
+	ActionLoadCommunicationService = "loadCommunicationService"
+	ActionLoadObservabilityService = "loadObservabilityService"
+	ActionLoadLifecycleService     = "loadLifecycleService"
+	ActionSignalKernelReady        = "signalKernelReady"
 )
 
 // securityBootstrap is the entry action for the security state.
@@ -110,4 +121,8 @@ func logFailure(runtimeCtx statechart.RuntimeContext, appCtx statechart.Applicat
 func panicAction(runtimeCtx statechart.RuntimeContext, appCtx statechart.ApplicationContext, event statechart.Event) error {
 	log.Println("[bootstrap] panicAction executed - panicking due to bootstrap failure")
 	panic("bootstrap failed")
+}
+
+func loadSecurityService(runtimeCtx statechart.RuntimeContext, appCtx statechart.ApplicationContext, event statechart.Event) error {
+	return ErrNotImplemented
 }
