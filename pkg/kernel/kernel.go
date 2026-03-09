@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/maelstrom/v3/pkg/bootstrap"
 	"github.com/maelstrom/v3/pkg/runtime"
@@ -25,6 +26,7 @@ type Kernel struct {
 	sequence  *bootstrap.Sequence
 	services  map[string]statechart.RuntimeID
 	runtimes  map[string]*runtime.ChartRuntime
+	appCtx    statechart.ApplicationContext
 	mu        sync.RWMutex
 	readyChan chan struct{}
 }
@@ -119,6 +121,7 @@ func (k *Kernel) Start(ctx context.Context) error {
 			kernel: k,
 			data:   make(map[string]interface{}),
 		}
+		k.appCtx = appCtx
 		bootstrapRTID, err = k.engine.Spawn(def, appCtx)
 		if err != nil {
 			return fmt.Errorf("failed to spawn bootstrap runtime: %w", err)
@@ -134,43 +137,28 @@ func (k *Kernel) Start(ctx context.Context) error {
 		if err := k.engine.Control(bootstrapRTID, statechart.CmdStart); err != nil {
 			return fmt.Errorf("failed to start bootstrap runtime: %w", err)
 		}
-	}
 
-	// Create bootstrap sequence
-	seq := bootstrap.NewSequence()
-	k.mu.Lock()
-	k.sequence = seq
-	k.readyChan = make(chan struct{})
-	k.mu.Unlock()
-
-	// Set up state entry handlers
-	seq.OnStateEnter(func(state string) error {
-		return k.onBootstrapStateEnter(ctx, state, bootstrapRTID)
-	})
-
-	// Set up completion handler
-	seq.OnComplete(func() {
-		log.Println("[kernel] Bootstrap complete, handing off to ChartRegistry")
-		k.onBootstrapComplete()
-		k.mu.Lock()
-		if k.readyChan != nil {
-			close(k.readyChan)
+		// Dispatch START_BOOTSTRAP event to begin the bootstrap flow
+		if err := k.engine.Dispatch(bootstrapRTID, statechart.Event{Type: "START_BOOTSTRAP"}); err != nil {
+			return fmt.Errorf("failed to dispatch START_BOOTSTRAP: %w", err)
 		}
-		k.mu.Unlock()
-	})
+		log.Println("[kernel] Dispatched START_BOOTSTRAP event")
 
-	// Start the sequence
-	if err := seq.Start(ctx); err != nil {
-		return fmt.Errorf("bootstrap failed: %w", err)
-	}
+		// Wait for bootstrap to complete or context cancellation
+		// The bootstrap chart will emit KERNEL_READY when complete
+		k.readyChan = make(chan struct{})
+		go k.waitForKernelReady(ctx, bootstrapRTID)
 
-	// Wait for completion or cancellation
-	select {
-	case <-k.readyChan:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
+		select {
+		case <-k.readyChan:
+			log.Println("[kernel] Bootstrap complete, handing off to ChartRegistry")
+			k.onBootstrapComplete()
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
+	return nil
 }
 
 func (k *Kernel) onBootstrapStateEnter(ctx context.Context, state string, bootstrapRTID statechart.RuntimeID) error {
@@ -218,6 +206,31 @@ func (k *Kernel) onBootstrapStateEnter(ctx context.Context, state string, bootst
 	return nil
 }
 
+func (k *Kernel) waitForKernelReady(ctx context.Context, bootstrapRTID statechart.RuntimeID) {
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			// Check if bootstrap has reached the ready state
+			// by checking if KERNEL_READY was processed
+			services, _, _ := k.appCtx.Get("bootstrap:loaded:services", "sys:bootstrap")
+			if services != nil {
+				k.mu.Lock()
+				if k.readyChan != nil {
+					close(k.readyChan)
+					k.readyChan = nil
+				}
+				k.mu.Unlock()
+				return
+			}
+		}
+	}
+}
+
 func (k *Kernel) onBootstrapComplete() {
 	log.Println("[kernel] Kernel going dormant")
 }
@@ -225,12 +238,9 @@ func (k *Kernel) onBootstrapComplete() {
 // IsBootstrapComplete returns true if bootstrap has finished.
 func (k *Kernel) IsBootstrapComplete() bool {
 	k.mu.RLock()
-	seq := k.sequence
-	k.mu.RUnlock()
-	if seq == nil {
-		return false
-	}
-	return seq.IsComplete()
+	defer k.mu.RUnlock()
+	// If readyChan is nil, it means bootstrap completed (we set it to nil after closing)
+	return k.readyChan == nil
 }
 
 // GetRuntimes returns the currently active runtimes.
