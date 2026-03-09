@@ -40,6 +40,8 @@ func (o *ObservabilityService) EmitTrace(trace services.Trace) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.traces = append(o.traces, trace)
+	o.metrics.StateCounts[trace.StatePath]++
+	o.metrics.LastUpdate = time.Now()
 	return nil
 }
 

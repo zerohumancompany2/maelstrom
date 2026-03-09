@@ -355,3 +355,44 @@ func TestObservabilityService_GetMetrics(t *testing.T) {
 		t.Error("Expected LastUpdate to be set, got zero time")
 	}
 }
+
+func TestObservabilityService_MetricsUpdateOnTrace(t *testing.T) {
+	svc := NewObservabilityService()
+
+	trace1 := services.Trace{
+		ID:        "trace-1",
+		RuntimeID: "runtime-1",
+		EventType: "transition",
+		StatePath: "root/state-a",
+	}
+	trace2 := services.Trace{
+		ID:        "trace-2",
+		RuntimeID: "runtime-1",
+		EventType: "entry",
+		StatePath: "root/state-a",
+	}
+	trace3 := services.Trace{
+		ID:        "trace-3",
+		RuntimeID: "runtime-1",
+		EventType: "exit",
+		StatePath: "root/state-b",
+	}
+
+	svc.EmitTrace(trace1)
+	metrics := svc.GetMetrics()
+	if metrics.StateCounts["root/state-a"] != 1 {
+		t.Errorf("Expected StateCounts['root/state-a'] = 1, got %d", metrics.StateCounts["root/state-a"])
+	}
+
+	svc.EmitTrace(trace2)
+	metrics = svc.GetMetrics()
+	if metrics.StateCounts["root/state-a"] != 2 {
+		t.Errorf("Expected StateCounts['root/state-a'] = 2, got %d", metrics.StateCounts["root/state-a"])
+	}
+
+	svc.EmitTrace(trace3)
+	metrics = svc.GetMetrics()
+	if metrics.StateCounts["root/state-b"] != 1 {
+		t.Errorf("Expected StateCounts['root/state-b'] = 1, got %d", metrics.StateCounts["root/state-b"])
+	}
+}
