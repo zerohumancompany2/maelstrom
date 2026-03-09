@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/maelstrom/v3/pkg/mail"
+	"github.com/maelstrom/v3/pkg/statechart"
 )
 
 func TestLifecycleService_NewLifecycleServiceReturnsNonNil(t *testing.T) {
@@ -31,6 +32,20 @@ func TestLifecycleService_HandleMailReturnsNil(t *testing.T) {
 
 	if err != nil {
 		t.Errorf("Expected HandleMail to return nil, got %v", err)
+	}
+}
+
+func TestLifecycleService_SpawnReturnsEmptyRuntimeID(t *testing.T) {
+	svc := NewLifecycleService()
+
+	id, err := svc.Spawn(statechart.ChartDefinition{})
+
+	if err != nil {
+		t.Errorf("Expected Spawn to return nil error, got %v", err)
+	}
+
+	if id != "" {
+		t.Errorf("Expected Spawn to return empty RuntimeID, got %s", id)
 	}
 }
 
