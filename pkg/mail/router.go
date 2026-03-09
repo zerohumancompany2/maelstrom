@@ -76,6 +76,8 @@ func (r *MailRouter) SubscribeService(name string, inbox *ServiceInbox) error {
 
 type TopicSubscriber interface {
 	Receive() chan Mail
+	Subscribe(topic string) error
+	Unsubscribe(topic string) error
 }
 
 type Topic struct {

@@ -10,6 +10,14 @@ func (m *mockSubscriber) Receive() chan Mail {
 	return m.ch
 }
 
+func (m *mockSubscriber) Subscribe(topic string) error {
+	return nil
+}
+
+func (m *mockSubscriber) Unsubscribe(topic string) error {
+	return nil
+}
+
 func TestTopic_SubscribeUnsubscribe(t *testing.T) {
 	topic := &Topic{Name: "test-topic"}
 

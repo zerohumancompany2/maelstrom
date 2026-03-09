@@ -2,6 +2,22 @@ package mail
 
 import "testing"
 
+type mockTopicSubscriber struct {
+	ch chan Mail
+}
+
+func (m *mockTopicSubscriber) Receive() chan Mail {
+	return m.ch
+}
+
+func (m *mockTopicSubscriber) Subscribe(topic string) error {
+	return nil
+}
+
+func (m *mockTopicSubscriber) Unsubscribe(topic string) error {
+	return nil
+}
+
 func TestMailRouter_SubscribeMethods(t *testing.T) {
 	router := NewMailRouter()
 
@@ -180,4 +196,10 @@ func TestParseAddress_invalid(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error for invalid format")
 	}
+}
+
+func TestTopicSubscriber_Interface(t *testing.T) {
+	sub := &mockTopicSubscriber{ch: make(chan Mail)}
+
+	var _ TopicSubscriber = sub
 }

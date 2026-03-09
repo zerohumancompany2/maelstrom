@@ -451,3 +451,11 @@ type topicSubscriberWrapper struct {
 func (t *topicSubscriberWrapper) Receive() chan Mail {
 	return t.ch
 }
+
+func (t *topicSubscriberWrapper) Subscribe(topic string) error {
+	return nil
+}
+
+func (t *topicSubscriberWrapper) Unsubscribe(topic string) error {
+	return nil
+}
