@@ -149,6 +149,20 @@ func TestTaintEngine_Violation(t *testing.T) {
 	}
 }
 
+func TestTaintEngine_CheckViolation_INNER_ONLY_on_DMZ(t *testing.T) {
+	engine := NewTaintEngine()
+
+	err := engine.CheckForbidden([]string{"INNER_ONLY"}, DMZBoundary)
+	if err == nil {
+		t.Error("Expected error for INNER_ONLY taint on DMZ boundary, got nil")
+	}
+
+	expectedMsg := "taint INNER_ONLY is forbidden on boundary dmz"
+	if err != nil && err.Error() != expectedMsg {
+		t.Errorf("Expected error message %q, got %q", expectedMsg, err.Error())
+	}
+}
+
 func TestTaintEngine_Redaction(t *testing.T) {
 	engine := NewTaintEngine()
 

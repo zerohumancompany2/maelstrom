@@ -256,6 +256,11 @@ func (e *taintEngineImpl) propagateTaintToSlice(slice []interface{}, newTaints [
 }
 
 func (e *taintEngineImpl) CheckForbidden(taints []string, boundary BoundaryType) error {
+	for _, taint := range taints {
+		if taint == "INNER_ONLY" && (boundary == DMZBoundary || boundary == OuterBoundary) {
+			return fmt.Errorf("taint %s is forbidden on boundary %s", taint, boundary)
+		}
+	}
 	return nil
 }
 
