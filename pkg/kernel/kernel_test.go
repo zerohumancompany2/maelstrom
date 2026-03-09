@@ -189,3 +189,12 @@ func TestKernel_Shutdown_StopsAllServices(t *testing.T) {
 		t.Errorf("Shutdown failed: %v", err)
 	}
 }
+
+func TestKernel_Shutdown_WithNilEngine_NoPanic(t *testing.T) {
+	k := New()
+	ctx := context.Background()
+	err := k.Shutdown(ctx)
+	if err != nil {
+		t.Errorf("Shutdown with nil engine should return nil, got %v", err)
+	}
+}
