@@ -69,3 +69,18 @@ func TestTopic_Broadcast(t *testing.T) {
 		}
 	}
 }
+
+func TestTopic_UnsubscribeNotFound(t *testing.T) {
+	topic := &Topic{Name: "test-topic"}
+
+	unsubscribedSub := &mockSubscriber{ch: make(chan Mail, 10)}
+
+	err := topic.Unsubscribe(unsubscribedSub)
+	if err == nil {
+		t.Error("Expected error for unsubscribing non-subscriber")
+	}
+
+	if err.Error() != "subscriber not found" {
+		t.Errorf("Expected 'subscriber not found', got '%s'", err.Error())
+	}
+}
