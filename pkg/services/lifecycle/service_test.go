@@ -265,3 +265,27 @@ func TestLifecycleService_NewWithEngineReturnsNonNil(t *testing.T) {
 		t.Error("Expected NewLifecycleService(engine) to return non-nil")
 	}
 }
+
+func TestLifecycleService_RuntimeStateUpdate(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+	}
+	rtID, _ := svc.Spawn(def)
+
+	err := svc.updateRuntimeState(string(rtID), "running")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	list, _ := svc.List()
+	if len(list) != 1 {
+		t.Errorf("Expected 1 runtime, got %d", len(list))
+	}
+	if list[0].ActiveStates[0] != "running" {
+		t.Errorf("Expected state 'running', got %v", list[0].ActiveStates)
+	}
+}
