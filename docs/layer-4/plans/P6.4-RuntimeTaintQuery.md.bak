@@ -1,0 +1,104 @@
+# Phase P6.4: Runtime Taint Query
+
+**Phase ID**: L4-P6.4  
+**Title**: Runtime Guard Taint Query  
+**Parent**: Phase P6 (Service Wiring)  
+**Status**: ❌ PENDING
+
+## Parent Requirements
+
+From `arch-v1.md L286` - Taint Propagation:
+```
+- Runtime guard: any action/guard can query taints; violation emits `taint_violation` event to dead-letter
+```
+
+From `arch-v1.md L283-286` (Taint Propagation section):
+- Security Service propagates taints on copy/read/write (like DLP tracking)
+- Inner → DMZ/outer: auto-strip or block on forbidden taints
+- On-disk (snapshots, long-term memory): taints stored with data; Persistence refuses writes that would violate policy
+- **Runtime guard: any action/guard can query taints; violation emits `taint_violation` event to dead-letter**
+
+From `recursive-audit-missing-requirements.md` - Gap G5:
+- **G5**: Runtime guard can query taints (arch-v1.md L286)
+- **Status**: Missing test for "Runtime guard can query taints"
+- **Recommended Phase**: P6.4
+
+## Dependencies
+
+- P1.1: AttachTaint functionality
+- P5.2: Stream boundary enforcement
+- P6.1: SecurityService integration (ReportTaints API)
+
+## Satisfied Lower-Layer Requirements
+
+- Layer 3: Dead-letter queue via sys:observability (arch-v1.md L642)
+- Layer 2: sys:security service skeleton (implementation-assessment.md L58-73)
+- Layer 0: Action/Guard interface with ApplicationContext (arch-v1.md L77-91)
+- P6.1: SecurityService.ReportTaints API for querying taints
+
+## Acceptance Criteria
+
+1. Runtime guards can query active taints via SecurityService.ReportTaints
+2. Taint violations detected by guards emit `taint_violation` events to dead-letter queue
+
+## Test Descriptions
+
+### Test 1: TestRuntimeTaintQuery_ReturnsActiveTaints
+
+**Given**: A SecurityService with taints tracked for runtimeId "agent-789" containing objects with taints `["PII", "SECRET", "INNER_ONLY"]`  
+**When**: A runtime guard calls ReportTaints with runtimeId "agent-789"  
+**Then**: TaintMap returned with all active taints for that runtime  
+**Expected Result**: TaintMap contains runtimeId mapping objects to their complete taint sets  
+**Spec Reference**: arch-v1.md L286 (Runtime guard can query taints), L1308 (ReportTaints API)
+
+### Test 2: TestRuntimeTaintQuery_EnablesViolationDetection
+
+**Given**: A runtime guard querying taints for data crossing from inner to outer boundary with forbidden taints `["INNER_ONLY"]`  
+**When**: Guard detects forbidden taint and emits violation  
+**Then**: `taint_violation` event is emitted to dead-letter queue  
+**Expected Result**: Event type is `taint_violation`, routed to sys:observability dead-letter  
+**Spec Reference**: arch-v1.md L286 (violation emits taint_violation event to dead-letter), L170 (taint_violation message type)
+
+## Implementation Plan
+
+### Files to Modify
+
+1. `pkg/services/security/service.go` - Ensure ReportTaints returns queryable TaintMap
+2. `pkg/services/security/service_test.go` - Add runtime guard query tests
+
+### Stubs Needed
+
+```go
+// pkg/services/security/service.go - method to enhance
+func (s *SecurityService) ReportTaints(runtimeId string) (security.TaintMap, error)
+
+// Action/Guard can call this to query taints
+type TaintQueryResult struct {
+    RuntimeID string
+    Objects   map[string][]string // object key → taints
+}
+```
+
+### Implementation Order
+
+1. Create stub implementation in `pkg/services/security/service.go`
+2. Write Test 1 → RED → Implement ReportTaints query → GREEN → commit
+3. Write Test 2 → RED → Implement taint_violation event emission → GREEN → commit
+
+## Commit Plan
+
+| Test | Commit Message |
+|------|----------------|
+| Test 1 | `feat(layer-4/security): add ReportTaints for runtime guard taint query` |
+| Test 2 | `feat(layer-4/security): emit taint_violation event on guard detection` |
+
+## Deliverables
+
+- 2 commits (1:1 test-to-commit ratio)
+- All tests passing
+- Files modified: `pkg/services/security/service.go`, `pkg/services/security/service_test.go`
+
+---
+
+*Document generated: 2026-03-09*  
+*Based on: arch-v1.md v1.3, recursive-audit-missing-requirements.md (Gap G5), P6.1-SecurityServiceIntegration.md*
