@@ -69,6 +69,16 @@ func TestObservabilityService_StartReturnsNil(t *testing.T) {
 	}
 }
 
+func TestObservabilityService_StopReturnsNil(t *testing.T) {
+	svc := NewObservabilityService()
+
+	err := svc.Stop()
+
+	if err != nil {
+		t.Errorf("Expected Stop to return nil, got %v", err)
+	}
+}
+
 func TestObservabilityService_BootstrapChart(t *testing.T) {
 	chart := BootstrapChart()
 
