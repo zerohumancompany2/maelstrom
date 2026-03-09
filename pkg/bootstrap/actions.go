@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/maelstrom/v3/pkg/services/security"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
 
@@ -124,5 +125,45 @@ func panicAction(runtimeCtx statechart.RuntimeContext, appCtx statechart.Applica
 }
 
 func loadSecurityService(runtimeCtx statechart.RuntimeContext, appCtx statechart.ApplicationContext, event statechart.Event) error {
-	return ErrNotImplemented
+	// Get engine from appCtx
+	engineAny, _, err := appCtx.Get("__engine", runtimeCtx.ChartID)
+	if err != nil {
+		return fmt.Errorf("failed to get engine: %w", err)
+	}
+	if engineAny == nil {
+		return fmt.Errorf("engine not found in appCtx")
+	}
+	engine, ok := engineAny.(statechart.Library)
+	if !ok {
+		return fmt.Errorf("invalid engine type in appCtx")
+	}
+
+	// Load security chart definition
+	def := security.BootstrapChart()
+
+	// Spawn security runtime
+	securityRTID, err := engine.Spawn(def, appCtx)
+	if err != nil {
+		return fmt.Errorf("failed to spawn security runtime: %w", err)
+	}
+	log.Printf("[bootstrap] Spawned security runtime: %s", securityRTID)
+
+	// Start the runtime
+	if err := engine.Control(securityRTID, statechart.CmdStart); err != nil {
+		return fmt.Errorf("failed to start security runtime: %w", err)
+	}
+	log.Printf("[bootstrap] Started security runtime: %s", securityRTID)
+
+	// Store security RTID in appCtx
+	if err := appCtx.Set("bootstrap:security:runtimeID", string(securityRTID), nil, runtimeCtx.ChartID); err != nil {
+		return fmt.Errorf("failed to store security RTID: %w", err)
+	}
+
+	// Dispatch SECURITY_READY event to bootstrap parent
+	if err := engine.Dispatch(statechart.RuntimeID(runtimeCtx.RuntimeID), statechart.Event{Type: "SECURITY_READY"}); err != nil {
+		return fmt.Errorf("failed to dispatch SECURITY_READY: %w", err)
+	}
+	log.Printf("[bootstrap] Dispatched SECURITY_READY event")
+
+	return nil
 }
