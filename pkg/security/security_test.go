@@ -914,3 +914,40 @@ func TestTaintEngine_StripTaint_Nested(t *testing.T) {
 		t.Errorf("Expected 3 stripped taints, got %d: %v", len(stripped), stripped)
 	}
 }
+
+func TestTaintEngine_StripTaint_NoForbidden(t *testing.T) {
+	engine := NewTaintEngine()
+
+	data := map[string]interface{}{
+		"_taints": []string{"TOOL_OUTPUT", "EXTERNAL"},
+		"key":     "value",
+	}
+
+	forbidden := []string{"PII", "SECRET"}
+	result, stripped, err := engine.StripTaint(data, forbidden)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected map[string]interface{}, got %T", result)
+	}
+
+	taints, ok := resultMap["_taints"].([]string)
+	if !ok {
+		t.Fatalf("Expected _taints key with []string value, got %T", resultMap["_taints"])
+	}
+
+	if len(taints) != 2 {
+		t.Errorf("Expected 2 taints unchanged, got %d: %v", len(taints), taints)
+	}
+
+	if len(stripped) != 0 {
+		t.Errorf("Expected empty stripped list, got %v", stripped)
+	}
+
+	if resultMap["key"] != "value" {
+		t.Errorf("Expected key to be 'value', got %v", resultMap["key"])
+	}
+}
