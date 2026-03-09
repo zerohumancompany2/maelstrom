@@ -316,3 +316,20 @@ func TestCommunicationService_ExponentialBackoff(t *testing.T) {
 		t.Errorf("Expected exponential backoff delays, got %v", elapsed)
 	}
 }
+
+func TestCommunicationService_MaxRespectsLimit(t *testing.T) {
+	svc := NewCommunicationService()
+
+	start := time.Now()
+	m := mail.Mail{Source: "test", Target: "non-existent:address"}
+
+	err := svc.PublishWithRetry(&m, 1)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Error("Expected error after max retries, got nil")
+	}
+	if elapsed > 2*time.Second {
+		t.Errorf("Expected to respect max retries limit, got %v elapsed", elapsed)
+	}
+}
