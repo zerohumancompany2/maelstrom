@@ -356,7 +356,7 @@ func (s *boundaryServiceImpl) MarkTaint(obj any, taints []string) (any, error) {
 }
 
 func (s *boundaryServiceImpl) CheckForbidden(taints []string, boundary BoundaryType) error {
-	return nil
+	return s.engine.CheckForbidden(taints, boundary)
 }
 
 func (s *boundaryServiceImpl) NamespaceIsolate(chartID, operation string) (IsolatedView, error) {
