@@ -5,6 +5,8 @@ package services
 import (
 	"errors"
 	"sync"
+
+	"github.com/maelstrom/v3/pkg/mail"
 )
 
 // ErrAlreadyRegistered is returned when a service is registered twice.
@@ -15,8 +17,8 @@ var ErrNotFound = errors.New("service not found")
 
 // Service represents a service in the system.
 type Service interface {
-	Name() string
-	HandleMail(mail any) (any, error)
+	ID() string
+	HandleMail(mail mail.Mail) error
 	Start() error
 	Stop() error
 }
