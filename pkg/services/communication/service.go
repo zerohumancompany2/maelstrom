@@ -125,3 +125,20 @@ func (c *CommunicationService) Start() error {
 func (c *CommunicationService) Stop() error {
 	return nil
 }
+
+func (c *CommunicationService) PublishWithRetry(mail *mail.Mail, maxRetries int) error {
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		ack, err := c.Publish(*mail)
+		if err != nil {
+			return err
+		}
+		if ack.Success {
+			return nil
+		}
+	}
+	return errors.New("delivery failed after max retries")
+}
+
+func (c *CommunicationService) trackDeliveryAttempt(correlationID string) {
+	panic("not implemented")
+}

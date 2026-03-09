@@ -287,3 +287,15 @@ func TestCommunicationService_UnsubscribeNotFoundReturnsError(t *testing.T) {
 		t.Errorf("Expected error mentioning 'no subscribers', got %v", err)
 	}
 }
+
+func TestCommunicationService_RetryOnFailure(t *testing.T) {
+	svc := NewCommunicationService()
+
+	m := mail.Mail{Source: "test", Target: "non-existent:address"}
+
+	err := svc.PublishWithRetry(&m, 3)
+
+	if err == nil {
+		t.Error("Expected error after retries, got nil")
+	}
+}
