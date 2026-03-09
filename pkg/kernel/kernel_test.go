@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/maelstrom/v3/pkg/bootstrap"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
 
@@ -342,5 +343,22 @@ func TestKernel_Start_WithEngine_SpawnsAndControls(t *testing.T) {
 	}
 	if rtID == "" {
 		t.Error("expected non-empty RuntimeID for spawned bootstrap")
+	}
+}
+
+// TestKernel_LoadsBootstrapChart verifies bootstrap chart loads with correct metadata.
+func TestKernel_LoadsBootstrapChart(t *testing.T) {
+	def, err := bootstrap.LoadBootstrapChart()
+	if err != nil {
+		t.Fatalf("LoadBootstrapChart() returned error: %v", err)
+	}
+	if def.ID != "sys:bootstrap" {
+		t.Errorf("expected ID to be 'sys:bootstrap', got %q", def.ID)
+	}
+	if def.Version != "1.0.0" {
+		t.Errorf("expected Version to be '1.0.0', got %q", def.Version)
+	}
+	if spec, ok := def.Spec["initial"].(string); !ok || spec != "sys:bootstrap/init" {
+		t.Errorf("expected spec.initial to be 'sys:bootstrap/init', got %q", spec)
 	}
 }
