@@ -77,7 +77,16 @@ func TestSecurityService_BootstrapChart(t *testing.T) {
 }
 
 func TestSecurityService_HandleMail(t *testing.T) {
-	// Placeholder for future implementation
+	svc := NewSecurityService()
+	mail := mail.Mail{
+		ID:     "test-mail-1",
+		Source: "test-source",
+		Target: "sys:security",
+	}
+	err := svc.HandleMail(mail)
+	if err != nil {
+		t.Errorf("HandleMail should return nil for Phase 1 pass-through, got: %v", err)
+	}
 }
 
 func TestSecurityService_ID(t *testing.T) {
