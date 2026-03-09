@@ -795,3 +795,36 @@ func TestTaintEngine_PropagateTaint_EmptySource(t *testing.T) {
 		t.Errorf("Expected ['EXISTING'] preserved, got %v", taints2)
 	}
 }
+
+func TestTaintEngine_StripTaint_Basic(t *testing.T) {
+	engine := NewTaintEngine()
+
+	data := map[string]interface{}{
+		"_taints": []string{"PII", "SECRET", "TOOL_OUTPUT"},
+		"key":     "value",
+	}
+
+	forbidden := []string{"PII", "SECRET"}
+	result, _, err := engine.StripTaint(data, forbidden)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected map[string]interface{}, got %T", result)
+	}
+
+	taints, ok := resultMap["_taints"].([]string)
+	if !ok {
+		t.Fatalf("Expected _taints key with []string value, got %T", resultMap["_taints"])
+	}
+
+	if len(taints) != 1 || taints[0] != "TOOL_OUTPUT" {
+		t.Errorf("Expected ['TOOL_OUTPUT'], got %v", taints)
+	}
+
+	if resultMap["key"] != "value" {
+		t.Errorf("Expected key to be 'value', got %v", resultMap["key"])
+	}
+}

@@ -163,6 +163,7 @@ type TaintEngine interface {
 	Redact(obj any, rules []RedactRule) (any, error)
 	ReportTaints(chartID string) (TaintMap, error)
 	AttachTaint(obj any, taints []string) (any, error)
+	StripTaint(obj any, forbiddenTaints []string) (any, []string, error)
 }
 
 type taintEngineImpl struct {
@@ -303,6 +304,53 @@ func (e *taintEngineImpl) AttachTaint(obj any, taints []string) (any, error) {
 	default:
 		return obj, nil
 	}
+}
+
+func (e *taintEngineImpl) StripTaint(obj any, forbiddenTaints []string) (any, []string, error) {
+	if obj == nil {
+		return nil, nil, fmt.Errorf("cannot strip taints from nil object")
+	}
+
+	forbiddenSet := make(map[string]bool)
+	for _, t := range forbiddenTaints {
+		forbiddenSet[t] = true
+	}
+
+	switch v := obj.(type) {
+	case map[string]interface{}:
+		return e.stripTaintFromMap(v, forbiddenSet)
+	default:
+		return obj, nil, nil
+	}
+}
+
+func (e *taintEngineImpl) stripTaintFromMap(m map[string]interface{}, forbiddenSet map[string]bool) (map[string]interface{}, []string, error) {
+	result := make(map[string]interface{})
+	stripped := make([]string, 0)
+
+	taints, ok := m["_taints"].([]string)
+	if ok {
+		remaining := make([]string, 0)
+		for _, t := range taints {
+			if forbiddenSet[t] {
+				stripped = append(stripped, t)
+			} else {
+				remaining = append(remaining, t)
+			}
+		}
+		if len(remaining) > 0 {
+			result["_taints"] = remaining
+		}
+	}
+
+	for k, val := range m {
+		if k == "_taints" {
+			continue
+		}
+		result[k] = val
+	}
+
+	return result, stripped, nil
 }
 
 func (e *taintEngineImpl) attachTaintToMap(m map[string]interface{}, taints []string) (map[string]interface{}, error) {
