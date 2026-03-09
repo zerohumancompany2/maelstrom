@@ -134,3 +134,15 @@ func TestTransition_SameBoundary(t *testing.T) {
 		t.Errorf("EnforceTransition(DMZBoundary, DMZBoundary, %v) = %v, want %v", taints, result, expected)
 	}
 }
+
+func TestTransition_ForbiddenTaints(t *testing.T) {
+	taints := []string{"SECRET", "INNER_ONLY"}
+	_, err := EnforceTransition(OuterBoundary, InnerBoundary, taints)
+	if err == nil {
+		t.Fatalf("EnforceTransition(OuterBoundary, InnerBoundary, %v) returned nil error, want error for forbidden taints", taints)
+	}
+	errStr := err.Error()
+	if !strings.Contains(errStr, "SECRET") && !strings.Contains(errStr, "INNER_ONLY") {
+		t.Errorf("EnforceTransition error = %v, want error mentioning forbidden taints", err)
+	}
+}
