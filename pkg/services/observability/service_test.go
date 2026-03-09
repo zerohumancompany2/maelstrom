@@ -467,3 +467,19 @@ func TestObservabilityService_MetricsCollector(t *testing.T) {
 		t.Errorf("Expected EventRate 0, got %f", metrics.EventRate)
 	}
 }
+
+func TestObservabilityService_MetricsAggregation(t *testing.T) {
+	svc := NewObservabilityService()
+
+	svc.trackTransition("idle", "running")
+	svc.trackEvent("transition")
+
+	aggregated := svc.aggregateMetrics(5 * time.Minute)
+
+	if aggregated.TransitionRate != 1 {
+		t.Errorf("Expected TransitionRate 1, got %f", aggregated.TransitionRate)
+	}
+	if aggregated.EventRate != 1 {
+		t.Errorf("Expected EventRate 1, got %f", aggregated.EventRate)
+	}
+}

@@ -133,3 +133,14 @@ func (o *ObservabilityService) trackEvent(eventType string) {
 	defer o.mu.Unlock()
 	o.metrics.EventRate++
 }
+
+func (o *ObservabilityService) aggregateMetrics(duration time.Duration) services.MetricsCollector {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	result := o.metrics
+	result.StateCounts = make(map[string]int)
+	for k, v := range o.metrics.StateCounts {
+		result.StateCounts[k] = v
+	}
+	return result
+}
