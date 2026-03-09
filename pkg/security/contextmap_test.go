@@ -70,3 +70,28 @@ func TestFilterContextBlock_Redact(t *testing.T) {
 		t.Errorf("Expected block structure to be preserved, got name: %s", filtered.Name)
 	}
 }
+
+func TestFilterContextBlock_DropBlock(t *testing.T) {
+	contextBlockRegistry = make(map[string]BlockTaintInfo)
+
+	block := ContextBlock{
+		Name:    "pii-block",
+		Content: "This contains PII data",
+		TaintPolicy: TaintPolicy{
+			RedactMode: "dropBlock",
+		},
+	}
+
+	filtered, err := FilterContextBlock(block, OuterBoundary)
+
+	if err != nil {
+		t.Fatalf("FilterContextBlock returned error: %v", err)
+	}
+
+	if filtered.Name != "" {
+		t.Errorf("Expected block to be dropped (empty name), got: %s", filtered.Name)
+	}
+	if filtered.Content != "" {
+		t.Errorf("Expected block content to be empty after drop, got: %s", filtered.Content)
+	}
+}

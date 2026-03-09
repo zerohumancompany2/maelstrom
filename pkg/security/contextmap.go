@@ -33,6 +33,9 @@ func PrepareContextForBoundary(runtimeId string, boundary BoundaryType) error {
 }
 
 func FilterContextBlock(block ContextBlock, boundary BoundaryType) (ContextBlock, error) {
+	if block.TaintPolicy.RedactMode == "dropBlock" {
+		return ContextBlock{}, nil
+	}
 	if block.TaintPolicy.RedactMode == "redact" {
 		result := block
 		content := result.Content
