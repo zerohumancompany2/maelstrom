@@ -373,3 +373,51 @@ func TestTaintEngine_AttachTaint_Map(t *testing.T) {
 		}
 	}
 }
+
+func TestTaintEngine_AttachTaint_Nested(t *testing.T) {
+	engine := NewTaintEngine()
+
+	nested := map[string]interface{}{
+		"level1": map[string]interface{}{
+			"level2": map[string]interface{}{
+				"data": "secret",
+			},
+		},
+	}
+
+	result, err := engine.AttachTaint(nested, []string{"INNER_ONLY"})
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected map[string]interface{}, got %T", result)
+	}
+
+	if _, hasTaints := resultMap["_taints"]; !hasTaints {
+		t.Error("Expected root map to have _taints key")
+	}
+
+	level1, ok := resultMap["level1"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected level1 to be map[string]interface{}, got %T", resultMap["level1"])
+	}
+
+	if _, hasTaints := level1["_taints"]; !hasTaints {
+		t.Error("Expected level1 to have _taints key")
+	}
+
+	level2, ok := level1["level2"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected level2 to be map[string]interface{}, got %T", level1["level2"])
+	}
+
+	if _, hasTaints := level2["_taints"]; !hasTaints {
+		t.Error("Expected level2 to have _taints key")
+	}
+
+	if level2["data"] != "secret" {
+		t.Errorf("Expected data to be 'secret', got %v", level2["data"])
+	}
+}

@@ -212,15 +212,28 @@ func (e *taintEngineImpl) AttachTaint(obj any, taints []string) (any, error) {
 		v.Metadata.Taints = merged
 		return v, nil
 	case map[string]interface{}:
-		result := make(map[string]interface{})
-		for k, val := range v {
-			result[k] = val
-		}
-		result["_taints"] = taints
-		return result, nil
+		return e.attachTaintToMap(v, taints)
 	default:
 		return obj, nil
 	}
+}
+
+func (e *taintEngineImpl) attachTaintToMap(m map[string]interface{}, taints []string) (map[string]interface{}, error) {
+	result := make(map[string]interface{})
+	for k, val := range m {
+		switch v := val.(type) {
+		case map[string]interface{}:
+			nested, err := e.attachTaintToMap(v, taints)
+			if err != nil {
+				return nil, err
+			}
+			result[k] = nested
+		default:
+			result[k] = val
+		}
+	}
+	result["_taints"] = taints
+	return result, nil
 }
 
 type BoundaryService interface {
