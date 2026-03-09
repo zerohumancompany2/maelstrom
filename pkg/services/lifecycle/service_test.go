@@ -8,15 +8,15 @@ import (
 )
 
 func TestLifecycleService_NewLifecycleServiceReturnsNonNil(t *testing.T) {
-	svc := NewLifecycleService()
+	svc := NewLifecycleServiceWithoutEngine()
 
 	if svc == nil {
-		t.Error("Expected NewLifecycleService to return non-nil")
+		t.Error("Expected NewLifecycleServiceWithoutEngine to return non-nil")
 	}
 }
 
 func TestLifecycleService_IDReturnsCorrectString(t *testing.T) {
-	svc := NewLifecycleService()
+	svc := NewLifecycleServiceWithoutEngine()
 
 	id := svc.ID()
 
@@ -26,7 +26,7 @@ func TestLifecycleService_IDReturnsCorrectString(t *testing.T) {
 }
 
 func TestLifecycleService_HandleMailReturnsNil(t *testing.T) {
-	svc := NewLifecycleService()
+	svc := NewLifecycleServiceWithoutEngine()
 
 	err := svc.HandleMail(mail.Mail{})
 
@@ -36,7 +36,7 @@ func TestLifecycleService_HandleMailReturnsNil(t *testing.T) {
 }
 
 func TestLifecycleService_SpawnReturnsNonEmptyRuntimeID(t *testing.T) {
-	svc := NewLifecycleService()
+	svc := NewLifecycleServiceWithoutEngine()
 
 	id, err := svc.Spawn(statechart.ChartDefinition{})
 
@@ -50,7 +50,7 @@ func TestLifecycleService_SpawnReturnsNonEmptyRuntimeID(t *testing.T) {
 }
 
 func TestLifecycleService_StopReturnsNil(t *testing.T) {
-	svc := NewLifecycleService()
+	svc := NewLifecycleServiceWithoutEngine()
 
 	err := svc.Stop(statechart.RuntimeID("test-123"))
 
@@ -59,8 +59,8 @@ func TestLifecycleService_StopReturnsNil(t *testing.T) {
 	}
 }
 
-func TestLifecycleService_ListReturnsNilSlice(t *testing.T) {
-	svc := NewLifecycleService()
+func TestLifecycleService_ListReturnsRuntimeInfo(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
 
 	list, err := svc.List()
 
@@ -68,13 +68,145 @@ func TestLifecycleService_ListReturnsNilSlice(t *testing.T) {
 		t.Errorf("Expected List to return nil error, got %v", err)
 	}
 
-	if list != nil {
-		t.Error("Expected List to return nil slice")
+	// Verify it's []RuntimeInfo type by checking we can access RuntimeInfo fields
+	if len(list) != 0 {
+		t.Errorf("Expected empty slice, got %d items", len(list))
+	}
+
+	// Type assertion to verify return type
+	_, ok := interface{}(list).([]RuntimeInfo)
+	if !ok {
+		t.Error("Expected List to return []RuntimeInfo type")
+	}
+}
+
+func TestLifecycleService_ListEmptyWhenNoRuntimes(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	list, err := svc.List()
+
+	if err != nil {
+		t.Errorf("Expected List to return nil error, got %v", err)
+	}
+
+	if len(list) != 0 {
+		t.Errorf("Expected empty slice, got %d items", len(list))
+	}
+
+	if list == nil {
+		t.Error("Expected non-nil empty slice")
+	}
+}
+
+func TestLifecycleService_SpawnTracksRuntime(t *testing.T) {
+	engine := statechart.NewEngine()
+	svc := NewLifecycleService(engine)
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+	}
+
+	rtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	list, err := svc.List()
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+
+	if len(list) != 1 {
+		t.Errorf("Expected 1 runtime in list, got %d", len(list))
+	}
+
+	if list[0].ID != string(rtID) {
+		t.Errorf("Expected runtime ID %s, got %s", rtID, list[0].ID)
+	}
+
+	if list[0].DefinitionID != "test-chart" {
+		t.Errorf("Expected DefinitionID test-chart, got %s", list[0].DefinitionID)
+	}
+
+	if list[0].Boundary != mail.InnerBoundary {
+		t.Errorf("Expected Boundary inner, got %v", list[0].Boundary)
+	}
+}
+
+func TestLifecycleService_ControlStart(t *testing.T) {
+	engine := statechart.NewEngine()
+	svc := NewLifecycleService(engine)
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+		Root: &statechart.Node{
+			ID: "root",
+			Children: map[string]*statechart.Node{
+				"idle": {ID: "idle"},
+			},
+		},
+	}
+
+	rtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	err = svc.Control(rtID, statechart.CmdStart)
+	if err != nil {
+		t.Errorf("Expected Control(CmdStart) to return nil, got %v", err)
+	}
+}
+
+func TestLifecycleService_ControlStop(t *testing.T) {
+	engine := statechart.NewEngine()
+	svc := NewLifecycleService(engine)
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+		Root: &statechart.Node{
+			ID: "root",
+			Children: map[string]*statechart.Node{
+				"idle": {ID: "idle"},
+			},
+		},
+	}
+
+	rtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	err = svc.Control(rtID, statechart.CmdStop)
+	if err != nil {
+		t.Errorf("Expected Control(CmdStop) to return nil, got %v", err)
+	}
+}
+
+func TestLifecycleService_ControlNotFoundReturnsError(t *testing.T) {
+	engine := statechart.NewEngine()
+	svc := NewLifecycleService(engine)
+
+	err := svc.Control(statechart.RuntimeID("non-existent"), statechart.CmdStart)
+	if err == nil {
+		t.Error("Expected Control with non-existent ID to return error")
+	}
+
+	svcNoEngine := NewLifecycleServiceWithoutEngine()
+	err = svcNoEngine.Control(statechart.RuntimeID("any"), statechart.CmdStart)
+	if err == nil {
+		t.Error("Expected Control without engine to return error")
 	}
 }
 
 func TestLifecycleService_StartReturnsNil(t *testing.T) {
-	svc := NewLifecycleService()
+	svc := NewLifecycleServiceWithoutEngine()
 
 	err := svc.Start()
 
@@ -96,7 +228,7 @@ func TestLifecycleService_BootstrapChart(t *testing.T) {
 }
 
 func TestLifecycleService_SpawnChart(t *testing.T) {
-	svc := NewLifecycleService()
+	svc := NewLifecycleServiceWithoutEngine()
 	def := statechart.ChartDefinition{
 		ID:      "test-chart",
 		Version: "1.0.0",
@@ -111,7 +243,7 @@ func TestLifecycleService_SpawnChart(t *testing.T) {
 }
 
 func TestLifecycleService_BoundaryInner(t *testing.T) {
-	svc := NewLifecycleService()
+	svc := NewLifecycleServiceWithoutEngine()
 	if svc.Boundary() != mail.InnerBoundary {
 		t.Errorf("Expected boundary 'inner', got: %v", svc.Boundary())
 	}
@@ -122,5 +254,14 @@ func TestLifecycleService_ID(t *testing.T) {
 
 	if chart.ID != "sys:lifecycle" {
 		t.Errorf("Expected ID sys:lifecycle, got %s", chart.ID)
+	}
+}
+
+func TestLifecycleService_NewWithEngineReturnsNonNil(t *testing.T) {
+	engine := statechart.NewEngine()
+	svc := NewLifecycleService(engine)
+
+	if svc == nil {
+		t.Error("Expected NewLifecycleService(engine) to return non-nil")
 	}
 }
