@@ -80,6 +80,24 @@ func TestLifecycleService_ListReturnsRuntimeInfo(t *testing.T) {
 	}
 }
 
+func TestLifecycleService_ListEmptyWhenNoRuntimes(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	list, err := svc.List()
+
+	if err != nil {
+		t.Errorf("Expected List to return nil error, got %v", err)
+	}
+
+	if len(list) != 0 {
+		t.Errorf("Expected empty slice, got %d items", len(list))
+	}
+
+	if list == nil {
+		t.Error("Expected non-nil empty slice")
+	}
+}
+
 func TestLifecycleService_StartReturnsNil(t *testing.T) {
 	svc := NewLifecycleServiceWithoutEngine()
 
