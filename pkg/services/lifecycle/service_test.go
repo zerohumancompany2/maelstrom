@@ -361,3 +361,30 @@ func TestLifecycleService_HotReload(t *testing.T) {
 		t.Errorf("Expected HotReload to return nil, got %v", err)
 	}
 }
+
+func TestLifecycleService_HotReloadStatePreservation(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+	}
+
+	rtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	svc.updateRuntimeState(string(rtID), "running")
+
+	err = svc.preserveState(string(rtID))
+	if err != nil {
+		t.Errorf("Expected preserveState to return nil, got %v", err)
+	}
+
+	savedState := svc.getSavedState(string(rtID))
+	if savedState != "running" {
+		t.Errorf("Expected saved state 'running', got %s", savedState)
+	}
+}

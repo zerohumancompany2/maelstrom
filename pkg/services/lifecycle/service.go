@@ -14,6 +14,7 @@ type LifecycleService struct {
 	engine       statechart.Library
 	runtimes     map[statechart.RuntimeID]RuntimeInfo
 	stateHistory map[string][]StateTransition
+	savedStates  map[string]string
 }
 
 func NewLifecycleService(engine statechart.Library) *LifecycleService {
@@ -21,6 +22,7 @@ func NewLifecycleService(engine statechart.Library) *LifecycleService {
 		engine:       engine,
 		runtimes:     make(map[statechart.RuntimeID]RuntimeInfo),
 		stateHistory: make(map[string][]StateTransition),
+		savedStates:  make(map[string]string),
 	}
 }
 
@@ -28,6 +30,7 @@ func NewLifecycleServiceWithoutEngine() *LifecycleService {
 	return &LifecycleService{
 		runtimes:     make(map[statechart.RuntimeID]RuntimeInfo),
 		stateHistory: make(map[string][]StateTransition),
+		savedStates:  make(map[string]string),
 	}
 }
 
@@ -149,4 +152,23 @@ func (l *LifecycleService) HotReload(serviceID string) error {
 		return statechart.ErrRuntimeNotFound
 	}
 	return nil
+}
+
+func (l *LifecycleService) preserveState(serviceID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	runtime, exists := l.runtimes[statechart.RuntimeID(serviceID)]
+	if !exists {
+		return statechart.ErrRuntimeNotFound
+	}
+	if len(runtime.ActiveStates) > 0 {
+		l.savedStates[serviceID] = runtime.ActiveStates[0]
+	}
+	return nil
+}
+
+func (l *LifecycleService) getSavedState(serviceID string) string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.savedStates[serviceID]
 }
