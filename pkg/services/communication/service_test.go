@@ -185,3 +185,24 @@ func TestCommunicationService_PublishReturnsAck(t *testing.T) {
 	}
 	_ = ch
 }
+
+func TestCommunicationService_PublishAckHasCorrelationID(t *testing.T) {
+	svc := NewCommunicationService()
+
+	ch, _ := svc.Subscribe("test-topic")
+	correlationID := "test-correlation-123"
+	m := mail.Mail{Source: "test", Target: "test-topic", CorrelationID: correlationID}
+
+	ack, err := svc.Publish(m)
+
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if ack.CorrelationID != correlationID {
+		t.Errorf("Expected CorrelationID %s, got %s", correlationID, ack.CorrelationID)
+	}
+	if ack.DeliveredAt.IsZero() {
+		t.Error("Expected DeliveredAt to be set")
+	}
+	_ = ch
+}

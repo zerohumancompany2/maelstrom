@@ -2,6 +2,7 @@ package communication
 
 import (
 	"sync"
+	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
 )
@@ -33,8 +34,10 @@ func (c *CommunicationService) Publish(m mail.Mail) (mail.Ack, error) {
 		target = m.Source
 	}
 	ack := mail.Ack{
-		MailID:  m.ID,
-		Success: false,
+		MailID:        m.ID,
+		CorrelationID: m.CorrelationID,
+		DeliveredAt:   time.Now(),
+		Success:       false,
 	}
 	for _, ch := range c.subscribers[target] {
 		select {
