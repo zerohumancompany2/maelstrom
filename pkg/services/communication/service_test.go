@@ -4,6 +4,14 @@ import (
 	"testing"
 )
 
+func TestCommunicationService_NewCommunicationServiceReturnsNonNil(t *testing.T) {
+	svc := NewCommunicationService()
+
+	if svc == nil {
+		t.Error("Expected NewCommunicationService to return non-nil")
+	}
+}
+
 func TestCommunicationService_BootstrapChart(t *testing.T) {
 	chart := BootstrapChart()
 
