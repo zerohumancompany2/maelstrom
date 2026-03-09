@@ -117,3 +117,15 @@ func TestServiceRegistry_List(t *testing.T) {
 		}
 	}
 }
+
+func TestServiceRegistry_ListEmpty(t *testing.T) {
+	sr := NewServiceRegistry()
+
+	names := sr.List()
+	if names == nil {
+		t.Fatal("List() returned nil for empty registry, want empty slice")
+	}
+	if len(names) != 0 {
+		t.Fatalf("List() returned %d names, want 0", len(names))
+	}
+}
