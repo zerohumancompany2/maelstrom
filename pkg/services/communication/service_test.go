@@ -588,3 +588,31 @@ func TestCommunicationService_DeadLetterWithReason(t *testing.T) {
 		t.Errorf("Expected reason 'delivery failed after max retries', got %s", entries[0].Reason)
 	}
 }
+
+func TestCommunicationService_DeadLetterAfterMaxRetries(t *testing.T) {
+	svc := NewCommunicationService()
+	obs := observability.NewObservabilityService()
+	svc.SetObservability(obs)
+
+	m := mail.Mail{ID: "fail-mail-3", Source: "test", Target: "non-existent:address"}
+
+	err := svc.PublishWithRetry(&m, 2)
+
+	if err == nil {
+		t.Error("Expected error after max retries, got nil")
+	}
+
+	entries, err := obs.QueryDeadLetters()
+	if err != nil {
+		t.Errorf("Expected nil error from QueryDeadLetters, got %v", err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("Expected 1 dead letter entry after max retries, got %d", len(entries))
+	}
+	if entries[0].Mail.ID != "fail-mail-3" {
+		t.Errorf("Expected mail ID 'fail-mail-3', got %s", entries[0].Mail.ID)
+	}
+	if entries[0].Reason != "delivery failed after max retries" {
+		t.Errorf("Expected reason 'delivery failed after max retries', got %s", entries[0].Reason)
+	}
+}
