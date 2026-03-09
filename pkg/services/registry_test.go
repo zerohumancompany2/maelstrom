@@ -130,6 +130,32 @@ func TestServiceRegistry_ListEmpty(t *testing.T) {
 	}
 }
 
+func TestServiceRegistry_RegisterWithState(t *testing.T) {
+	sr := NewServiceRegistry()
+	svc := &mockService{id: "test:service"}
+
+	err := sr.RegisterWithState(svc, "registered")
+	if err != nil {
+		t.Fatalf("RegisterWithState() returned error: %v", err)
+	}
+
+	retrieved, ok := sr.Get(svc.ID())
+	if !ok {
+		t.Fatal("Get() returned false for registered service")
+	}
+	if retrieved.(*mockService) != svc {
+		t.Fatal("Get() returned wrong service")
+	}
+
+	state, ok := sr.GetState(svc.ID())
+	if !ok {
+		t.Fatal("GetState() returned false for registered service")
+	}
+	if state != "registered" {
+		t.Fatalf("GetState() returned %q, want %q", state, "registered")
+	}
+}
+
 func TestAllServicesIntegrateViaRegistry(t *testing.T) {
 	sr := NewServiceRegistry()
 
