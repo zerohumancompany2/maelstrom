@@ -44,13 +44,14 @@ func TestMail_Types(t *testing.T) {
 
 func TestMail_Metadata(t *testing.T) {
 	meta := MailMetadata{
-		Tokens:   150,
-		Model:    "gpt-4",
-		Cost:     0.03,
-		Boundary: InnerBoundary,
-		Taints:   []string{"USER_SUPPLIED", "TOOL_OUTPUT"},
-		Stream:   nil,
-		IsFinal:  true,
+		Tokens:      150,
+		Model:       "gpt-4",
+		Cost:        0.03,
+		Boundary:    InnerBoundary,
+		Taints:      []string{"USER_SUPPLIED", "TOOL_OUTPUT"},
+		Stream:      false,
+		StreamChunk: nil,
+		IsFinal:     true,
 	}
 
 	if meta.Tokens != 150 {

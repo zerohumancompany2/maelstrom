@@ -43,13 +43,14 @@ const (
 )
 
 type MailMetadata struct {
-	Tokens   int
-	Model    string
-	Cost     float64
-	Boundary BoundaryType
-	Taints   []string
-	Stream   *StreamChunk
-	IsFinal  bool
+	Tokens      int
+	Model       string
+	Cost        float64
+	Boundary    BoundaryType
+	Taints      []string
+	Stream      bool
+	StreamChunk *StreamChunk
+	IsFinal     bool
 }
 
 type BoundaryType string

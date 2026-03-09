@@ -232,13 +232,14 @@ func TestMail_MetadataStructure(t *testing.T) {
 		Taints:   []string{"test"},
 	}
 	metadata := MailMetadata{
-		Tokens:   100,
-		Model:    "test-model",
-		Cost:     0.5,
-		Boundary: InnerBoundary,
-		Taints:   []string{"PII", "SECRET"},
-		Stream:   streamChunk,
-		IsFinal:  true,
+		Tokens:      100,
+		Model:       "test-model",
+		Cost:        0.5,
+		Boundary:    InnerBoundary,
+		Taints:      []string{"PII", "SECRET"},
+		Stream:      true,
+		StreamChunk: streamChunk,
+		IsFinal:     true,
 	}
 
 	if metadata.Tokens != 100 {
@@ -261,7 +262,7 @@ func TestMail_MetadataStructure(t *testing.T) {
 		t.Errorf("Expected 2 taints, got %d", len(metadata.Taints))
 	}
 
-	if metadata.Stream == nil {
+	if !metadata.Stream {
 		t.Error("Expected stream to be set")
 	}
 
