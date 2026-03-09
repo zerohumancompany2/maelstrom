@@ -33,19 +33,34 @@ func PrepareContextForBoundary(runtimeId string, boundary BoundaryType) error {
 }
 
 func FilterContextBlock(block ContextBlock, boundary BoundaryType) (ContextBlock, error) {
-	if block.TaintPolicy.RedactMode == "dropBlock" {
-		return ContextBlock{}, nil
-	}
-	if block.TaintPolicy.RedactMode == "redact" {
-		result := block
-		content := result.Content
-		for _, rule := range block.TaintPolicy.RedactRules {
-			content = replaceTaint(content, rule.Taint, rule.Replacement)
+	if isBoundaryAllowed(block.TaintPolicy.AllowedForBoundary, boundary) {
+		if block.TaintPolicy.RedactMode == "dropBlock" {
+			return ContextBlock{}, nil
 		}
-		result.Content = content
-		return result, nil
+		if block.TaintPolicy.RedactMode == "redact" {
+			result := block
+			content := result.Content
+			for _, rule := range block.TaintPolicy.RedactRules {
+				content = replaceTaint(content, rule.Taint, rule.Replacement)
+			}
+			result.Content = content
+			return result, nil
+		}
+		return block, nil
 	}
-	return block, nil
+	return ContextBlock{}, nil
+}
+
+func isBoundaryAllowed(allowed []BoundaryType, boundary BoundaryType) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+	for _, b := range allowed {
+		if b == boundary {
+			return true
+		}
+	}
+	return false
 }
 
 func FilterContextBlockWithGlobalPolicy(block ContextBlock, boundary BoundaryType, globalPolicy TaintPolicyConfig) (ContextBlock, error) {

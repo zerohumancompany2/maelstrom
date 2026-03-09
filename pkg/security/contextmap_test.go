@@ -125,3 +125,25 @@ func TestFilterContextBlock_PerBlockOverride(t *testing.T) {
 		t.Errorf("Expected block content to be preserved with audit mode, got: %s", filtered.Content)
 	}
 }
+
+func TestFilterContextBlock_AllowedForBoundary(t *testing.T) {
+	contextBlockRegistry = make(map[string]BlockTaintInfo)
+
+	block := ContextBlock{
+		Name:    "inner-only-block",
+		Content: "This contains SECRET data",
+		TaintPolicy: TaintPolicy{
+			AllowedForBoundary: []BoundaryType{InnerBoundary},
+		},
+	}
+
+	filtered, err := FilterContextBlock(block, DMZBoundary)
+
+	if err != nil {
+		t.Fatalf("FilterContextBlock returned error: %v", err)
+	}
+
+	if filtered.Name != "" {
+		t.Errorf("Expected block to be filtered out (dmz not in allowedForBoundary), got name: %s", filtered.Name)
+	}
+}
