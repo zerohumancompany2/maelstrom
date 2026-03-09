@@ -43,6 +43,9 @@ func NewServiceRegistry() *ServiceRegistry {
 func (sr *ServiceRegistry) Register(name string, svc Service) error {
 	sr.mu.Lock()
 	defer sr.mu.Unlock()
+	if _, exists := sr.services[name]; exists {
+		return ErrAlreadyRegistered
+	}
 	sr.services[name] = svc
 	return nil
 }
