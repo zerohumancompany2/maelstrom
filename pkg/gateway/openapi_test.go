@@ -3,6 +3,7 @@ package gateway
 import (
 	"testing"
 
+	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
 
@@ -71,5 +72,27 @@ func TestOpenAPI_AuthMiddleware(t *testing.T) {
 
 	if _, ok := spec.Components.SecuritySchemes["bearerAuth"]; !ok {
 		t.Error("Expected bearerAuth security scheme")
+	}
+}
+
+func TestOpenAPI_BoundaryFiltering(t *testing.T) {
+	chart := &statechart.ChartDefinition{
+		ID:      "test-chart",
+		Version: "1.0.0",
+	}
+
+	spec, err := GenerateHTTPExposureSpec(chart)
+	if err != nil {
+		t.Fatalf("Expected nil error, got %v", err)
+	}
+
+	if spec == nil {
+		t.Fatal("Expected non-nil HTTP spec")
+	}
+
+	for _, endpoint := range spec.Endpoints {
+		if endpoint.Boundary == mail.InnerBoundary {
+			t.Error("Inner boundary endpoints should not be exposed")
+		}
 	}
 }
