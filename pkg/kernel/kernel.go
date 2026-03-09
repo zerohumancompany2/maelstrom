@@ -373,6 +373,13 @@ func (k *Kernel) GetCurrentState() string {
 	return seq.CurrentState()
 }
 
+// GetSequence returns the bootstrap sequence.
+func (k *Kernel) GetSequence() *bootstrap.Sequence {
+	k.mu.RLock()
+	defer k.mu.RUnlock()
+	return k.sequence
+}
+
 // GetServiceRuntimeID returns the RuntimeID for a service.
 func (k *Kernel) GetServiceRuntimeID(name string) (statechart.RuntimeID, bool) {
 	k.mu.RLock()

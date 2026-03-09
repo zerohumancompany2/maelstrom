@@ -9,12 +9,14 @@ import (
 
 // Sequence orchestrates the bootstrap state machine.
 type Sequence struct {
-	kernel       interface{}
-	mu           sync.RWMutex
-	currentState string
-	services     map[string]bool // Track loaded services
-	onStateEnter func(state string) error
-	onComplete   func()
+	kernel        interface{}
+	mu            sync.RWMutex
+	currentState  string
+	services      map[string]bool // Track loaded services
+	onStateEnter  func(state string) error
+	onComplete    func()
+	statesEntered []string
+	statesMu      sync.RWMutex
 }
 
 // NewSequence creates a new bootstrap sequence starting at "initializing".
@@ -36,7 +38,15 @@ func NewSequenceWithKernel(kernel interface{}) *Sequence {
 
 // OnStateEnter registers a callback for state entry (to load services).
 func (s *Sequence) OnStateEnter(fn func(state string) error) {
-	s.onStateEnter = fn
+	s.onStateEnter = func(state string) error {
+		s.statesMu.Lock()
+		s.statesEntered = append(s.statesEntered, state)
+		s.statesMu.Unlock()
+		if fn != nil {
+			return fn(state)
+		}
+		return nil
+	}
 }
 
 // OnComplete registers a callback for when bootstrap finishes.
@@ -127,4 +137,13 @@ func (s *Sequence) IsComplete() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.currentState == "complete"
+}
+
+// GetStatesEntered returns a copy of all states entered during bootstrap.
+func (s *Sequence) GetStatesEntered() []string {
+	s.statesMu.RLock()
+	defer s.statesMu.RUnlock()
+	result := make([]string, len(s.statesEntered))
+	copy(result, s.statesEntered)
+	return result
 }

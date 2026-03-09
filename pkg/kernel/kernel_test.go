@@ -411,3 +411,41 @@ func TestKernel_BootstrapSequenceStartsWithSecurity(t *testing.T) {
 		t.Errorf("expected CurrentState to be 'security', got %q", seq.CurrentState())
 	}
 }
+
+func TestKernel_ServicesLoadInOrder(t *testing.T) {
+	kernel := New()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	done := make(chan error)
+	go func() {
+		done <- kernel.Start(ctx)
+	}()
+
+	// Wait for bootstrap to complete
+	<-done
+
+	// Get states from sequence
+	seq := kernel.GetSequence()
+	if seq == nil {
+		t.Fatal("sequence should not be nil")
+	}
+
+	states := seq.GetStatesEntered()
+	expected := []string{"security", "communication", "observability", "lifecycle", "handoff", "complete"}
+
+	if len(states) != len(expected) {
+		t.Errorf("expected %d states, got %d: %v", len(expected), len(states), states)
+	}
+
+	for i, expectedState := range expected {
+		if i >= len(states) {
+			t.Errorf("missing state at index %d: expected %q", i, expectedState)
+			continue
+		}
+		if states[i] != expectedState {
+			t.Errorf("state[%d]: expected %q, got %q", i, expectedState, states[i])
+		}
+	}
+}
