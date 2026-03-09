@@ -274,3 +274,40 @@ func TestBoundaryAwareTool_BlocksOuterAccess(t *testing.T) {
 		t.Errorf("Expected ErrToolNotAccessible, got %v", err)
 	}
 }
+
+func TestBoundaryAwareTool_EnforcesBoundary(t *testing.T) {
+	svc := NewToolsService()
+
+	dmzTool := ToolDescriptor{
+		Name:      "webSearch",
+		Boundary:  "dmz",
+		Schema:    map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string"}}},
+		Isolation: "sandbox",
+	}
+
+	err := svc.Register(dmzTool)
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	resolved, err := svc.Resolve("webSearch", "dmz")
+	if err != nil {
+		t.Fatalf("Resolve failed for DMZ caller accessing DMZ tool: %v", err)
+	}
+
+	if resolved.Name != "webSearch" {
+		t.Errorf("Expected name 'webSearch', got '%s'", resolved.Name)
+	}
+
+	if resolved.Boundary != "dmz" {
+		t.Errorf("Expected boundary 'dmz', got '%s'", resolved.Boundary)
+	}
+
+	if len(resolved.Schema) == 0 {
+		t.Error("Expected schema to be returned for DMZ caller")
+	}
+
+	if _, ok := resolved.Schema["properties"]; !ok {
+		t.Error("Expected schema to contain DMZ-appropriate fields")
+	}
+}
