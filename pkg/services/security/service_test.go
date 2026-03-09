@@ -199,3 +199,35 @@ func TestSecurityService_ValidateAndSanitize_innerToOuter(t *testing.T) {
 		t.Errorf("Expected boundary to be updated to OuterBoundary, got: %s", result.Metadata.Boundary)
 	}
 }
+
+func TestSecurityService_ValidateAndSanitize_outerToInner(t *testing.T) {
+	svc := NewSecurityService()
+
+	inputMail := mail.Mail{
+		ID:     "test-mail-outer-inner",
+		Source: "agent:external",
+		Target: "sys:security",
+		Metadata: mail.MailMetadata{
+			Boundary: mail.OuterBoundary,
+			Taints:   []string{},
+		},
+	}
+
+	result, err := svc.ValidateAndSanitize(inputMail, mail.OuterBoundary, mail.InnerBoundary)
+
+	if err != nil {
+		t.Errorf("Expected outer→inner transition to be allowed, got error: %v", err)
+	}
+
+	hasExternalTaint := false
+	for _, taint := range result.Metadata.Taints {
+		if taint == "EXTERNAL" {
+			hasExternalTaint = true
+			break
+		}
+	}
+
+	if !hasExternalTaint {
+		t.Errorf("Expected EXTERNAL taint to be added for outer→inner transition, got: %v", result.Metadata.Taints)
+	}
+}

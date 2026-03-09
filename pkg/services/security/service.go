@@ -35,6 +35,14 @@ func (s *SecurityService) ValidateAndSanitize(m mail.Mail, sourceBoundary, targe
 		return result, nil
 	}
 
+	if sourceBoundary == mail.OuterBoundary && targetBoundary == mail.InnerBoundary {
+		if result.Metadata.Taints == nil {
+			result.Metadata.Taints = []string{}
+		}
+		result.Metadata.Taints = append(result.Metadata.Taints, "EXTERNAL")
+		return result, nil
+	}
+
 	return result, nil
 }
 
