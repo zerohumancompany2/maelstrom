@@ -420,3 +420,17 @@ func TestObservabilityService_QueryDeadLettersWithFilters(t *testing.T) {
 		t.Errorf("Expected reason 'reason-a', got %s", entries[1].Reason)
 	}
 }
+
+func TestObservabilityService_TransitionRate(t *testing.T) {
+	svc := NewObservabilityService()
+
+	svc.trackTransition("idle", "running")
+	svc.trackTransition("running", "stopped")
+	svc.trackTransition("idle", "running")
+
+	metrics := svc.GetMetrics()
+
+	if metrics.TransitionRate != 3 {
+		t.Errorf("Expected TransitionRate 3, got %f", metrics.TransitionRate)
+	}
+}

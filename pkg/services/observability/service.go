@@ -121,3 +121,9 @@ func (o *ObservabilityService) GetMetrics() services.MetricsCollector {
 	}
 	return result
 }
+
+func (o *ObservabilityService) trackTransition(from, to string) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.metrics.TransitionRate++
+}
