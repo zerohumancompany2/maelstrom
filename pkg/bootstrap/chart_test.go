@@ -197,3 +197,70 @@ func TestBootstrapChartYAML_HasErrorTransitions(t *testing.T) {
 	checkErrorTransition("sys:bootstrap/observability", "observabilityFailed")
 	checkErrorTransition("sys:bootstrap/lifecycle", "lifecycleFailed")
 }
+
+func TestBootstrapChartYAML_HasFinalReadyTransition(t *testing.T) {
+	def, err := LoadBootstrapChart()
+	if err != nil {
+		t.Fatalf("failed to load bootstrap chart: %v", err)
+	}
+
+	states, ok := def.Spec["states"].(map[string]interface{})
+	if !ok {
+		t.Fatal("states should be a map")
+	}
+
+	lifecycleState, ok := states["sys:bootstrap/lifecycle"]
+	if !ok {
+		t.Fatal("sys:bootstrap/lifecycle state not found")
+	}
+	lifecycleMap, ok := lifecycleState.(map[string]interface{})
+	if !ok {
+		t.Fatal("sys:bootstrap/lifecycle should be a map")
+	}
+
+	transitions, ok := lifecycleMap["transitions"].([]interface{})
+	if !ok {
+		t.Fatal("sys:bootstrap/lifecycle should have transitions")
+	}
+
+	found := false
+	for _, trans := range transitions {
+		transMap, ok := trans.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if transMap["event"] == "LIFECYCLE_READY" && transMap["target"] == "sys:bootstrap/ready" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("missing transition: sys:bootstrap/lifecycle --(LIFECYCLE_READY)--> sys:bootstrap/ready")
+	}
+
+	readyState, ok := states["sys:bootstrap/ready"]
+	if !ok {
+		t.Fatal("sys:bootstrap/ready state not found")
+	}
+	readyMap, ok := readyState.(map[string]interface{})
+	if !ok {
+		t.Fatal("sys:bootstrap/ready should be a map")
+	}
+
+	entryActions, ok := readyMap["entryActions"].([]interface{})
+	if !ok {
+		t.Error("sys:bootstrap/ready should have entryActions")
+		return
+	}
+
+	foundLogSuccess := false
+	for _, action := range entryActions {
+		if action == "logSuccess" {
+			foundLogSuccess = true
+			break
+		}
+	}
+	if !foundLogSuccess {
+		t.Error("sys:bootstrap/ready should have logSuccess entry action")
+	}
+}
