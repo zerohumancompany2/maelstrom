@@ -120,3 +120,24 @@ func TestSecurityService_ValidateAndSanitizePassThrough(t *testing.T) {
 		t.Errorf("Expected mail Source to be unchanged, got %s", result.Source)
 	}
 }
+
+func TestSecurityService_TaintPropagateReturnsObject(t *testing.T) {
+	svc := NewSecurityService()
+
+	inputObj := "test-string"
+
+	result, err := svc.TaintPropagate(inputObj, []string{"PII", "SECRET"})
+
+	if err != nil {
+		t.Errorf("Expected TaintPropagate to return nil error, got %v", err)
+	}
+
+	resultStr, ok := result.(string)
+	if !ok {
+		t.Error("Expected result to be string type")
+	}
+
+	if resultStr != inputObj {
+		t.Errorf("Expected object to be unchanged, got %s", resultStr)
+	}
+}

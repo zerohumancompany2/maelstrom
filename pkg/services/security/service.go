@@ -30,6 +30,10 @@ func (s *SecurityService) ValidateAndSanitize(mail mail.Mail, sourceBoundary, ta
 	return mail, nil
 }
 
+func (s *SecurityService) TaintPropagate(obj any, newTaints []string) (any, error) {
+	return obj, nil
+}
+
 func (s *SecurityService) Start() error {
 	return nil
 }
