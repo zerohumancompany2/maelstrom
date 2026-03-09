@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/maelstrom/v3/pkg/mail"
+	"github.com/maelstrom/v3/pkg/security"
 )
 
 type SecurityService struct {
@@ -32,6 +33,10 @@ func (s *SecurityService) ValidateAndSanitize(mail mail.Mail, sourceBoundary, ta
 
 func (s *SecurityService) TaintPropagate(obj any, newTaints []string) (any, error) {
 	return obj, nil
+}
+
+func (s *SecurityService) ReportTaints(runtimeId string) (security.TaintMap, error) {
+	return security.TaintMap{}, nil
 }
 
 func (s *SecurityService) Start() error {

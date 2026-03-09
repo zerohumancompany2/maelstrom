@@ -141,3 +141,21 @@ func TestSecurityService_TaintPropagateReturnsObject(t *testing.T) {
 		t.Errorf("Expected object to be unchanged, got %s", resultStr)
 	}
 }
+
+func TestSecurityService_ReportTaintsReturnsEmptyMap(t *testing.T) {
+	svc := NewSecurityService()
+
+	result, err := svc.ReportTaints("runtime-123")
+
+	if err != nil {
+		t.Errorf("Expected ReportTaints to return nil error, got %v", err)
+	}
+
+	if result == nil {
+		t.Error("Expected ReportTaints to return non-nil TaintMap")
+	}
+
+	if len(result) != 0 {
+		t.Errorf("Expected empty TaintMap, got %d entries", len(result))
+	}
+}
