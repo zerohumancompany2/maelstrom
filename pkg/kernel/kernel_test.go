@@ -85,3 +85,13 @@ func TestKernel_MailSystemRequired(t *testing.T) {
 	// Placeholder for future integration test
 	// Verifies mail system exists before services spawn
 }
+
+func TestKernelConfig_DefaultValues(t *testing.T) {
+	cfg := KernelConfig{}
+	if cfg.ChartsDir != "" {
+		t.Errorf("expected ChartsDir to be empty, got %q", cfg.ChartsDir)
+	}
+	if cfg.AppVars != nil && len(cfg.AppVars) > 0 {
+		t.Errorf("expected AppVars to be nil or empty, got %v", cfg.AppVars)
+	}
+}

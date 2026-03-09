@@ -11,9 +11,16 @@ import (
 	"github.com/maelstrom/v3/pkg/statechart"
 )
 
+// KernelConfig holds kernel configuration.
+type KernelConfig struct {
+	ChartsDir string            // Path to charts/ directory
+	AppVars   map[string]string // Application variables for hydration
+}
+
 // Kernel orchestrates bootstrap and hands off to ChartRegistry.
 type Kernel struct {
 	engine   statechart.Library
+	config   KernelConfig
 	factory  *runtime.Factory
 	sequence *bootstrap.Sequence
 	runtimes map[string]*runtime.ChartRuntime
