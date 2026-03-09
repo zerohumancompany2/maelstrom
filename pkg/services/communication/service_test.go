@@ -224,3 +224,50 @@ func TestCommunicationService_PublishToNonExistentAddress(t *testing.T) {
 		t.Errorf("Expected ErrorMessage 'no subscribers', got %s", ack.ErrorMessage)
 	}
 }
+
+func TestCommunicationService_UnsubscribeRemovesSubscriber(t *testing.T) {
+	svc := NewCommunicationService()
+
+	ch, err := svc.Subscribe("test-topic")
+	if err != nil {
+		t.Fatalf("Subscribe failed: %v", err)
+	}
+
+	m := mail.Mail{Source: "test", Target: "test-topic"}
+	_, err = svc.Publish(m)
+	if err != nil {
+		t.Fatalf("Publish failed: %v", err)
+	}
+
+	select {
+	case <-ch:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("Timeout waiting for mail before unsubscribe")
+	}
+
+	for len(ch) > 0 {
+		select {
+		case <-ch:
+		default:
+			goto unsubscribed
+		}
+	}
+unsubscribed:
+	err = svc.Unsubscribe("test-topic", ch)
+	if err != nil {
+		t.Errorf("Unsubscribe should return nil error, got %v", err)
+	}
+
+	_, err = svc.Publish(m)
+	if err != nil {
+		t.Fatalf("Publish failed: %v", err)
+	}
+
+	select {
+	case _, ok := <-ch:
+		if ok {
+			t.Error("Should not receive mail after unsubscribe")
+		}
+	case <-time.After(50 * time.Millisecond):
+	}
+}
