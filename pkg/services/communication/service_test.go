@@ -1,6 +1,7 @@
 package communication
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -38,7 +39,7 @@ func TestCommunicationService_HandleMailReturnsNil(t *testing.T) {
 func TestCommunicationService_PublishReturnsNil(t *testing.T) {
 	svc := NewCommunicationService()
 
-	err := svc.Publish(mail.Mail{})
+	_, err := svc.Publish(mail.Mail{})
 
 	if err != nil {
 		t.Errorf("Expected Publish to return nil, got %v", err)
@@ -102,7 +103,7 @@ func TestCommunicationService_PubSub(t *testing.T) {
 	}
 
 	mail := mail.Mail{Source: "test", Target: "test-topic"}
-	err = svc.Publish(mail)
+	_, err = svc.Publish(mail)
 	if err != nil {
 		t.Errorf("Publish should return nil, got: %v", err)
 	}
@@ -124,7 +125,7 @@ func TestCommunicationService_RoutesMail(t *testing.T) {
 	topicCh, _ := svc.Subscribe("topic:test-topic")
 	sysCh, _ := svc.Subscribe("sys:security")
 
-	err := svc.Publish(mail.Mail{Source: "test", Target: "agent:test-agent"})
+	_, err := svc.Publish(mail.Mail{Source: "test", Target: "agent:test-agent"})
 	if err != nil {
 		t.Errorf("Publish to agent failed: %v", err)
 	}
@@ -135,7 +136,7 @@ func TestCommunicationService_RoutesMail(t *testing.T) {
 		t.Error("Timeout waiting for agent mail")
 	}
 
-	err = svc.Publish(mail.Mail{Source: "test", Target: "topic:test-topic"})
+	_, err = svc.Publish(mail.Mail{Source: "test", Target: "topic:test-topic"})
 	if err != nil {
 		t.Errorf("Publish to topic failed: %v", err)
 	}
@@ -146,7 +147,7 @@ func TestCommunicationService_RoutesMail(t *testing.T) {
 		t.Error("Timeout waiting for topic mail")
 	}
 
-	err = svc.Publish(mail.Mail{Source: "test", Target: "sys:security"})
+	_, err = svc.Publish(mail.Mail{Source: "test", Target: "sys:security"})
 	if err != nil {
 		t.Errorf("Publish to sys failed: %v", err)
 	}
@@ -163,5 +164,126 @@ func TestCommunicationService_ID(t *testing.T) {
 
 	if chart.ID != "sys:communication" {
 		t.Errorf("Expected ID sys:communication, got %s", chart.ID)
+	}
+}
+
+func TestCommunicationService_PublishReturnsAck(t *testing.T) {
+	svc := NewCommunicationService()
+
+	ch, _ := svc.Subscribe("test-topic")
+	m := mail.Mail{Source: "test", Target: "test-topic"}
+
+	ack, err := svc.Publish(m)
+
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if ack.MailID != m.ID {
+		t.Errorf("Expected MailID %s, got %s", m.ID, ack.MailID)
+	}
+	if !ack.Success {
+		t.Error("Expected Success to be true")
+	}
+	_ = ch
+}
+
+func TestCommunicationService_PublishAckHasCorrelationID(t *testing.T) {
+	svc := NewCommunicationService()
+
+	ch, _ := svc.Subscribe("test-topic")
+	correlationID := "test-correlation-123"
+	m := mail.Mail{Source: "test", Target: "test-topic", CorrelationID: correlationID}
+
+	ack, err := svc.Publish(m)
+
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if ack.CorrelationID != correlationID {
+		t.Errorf("Expected CorrelationID %s, got %s", correlationID, ack.CorrelationID)
+	}
+	if ack.DeliveredAt.IsZero() {
+		t.Error("Expected DeliveredAt to be set")
+	}
+	_ = ch
+}
+
+func TestCommunicationService_PublishToNonExistentAddress(t *testing.T) {
+	svc := NewCommunicationService()
+
+	m := mail.Mail{Source: "test", Target: "non-existent:address"}
+
+	ack, err := svc.Publish(m)
+
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if ack.Success {
+		t.Error("Expected Success to be false for non-existent address")
+	}
+	if ack.ErrorMessage != "no subscribers" {
+		t.Errorf("Expected ErrorMessage 'no subscribers', got %s", ack.ErrorMessage)
+	}
+}
+
+func TestCommunicationService_UnsubscribeRemovesSubscriber(t *testing.T) {
+	svc := NewCommunicationService()
+
+	ch, err := svc.Subscribe("test-topic")
+	if err != nil {
+		t.Fatalf("Subscribe failed: %v", err)
+	}
+
+	m := mail.Mail{Source: "test", Target: "test-topic"}
+	_, err = svc.Publish(m)
+	if err != nil {
+		t.Fatalf("Publish failed: %v", err)
+	}
+
+	select {
+	case <-ch:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("Timeout waiting for mail before unsubscribe")
+	}
+
+	for len(ch) > 0 {
+		select {
+		case <-ch:
+		default:
+			goto unsubscribed
+		}
+	}
+unsubscribed:
+	err = svc.Unsubscribe("test-topic", ch)
+	if err != nil {
+		t.Errorf("Unsubscribe should return nil error, got %v", err)
+	}
+
+	_, err = svc.Publish(m)
+	if err != nil {
+		t.Fatalf("Publish failed: %v", err)
+	}
+
+	select {
+	case _, ok := <-ch:
+		if ok {
+			t.Error("Should not receive mail after unsubscribe")
+		}
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
+func TestCommunicationService_UnsubscribeNotFoundReturnsError(t *testing.T) {
+	svc := NewCommunicationService()
+
+	ch := make(chan mail.Mail)
+
+	err := svc.Unsubscribe("non-existent", ch)
+
+	if err == nil {
+		t.Error("Expected error for non-existent address, got nil")
+	}
+	if !strings.Contains(err.Error(), "no subscribers") {
+		t.Errorf("Expected error mentioning 'no subscribers', got %v", err)
 	}
 }
