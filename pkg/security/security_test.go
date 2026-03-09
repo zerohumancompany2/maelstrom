@@ -1020,3 +1020,44 @@ func TestTaintEngine_StripTaint_NoForbidden(t *testing.T) {
 		t.Errorf("Expected key to be 'value', got %v", resultMap["key"])
 	}
 }
+
+func TestToolTaintOutput_AutoAttach(t *testing.T) {
+	registry := NewToolRegistry()
+	registry.RegisterTool(&ToolConfig{
+		Name:        "webSearch",
+		Boundary:    mail.DMZBoundary,
+		TaintOutput: []string{"TOOL_OUTPUT"},
+	})
+
+	resultMail := &mail.Mail{
+		ID:     "result-1",
+		Type:   mail.MailTypeToolResult,
+		Source: "sys:tools",
+		Target: "agent:user",
+		Content: map[string]interface{}{
+			"query": "test",
+			"data":  "search results",
+		},
+		Metadata: mail.MailMetadata{
+			Taints: []string{},
+		},
+	}
+
+	result, err := AttachToolTaints("webSearch", resultMail, registry)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	resultMail, ok := result.(*mail.Mail)
+	if !ok {
+		t.Fatalf("Expected *mail.Mail, got %T", result)
+	}
+
+	if len(resultMail.Metadata.Taints) != 1 {
+		t.Errorf("Expected 1 taint, got %d: %v", len(resultMail.Metadata.Taints), resultMail.Metadata.Taints)
+	}
+
+	if resultMail.Metadata.Taints[0] != "TOOL_OUTPUT" {
+		t.Errorf("Expected taint 'TOOL_OUTPUT', got %v", resultMail.Metadata.Taints)
+	}
+}
