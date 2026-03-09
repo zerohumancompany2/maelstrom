@@ -135,3 +135,16 @@ func TestMailRouter_RouteToUnknownAddress(t *testing.T) {
 		t.Error("Expected error for invalid address format")
 	}
 }
+
+func TestParseAddress_agent(t *testing.T) {
+	addrType, id, err := ParseAddress("agent:user-123")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if addrType != AddressTypeAgent {
+		t.Errorf("Expected AddressTypeAgent, got %v", addrType)
+	}
+	if id != "user-123" {
+		t.Errorf("Expected id 'user-123', got %v", id)
+	}
+}
