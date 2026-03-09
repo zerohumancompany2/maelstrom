@@ -49,6 +49,16 @@ func TestLifecycleService_SpawnReturnsEmptyRuntimeID(t *testing.T) {
 	}
 }
 
+func TestLifecycleService_StopReturnsNil(t *testing.T) {
+	svc := NewLifecycleService()
+
+	err := svc.Stop(statechart.RuntimeID("test-123"))
+
+	if err != nil {
+		t.Errorf("Expected Stop to return nil, got %v", err)
+	}
+}
+
 func TestLifecycleService_BootstrapChart(t *testing.T) {
 	chart := BootstrapChart()
 
