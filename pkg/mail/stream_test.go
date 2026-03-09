@@ -107,3 +107,32 @@ func TestTaintStripping(t *testing.T) {
 		t.Errorf("Expected 0 taints with empty allowed list, got %d", len(stripped2.Taints))
 	}
 }
+
+func TestStreamChunk_IsFinal(t *testing.T) {
+	// Create a sequence of chunks
+	chunks := []StreamChunk{
+		{Data: "Part 1", Sequence: 1, IsFinal: false},
+		{Data: "Part 2", Sequence: 2, IsFinal: false},
+		{Data: "Part 3", Sequence: 3, IsFinal: true},
+	}
+
+	// Verify only last chunk is final
+	for i, chunk := range chunks {
+		expectedFinal := (i == len(chunks)-1)
+		if chunk.IsFinal != expectedFinal {
+			t.Errorf("Chunk %d: Expected IsFinal=%v, got %v", i, expectedFinal, chunk.IsFinal)
+		}
+	}
+
+	// Test stream completion detection
+	isComplete := false
+	for _, chunk := range chunks {
+		if chunk.IsFinal {
+			isComplete = true
+			break
+		}
+	}
+	if !isComplete {
+		t.Error("Expected to detect stream completion via IsFinal")
+	}
+}
