@@ -131,3 +131,32 @@ func TestObservabilityService_ID(t *testing.T) {
 		t.Errorf("Expected ID sys:observability, got %s", chart.ID)
 	}
 }
+
+func TestObservabilityService_EmptyFiltersReturnsAll(t *testing.T) {
+	svc := NewObservabilityService()
+
+	trace1 := services.Trace{
+		ID:        "trace-1",
+		RuntimeID: "runtime-1",
+		EventType: "transition",
+		StatePath: "state/1",
+	}
+	trace2 := services.Trace{
+		ID:        "trace-2",
+		RuntimeID: "runtime-2",
+		EventType: "entry",
+		StatePath: "state/2",
+	}
+	svc.EmitTrace(trace1)
+	svc.EmitTrace(trace2)
+
+	filters := services.TraceFilters{}
+	traces, err := svc.QueryTraces(filters)
+
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if len(traces) != 2 {
+		t.Errorf("Expected 2 traces, got %d", len(traces))
+	}
+}
