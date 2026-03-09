@@ -4,6 +4,14 @@ import (
 	"testing"
 )
 
+func TestObservabilityService_NewObservabilityServiceReturnsNonNil(t *testing.T) {
+	svc := NewObservabilityService()
+
+	if svc == nil {
+		t.Error("Expected NewObservabilityService to return non-nil")
+	}
+}
+
 func TestObservabilityService_BootstrapChart(t *testing.T) {
 	chart := BootstrapChart()
 
