@@ -100,3 +100,46 @@ func TestSequence_PassesKernelToActions(t *testing.T) {
 		t.Fatal("expected non-nil sequence")
 	}
 }
+
+// TestActions_ReceiveKernelReference verifies actions receive kernel reference.
+func TestActions_ReceiveKernelReference(t *testing.T) {
+	kernel := &MockKernel{
+		services: make(map[string]interface{}),
+	}
+	seq := NewSequenceWithKernel(kernel)
+
+	kernelAccessed := false
+	seq.OnStateEnter(func(state string) error {
+		if state == "security" {
+			kernelAccessed = true
+			kernel.RegisterService("security", "security-service")
+		}
+		return nil
+	})
+
+	ctx := context.Background()
+	if err := seq.Start(ctx); err != nil {
+		t.Fatalf("failed to start: %v", err)
+	}
+
+	if !kernelAccessed {
+		t.Error("kernel was not accessed during state entry")
+	}
+
+	if len(kernel.services) != 1 {
+		t.Errorf("expected 1 service registered, got %d", len(kernel.services))
+	}
+
+	if _, ok := kernel.services["security"]; !ok {
+		t.Error("expected security service to be registered")
+	}
+}
+
+type MockKernel struct {
+	services map[string]interface{}
+}
+
+func (m *MockKernel) RegisterService(name string, service interface{}) error {
+	m.services[name] = service
+	return nil
+}
