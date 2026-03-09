@@ -561,3 +561,89 @@ func TestTaintEngine_PropagateTaint_NestedMap(t *testing.T) {
 		}
 	}
 }
+
+func TestTaintEngine_PropagateTaint_Slice(t *testing.T) {
+	engine := NewTaintEngine()
+
+	data := map[string]interface{}{
+		"_taints": []string{"PII"},
+		"items": []interface{}{
+			map[string]interface{}{
+				"_taints": []string{"PII"},
+				"name":    "item1",
+			},
+			map[string]interface{}{
+				"_taints": []string{"PII"},
+				"name":    "item2",
+			},
+			"non-map-element",
+		},
+	}
+
+	result, err := engine.Propagate(data, []string{"WORKSPACE"})
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected map[string]interface{}, got %T", result)
+	}
+
+	rootTaints, ok := resultMap["_taints"].([]string)
+	if !ok {
+		t.Fatalf("Expected root _taints to be []string, got %T", resultMap["_taints"])
+	}
+
+	if len(rootTaints) != 2 {
+		t.Errorf("Expected root to have 2 taints, got %d", len(rootTaints))
+	}
+
+	items, ok := resultMap["items"].([]interface{})
+	if !ok {
+		t.Fatalf("Expected items to be []interface{}, got %T", resultMap["items"])
+	}
+
+	if len(items) != 3 {
+		t.Errorf("Expected 3 items, got %d", len(items))
+	}
+
+	item1, ok := items[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected item1 to be map[string]interface{}, got %T", items[0])
+	}
+
+	item1Taints, ok := item1["_taints"].([]string)
+	if !ok {
+		t.Fatalf("Expected item1 _taints to be []string, got %T", item1["_taints"])
+	}
+
+	if len(item1Taints) != 2 {
+		t.Errorf("Expected item1 to have 2 taints, got %d", len(item1Taints))
+	}
+
+	item2, ok := items[1].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected item2 to be map[string]interface{}, got %T", items[1])
+	}
+
+	item2Taints, ok := item2["_taints"].([]string)
+	if !ok {
+		t.Fatalf("Expected item2 _taints to be []string, got %T", item2["_taints"])
+	}
+
+	if len(item2Taints) != 2 {
+		t.Errorf("Expected item2 to have 2 taints, got %d", len(item2Taints))
+	}
+
+	if items[2] != "non-map-element" {
+		t.Errorf("Expected non-map element unchanged, got %v", items[2])
+	}
+
+	expectedTaints := map[string]bool{"PII": true, "WORKSPACE": true}
+	for _, taint := range item1Taints {
+		if !expectedTaints[taint] {
+			t.Errorf("Unexpected item1 taint %q", taint)
+		}
+	}
+}

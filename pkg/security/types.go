@@ -227,12 +227,28 @@ func (e *taintEngineImpl) propagateTaintToMap(m map[string]interface{}, newTaint
 				return nil, err
 			}
 			result[k] = nested
+		case []interface{}:
+			result[k] = e.propagateTaintToSlice(v, newTaints)
 		default:
 			result[k] = val
 		}
 	}
 
 	return result, nil
+}
+
+func (e *taintEngineImpl) propagateTaintToSlice(slice []interface{}, newTaints []string) []interface{} {
+	result := make([]interface{}, len(slice))
+	for i, elem := range slice {
+		switch v := elem.(type) {
+		case map[string]interface{}:
+			nested, _ := e.propagateTaintToMap(v, newTaints)
+			result[i] = nested
+		default:
+			result[i] = elem
+		}
+	}
+	return result
 }
 
 func (e *taintEngineImpl) CheckForbidden(taints []string, boundary BoundaryType) error {
