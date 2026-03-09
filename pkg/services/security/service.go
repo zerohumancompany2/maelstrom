@@ -58,6 +58,27 @@ func (s *SecurityService) PrepareContextForBoundary(runtimeId string, boundary m
 	return nil
 }
 
+func (s *SecurityService) NamespaceIsolate(data interface{}, agentID string) interface{} {
+	dataSlice, ok := data.([]interface{})
+	if !ok {
+		return data
+	}
+
+	var result []interface{}
+	for _, item := range dataSlice {
+		itemMap, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		if itemMap["agentID"] == agentID {
+			result = append(result, item)
+		}
+	}
+
+	return result
+}
+
 func (s *SecurityService) Start() error {
 	return nil
 }

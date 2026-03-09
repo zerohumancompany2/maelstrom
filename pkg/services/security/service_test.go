@@ -231,3 +231,32 @@ func TestSecurityService_ValidateAndSanitize_outerToInner(t *testing.T) {
 		t.Errorf("Expected EXTERNAL taint to be added for outer→inner transition, got: %v", result.Metadata.Taints)
 	}
 }
+
+func TestSecurityService_NamespaceIsolate(t *testing.T) {
+	svc := NewSecurityService()
+
+	data := []interface{}{
+		map[string]interface{}{"agentID": "agent-1", "value": "data-1"},
+		map[string]interface{}{"agentID": "agent-2", "value": "data-2"},
+		map[string]interface{}{"agentID": "agent-1", "value": "data-3"},
+	}
+
+	result := svc.NamespaceIsolate(data, "agent-1")
+
+	resultSlice, ok := result.([]interface{})
+	if !ok {
+		t.Error("Expected result to be []interface{}")
+	}
+
+	if len(resultSlice) != 2 {
+		t.Errorf("Expected 2 items for agent-1, got %d", len(resultSlice))
+	}
+
+	if resultSlice[0].(map[string]interface{})["value"] != "data-1" {
+		t.Error("Expected first item to be data-1")
+	}
+
+	if resultSlice[1].(map[string]interface{})["value"] != "data-3" {
+		t.Error("Expected second item to be data-3")
+	}
+}
