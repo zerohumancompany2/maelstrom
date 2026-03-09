@@ -34,6 +34,16 @@ func TestCommunicationService_HandleMailReturnsNil(t *testing.T) {
 	}
 }
 
+func TestCommunicationService_PublishReturnsNil(t *testing.T) {
+	svc := NewCommunicationService()
+
+	err := svc.Publish(mail.Mail{})
+
+	if err != nil {
+		t.Errorf("Expected Publish to return nil, got %v", err)
+	}
+}
+
 func TestCommunicationService_BootstrapChart(t *testing.T) {
 	chart := BootstrapChart()
 
