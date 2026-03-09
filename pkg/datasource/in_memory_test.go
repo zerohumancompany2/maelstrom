@@ -35,3 +35,40 @@ func TestInMemory_TagOnWrite(t *testing.T) {
 		}
 	}
 }
+
+func TestInMemory_GetTaints(t *testing.T) {
+	ds := NewInMemoryDataSource()
+
+	knownPath := "/workspace/test.txt"
+	unknownPath := "/workspace/other.txt"
+	taints := []string{"WORKSPACE", "TOOL_OUTPUT"}
+
+	err := ds.TagOnWrite(knownPath, taints)
+	if err != nil {
+		t.Fatalf("Expected no error on TagOnWrite, got %v", err)
+	}
+
+	retrieved, err := ds.GetTaints(knownPath)
+	if err != nil {
+		t.Fatalf("Expected no error on GetTaints, got %v", err)
+	}
+
+	if len(retrieved) != len(taints) {
+		t.Errorf("Expected %d taints for known path, got %d", len(taints), len(retrieved))
+	}
+
+	for i, expected := range taints {
+		if retrieved[i] != expected {
+			t.Errorf("Expected taint %s at index %d, got %s", expected, i, retrieved[i])
+		}
+	}
+
+	emptyTaints, err := ds.GetTaints(unknownPath)
+	if err != nil {
+		t.Fatalf("Expected no error for unknown path, got %v", err)
+	}
+
+	if len(emptyTaints) != 0 {
+		t.Errorf("Expected empty taints for unknown path, got %v", emptyTaints)
+	}
+}

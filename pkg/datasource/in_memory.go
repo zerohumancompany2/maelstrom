@@ -26,8 +26,13 @@ func (im *inMemoryDataSource) TagOnWrite(path string, taints []string) error {
 }
 
 func (im *inMemoryDataSource) GetTaints(path string) ([]string, error) {
-	// TODO: implement
-	return nil, nil
+	im.mu.RLock()
+	defer im.mu.RUnlock()
+	taints, ok := im.taints[path]
+	if !ok {
+		return []string{}, nil
+	}
+	return append([]string(nil), taints...), nil
 }
 
 func (im *inMemoryDataSource) ValidateAccess(boundary security.BoundaryType) error {
