@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/maelstrom/v3/pkg/security"
 	"golang.org/x/sys/unix"
 )
 
@@ -110,5 +111,33 @@ func TestLocalDisk_SidecarFallback(t *testing.T) {
 		if retrieved[i] != expected {
 			t.Errorf("taint[%d] mismatch: got %q, want %q", i, retrieved[i], expected)
 		}
+	}
+}
+
+func TestLocalDisk_ValidateAccess_Allowed(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	testFile := tmpDir + "/test.txt"
+	if err := os.WriteFile(testFile, []byte("content"), 0644); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+
+	taints := []string{"PII"}
+	jsonData, _ := json.Marshal(taints)
+	if err := unix.Lsetxattr(testFile, "user.maelstrom.taints", jsonData, 0); err != nil {
+		t.Fatalf("Lsetxattr failed: %v", err)
+	}
+
+	ds, err := NewLocalDisk(map[string]any{
+		"path":               tmpDir,
+		"allowedForBoundary": []security.BoundaryType{security.InnerBoundary, security.DMZBoundary},
+	})
+	if err != nil {
+		t.Fatalf("NewLocalDisk failed: %v", err)
+	}
+
+	err = ds.ValidateAccess(security.DMZBoundary)
+	if err != nil {
+		t.Errorf("ValidateAccess should allow dmz boundary, got error: %v", err)
 	}
 }

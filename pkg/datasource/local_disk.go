@@ -2,6 +2,7 @@ package datasource
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/maelstrom/v3/pkg/security"
 	"os"
 	"path/filepath"
@@ -10,8 +11,9 @@ import (
 )
 
 type localDisk struct {
-	path           string
-	xattrNamespace string
+	path               string
+	xattrNamespace     string
+	allowedForBoundary []security.BoundaryType
 }
 
 func NewLocalDisk(config map[string]any) (DataSource, error) {
@@ -21,9 +23,15 @@ func NewLocalDisk(config map[string]any) (DataSource, error) {
 		xattrNS = ns
 	}
 
+	allowedForBoundary := []security.BoundaryType{}
+	if allowed, ok := config["allowedForBoundary"].([]security.BoundaryType); ok {
+		allowedForBoundary = allowed
+	}
+
 	return &localDisk{
-		path:           path,
-		xattrNamespace: xattrNS,
+		path:               path,
+		xattrNamespace:     xattrNS,
+		allowedForBoundary: allowedForBoundary,
 	}, nil
 }
 
@@ -76,7 +84,12 @@ func (d *localDisk) GetTaints(path string) ([]string, error) {
 }
 
 func (d *localDisk) ValidateAccess(boundary security.BoundaryType) error {
-	return nil
+	for _, allowed := range d.allowedForBoundary {
+		if allowed == boundary {
+			return nil
+		}
+	}
+	return fmt.Errorf("boundary %s not allowed for this datasource", boundary)
 }
 
 func (d *localDisk) writeSidecar(path string, taints []string) error {
