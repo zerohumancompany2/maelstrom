@@ -40,8 +40,8 @@ func TestBootstrapChart_HasSecurityState(t *testing.T) {
 		t.Fatal("states should be a map")
 	}
 
-	if _, ok := states["security"]; !ok {
-		t.Error("bootstrap chart missing 'security' state")
+	if _, ok := states["sys:bootstrap/security"]; !ok {
+		t.Error("bootstrap chart missing 'sys:bootstrap/security' state")
 	}
 }
 
