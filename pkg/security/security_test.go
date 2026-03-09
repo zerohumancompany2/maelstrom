@@ -330,3 +330,46 @@ func TestTaintEngine_AttachTaint_Mail(t *testing.T) {
 		}
 	}
 }
+
+func TestTaintEngine_AttachTaint_Map(t *testing.T) {
+	engine := NewTaintEngine()
+
+	data := map[string]interface{}{
+		"key1": "value1",
+		"key2": 123,
+	}
+
+	result, err := engine.AttachTaint(data, []string{"PII", "SECRET"})
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected map[string]interface{}, got %T", result)
+	}
+
+	if resultMap["key1"] != "value1" {
+		t.Errorf("Expected key1 to be 'value1', got %v", resultMap["key1"])
+	}
+
+	if resultMap["key2"] != 123 {
+		t.Errorf("Expected key2 to be 123, got %v", resultMap["key2"])
+	}
+
+	taints, ok := resultMap["_taints"].([]string)
+	if !ok {
+		t.Fatalf("Expected _taints key with []string value, got %T", resultMap["_taints"])
+	}
+
+	if len(taints) != 2 {
+		t.Errorf("Expected 2 taints, got %d", len(taints))
+	}
+
+	expectedTaints := map[string]bool{"PII": true, "SECRET": true}
+	for _, taint := range taints {
+		if !expectedTaints[taint] {
+			t.Errorf("Unexpected taint %q", taint)
+		}
+	}
+}

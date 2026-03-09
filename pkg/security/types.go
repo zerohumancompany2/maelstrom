@@ -211,6 +211,13 @@ func (e *taintEngineImpl) AttachTaint(obj any, taints []string) (any, error) {
 		}
 		v.Metadata.Taints = merged
 		return v, nil
+	case map[string]interface{}:
+		result := make(map[string]interface{})
+		for k, val := range v {
+			result[k] = val
+		}
+		result["_taints"] = taints
+		return result, nil
 	default:
 		return obj, nil
 	}
