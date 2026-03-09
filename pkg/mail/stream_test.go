@@ -331,3 +331,36 @@ func TestMailStream_TaintStripping(t *testing.T) {
 		t.Error("Expected INNER_BOUNDARY to be stripped")
 	}
 }
+
+func TestMailStream_TaintPropagation(t *testing.T) {
+	session := NewStreamSession("test-session", nil)
+
+	inputChunk := StreamChunk{
+		Data:     "test data",
+		Sequence: 1,
+		Taints:   []string{"USER_SUPPLIED"},
+	}
+
+	propagated := session.propagateTaints(&inputChunk, []string{"PROCESSING"})
+
+	if len(propagated.Taints) != 2 {
+		t.Errorf("Expected 2 taints after propagation, got %d", len(propagated.Taints))
+	}
+
+	hasUserSupplied := false
+	hasProcessing := false
+	for _, t := range propagated.Taints {
+		if t == "USER_SUPPLIED" {
+			hasUserSupplied = true
+		}
+		if t == "PROCESSING" {
+			hasProcessing = true
+		}
+	}
+	if !hasUserSupplied {
+		t.Error("Expected USER_SUPPLIED to be preserved")
+	}
+	if !hasProcessing {
+		t.Error("Expected PROCESSING to be added")
+	}
+}

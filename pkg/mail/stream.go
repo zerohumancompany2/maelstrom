@@ -95,3 +95,20 @@ func (s *StreamSession) stripTaints(chunk *StreamChunk) *StreamChunk {
 	chunk.Taints = filtered
 	return chunk
 }
+
+// propagateTaints adds new taints to a stream chunk
+func (s *StreamSession) propagateTaints(chunk *StreamChunk, newTaints []string) *StreamChunk {
+	taintMap := make(map[string]bool)
+	for _, t := range chunk.Taints {
+		taintMap[t] = true
+	}
+	for _, t := range newTaints {
+		taintMap[t] = true
+	}
+	var result []string
+	for t := range taintMap {
+		result = append(result, t)
+	}
+	chunk.Taints = result
+	return chunk
+}
