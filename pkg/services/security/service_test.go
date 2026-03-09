@@ -34,6 +34,16 @@ func TestSecurityService_HandleMailReturnsNil(t *testing.T) {
 	}
 }
 
+func TestSecurityService_ValidateBoundaryReturnsNil(t *testing.T) {
+	svc := NewSecurityService()
+
+	err := svc.ValidateBoundary(mail.InnerBoundary, mail.DMZBoundary)
+
+	if err != nil {
+		t.Errorf("Expected ValidateBoundary to return nil, got %v", err)
+	}
+}
+
 func TestSecurityService_BootstrapChart(t *testing.T) {
 	chart := BootstrapChart()
 
