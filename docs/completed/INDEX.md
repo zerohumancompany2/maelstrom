@@ -1,13 +1,17 @@
-# Layer 1 Completed Documentation Index
+# Completed Documentation Index
 
-**Generated:** 2026-03-08  
-**Status:** All Layer 1 phases complete
+**Generated:** 2026-03-09  
+**Status:** Layers 1-3 + Gap Remediation complete
 
 ---
 
 ## Overview
 
-This directory contains all completed documentation for Layer 1 (Kernel Bootstrap) implementation.
+This directory contains all completed documentation for:
+- Layer 1 (Kernel Bootstrap)
+- Layer 2 (Core Platform Services)
+- Layer 3 (Communication & Mail)
+- Gap Remediation (24 gaps across 6 phases)
 
 ### Quick Links
 
@@ -232,10 +236,174 @@ See [`../gaps/layer-01-minor-gaps.md`](../gaps/layer-01-minor-gaps.md) for:
 ## References
 
 - **Architecture Spec:** `docs/arch-v1.md`
-- **Layer 2 Spec:** `docs/planning/layer-02-core-services.md`
 - **Gaps Document:** `docs/gaps/layer-01-minor-gaps.md`
 
 ---
 
+# Layer 2: Core Platform Services
+
+**Status:** ✅ Complete (94% compliance)
+
+## Audit Report
+
+### layer-02-audit-report.md (in ../gaps/)
+**Final audit of Layer 2 implementation**
+
+- **Compliance:** 94%
+- **Critical Gaps:** 0 (all remediated)
+- **Tests Passing:** All packages passing
+
+---
+
+## Complete Status
+
+### layer-02-core-services.md
+**Comprehensive Layer 2 implementation summary**
+
+**Contents:**
+- 4 core services (security, communication, observability, lifecycle)
+- 6 hot-reloadable services (admin, persistence, heartbeat, memory, tools, datasources)
+- Service registry with state tracking
+- All services wired to Kernel bootstrap
+
+---
+
+## Phase Breakdown
+
+### layer-02-phase-breakdown.md
+**Detailed phase-by-phase implementation plan**
+
+**Phases:**
+- Phase 2.1: Type definitions
+- Phase 2.2: Communication service
+- Phase 2.3: Observability service
+- Phase 2.4: Lifecycle service
+- Phase 2.5: Security service
+- Phase 2.6: Registry integration
+
+---
+
+# Layer 3: Communication & Mail
+
+**Status:** ✅ Complete (95% compliance)
+
+## Complete Status
+
+### layer-03-communication-mail.md
+**Comprehensive Layer 3 implementation summary**
+
+**Contents:**
+- Mail types and addressing
+- Mail router with pub/sub
+- Agent and service inboxes
+- Topic-based pub/sub
+- Streaming support
+- Gateway adapters (webhook, SSE, WebSocket, stubs)
+- Human gateway service
+
+---
+
+## Phase Breakdown
+
+### layer-03-phase-breakdown.md
+**Detailed Layer 3 implementation plan**
+
+**Phases:**
+- Phase 3.1: Mail types
+- Phase 3.2: Mail router
+- Phase 3.3: Agent/service inbox & topic pub/sub
+- Phase 3.4: Pub/sub service
+- Phase 3.5: Streaming
+- Phase 3.6: Gateway adapters
+- Phase 3.7: Human gateway
+- Phase 3.8: Integration
+
+---
+
+## Index
+
+### layer-03-index.md
+**Layer 3 documentation navigation**
+
+---
+
+# Gap Remediation
+
+**Status:** ✅ Complete (24 gaps fixed, 89 commits)
+
+## Overview
+
+### gap-remediation-plan.md
+**High-level gap remediation strategy**
+
+- 6 phases (G1-G6)
+- 25 sub-phases
+- 89 tests, 89 commits
+- P0-P3 priority levels
+
+---
+
+## Phase Breakdown
+
+### gap-remediation-phase-breakdown.md
+**Detailed gap remediation phases**
+
+**Phases:**
+- G1 (Critical): ParseAddress, StreamSession, Security boundary, NamespaceIsolate, CheckTaintPolicy, Human gateway
+- G2 (Core): Address validation, Taint propagation, At-least-once delivery, Request-reply, Gateway servers
+- G3 (Integration): Registry state, Service bootstrap, Dead-letter, Stream taints
+- G4 (Gateway): TopicSubscriber, OpenAPI, Hot-reloadable services, HTTP endpoints
+- G5 (Observability): Mail metadata, Metrics, Dead-letter optimization, Runtime tracking
+- G6 (Advanced): Deduplication, Hot-reload
+
+---
+
+## Index
+
+### gap-remediation-index.md
+**Gap remediation documentation navigation**
+
+---
+
+## Phase Specs
+
+### gap-remediation/
+**Individual phase specification documents (25 files)**
+
+| Phase | Files | Gaps Addressed |
+|-------|-------|----------------|
+| G1 (Critical) | phase-g1.1.md - phase-g1.6.md | L3-H4, L3-C1, L2-C1, L2-C2, L2-C3, L3-C3 |
+| G2 (Core) | phase-g2.1.md - phase-g2.5.md | L3-H1, L2-H1, L2-H2, L3-H2, L3-H3 |
+| G3 (Integration) | phase-g3.1.md - phase-g3.4.md | L2-H5, L2-M5, L3-M3, L3-M4 |
+| G4 (Gateway) | phase-g4.1.md - phase-g4.4.md | L3-M2, L3-C2, L2-M4 |
+| G5 (Observability) | phase-g5.1.md - phase-g5.4.md | L3-M1, L2-H3, L2-M2, L2-M3 |
+| G6 (Advanced) | phase-g6.1.md - phase-g6.2.md | L2-M1, L2-H4 |
+
+---
+
+## Summary Statistics
+
+### Total Implementation
+
+| Metric | Value |
+|--------|-------|
+| Layers Completed | 3 |
+| Gaps Remediated | 24 |
+| Total Commits | 460+ |
+| Test Coverage | 24/25 packages passing |
+| Compliance | ~95% |
+
+### Branches Merged
+
+| Layer | Branches | Commits |
+|-------|----------|---------|
+| Layer 1 | 11 | 85 |
+| Layer 2 | 7 | 48 |
+| Layer 3 | 4 | 40 |
+| Gap Remediation | 1 | 376 |
+| **Total** | **23** | **549** |
+
+---
+
 **Document Status:** Complete  
-**Last Updated:** 2026-03-08
+**Last Updated:** 2026-03-09
