@@ -347,10 +347,36 @@ func (e *taintEngineImpl) stripTaintFromMap(m map[string]interface{}, forbiddenS
 		if k == "_taints" {
 			continue
 		}
-		result[k] = val
+		switch v := val.(type) {
+		case map[string]interface{}:
+			nested, nestedStripped, err := e.stripTaintFromMap(v, forbiddenSet)
+			if err != nil {
+				return nil, nil, err
+			}
+			result[k] = nested
+			stripped = append(stripped, nestedStripped...)
+		case []interface{}:
+			result[k] = e.stripTaintFromSlice(v, forbiddenSet)
+		default:
+			result[k] = val
+		}
 	}
 
 	return result, stripped, nil
+}
+
+func (e *taintEngineImpl) stripTaintFromSlice(slice []interface{}, forbiddenSet map[string]bool) []interface{} {
+	result := make([]interface{}, len(slice))
+	for i, elem := range slice {
+		switch v := elem.(type) {
+		case map[string]interface{}:
+			nested, _, _ := e.stripTaintFromMap(v, forbiddenSet)
+			result[i] = nested
+		default:
+			result[i] = elem
+		}
+	}
+	return result
 }
 
 func (e *taintEngineImpl) attachTaintToMap(m map[string]interface{}, taints []string) (map[string]interface{}, error) {

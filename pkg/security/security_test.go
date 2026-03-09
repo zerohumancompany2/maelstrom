@@ -847,3 +847,70 @@ func TestTaintEngine_StripTaint_ReturnsStripped(t *testing.T) {
 		t.Errorf("Expected stripped list ['PII'], got %v", stripped)
 	}
 }
+
+func TestTaintEngine_StripTaint_Nested(t *testing.T) {
+	engine := NewTaintEngine()
+
+	nested := map[string]interface{}{
+		"_taints": []string{"PII", "INNER_ONLY"},
+		"level1": map[string]interface{}{
+			"_taints": []string{"SECRET", "INNER_ONLY"},
+			"level2": map[string]interface{}{
+				"_taints": []string{"INNER_ONLY", "TOOL_OUTPUT"},
+				"data":    "secret",
+			},
+		},
+	}
+
+	forbidden := []string{"INNER_ONLY"}
+	result, stripped, err := engine.StripTaint(nested, forbidden)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected map[string]interface{}, got %T", result)
+	}
+
+	rootTaints, ok := resultMap["_taints"].([]string)
+	if !ok {
+		t.Fatalf("Expected root _taints to be []string, got %T", resultMap["_taints"])
+	}
+
+	if len(rootTaints) != 1 || rootTaints[0] != "PII" {
+		t.Errorf("Expected root to have ['PII'], got %v", rootTaints)
+	}
+
+	level1, ok := resultMap["level1"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected level1 to be map[string]interface{}, got %T", resultMap["level1"])
+	}
+
+	level1Taints, ok := level1["_taints"].([]string)
+	if !ok {
+		t.Fatalf("Expected level1 _taints to be []string, got %T", level1["_taints"])
+	}
+
+	if len(level1Taints) != 1 || level1Taints[0] != "SECRET" {
+		t.Errorf("Expected level1 to have ['SECRET'], got %v", level1Taints)
+	}
+
+	level2, ok := level1["level2"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected level2 to be map[string]interface{}, got %T", level1["level2"])
+	}
+
+	level2Taints, ok := level2["_taints"].([]string)
+	if !ok {
+		t.Fatalf("Expected level2 _taints to be []string, got %T", level2["_taints"])
+	}
+
+	if len(level2Taints) != 1 || level2Taints[0] != "TOOL_OUTPUT" {
+		t.Errorf("Expected level2 to have ['TOOL_OUTPUT'], got %v", level2Taints)
+	}
+
+	if len(stripped) != 3 {
+		t.Errorf("Expected 3 stripped taints, got %d: %v", len(stripped), stripped)
+	}
+}
