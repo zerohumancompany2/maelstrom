@@ -1,6 +1,9 @@
 package mail
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestMail_Types(t *testing.T) {
 	types := []MailType{
@@ -75,6 +78,46 @@ func TestMail_Metadata(t *testing.T) {
 	emptyMeta := MailMetadata{Taints: []string{}}
 	if len(emptyMeta.Taints) != 0 {
 		t.Error("Expected empty Taints slice")
+	}
+}
+
+func TestMail_Structure(t *testing.T) {
+	mail := Mail{
+		ID:            "msg-001",
+		CorrelationID: "corr-001",
+		Type:          MailTypeUser,
+		CreatedAt:     time.Now(),
+		Source:        "agent:user-agent",
+		Target:        "agent:recommendation-agent",
+		Content:       map[string]any{"text": "hello"},
+		Metadata: MailMetadata{
+			Tokens:   10,
+			Boundary: OuterBoundary,
+			Taints:   []string{"USER_SUPPLIED"},
+		},
+	}
+
+	if mail.ID != "msg-001" {
+		t.Errorf("Expected ID 'msg-001', got '%s'", mail.ID)
+	}
+	if mail.Type != MailTypeUser {
+		t.Errorf("Expected Type MailTypeUser, got %s", mail.Type)
+	}
+	if mail.Source != "agent:user-agent" {
+		t.Errorf("Expected Source 'agent:user-agent', got '%s'", mail.Source)
+	}
+	if mail.Target != "agent:recommendation-agent" {
+		t.Errorf("Expected Target 'agent:recommendation-agent', got '%s'", mail.Target)
+	}
+
+	// Test Content accepts any type
+	mail.Content = "string content"
+	if mail.Content != "string content" {
+		t.Error("Expected Content to accept string")
+	}
+	mail.Content = 42
+	if mail.Content != 42 {
+		t.Error("Expected Content to accept int")
 	}
 }
 
