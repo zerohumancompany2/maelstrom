@@ -26,3 +26,29 @@ func TestMailRouter_SubscribeMethods(t *testing.T) {
 		t.Errorf("Expected nil error, got %v", err)
 	}
 }
+
+func TestMailRouter_RouteToAgent(t *testing.T) {
+	router := NewMailRouter()
+
+	agentInbox := &AgentInbox{ID: "recommendation-agent"}
+	router.SubscribeAgent("recommendation-agent", agentInbox)
+
+	mail := Mail{
+		ID:     "msg-001",
+		Source: "agent:user-agent",
+		Target: "agent:recommendation-agent",
+		Type:   MailTypeUser,
+	}
+
+	err := router.Route(mail)
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	// Verify message was pushed to inbox
+	agentInbox.mu.RLock()
+	if len(agentInbox.Messages) != 1 {
+		t.Errorf("Expected 1 message in inbox, got %d", len(agentInbox.Messages))
+	}
+	agentInbox.mu.RUnlock()
+}

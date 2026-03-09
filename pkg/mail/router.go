@@ -21,8 +21,24 @@ func NewMailRouter() *MailRouter {
 }
 
 func (r *MailRouter) Route(mail Mail) error {
-	// TODO: implement
-	return errors.New("not implemented")
+	addrType, id, err := ParseAddress(mail.Target)
+	if err != nil {
+		return err
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	switch addrType {
+	case AddressTypeAgent:
+		inbox, exists := r.agents[id]
+		if !exists {
+			return errors.New("agent not found: " + id)
+		}
+		return inbox.Push(mail)
+	default:
+		return errors.New("unknown address type")
+	}
 }
 
 func (r *MailRouter) SubscribeAgent(id string, inbox *AgentInbox) error {
@@ -54,7 +70,9 @@ type AgentInbox struct {
 }
 
 func (ai *AgentInbox) Push(mail Mail) error {
-	// TODO: implement
+	ai.mu.Lock()
+	defer ai.mu.Unlock()
+	ai.Messages = append(ai.Messages, mail)
 	return nil
 }
 
