@@ -18,56 +18,64 @@ const BootstrapChartYAML = `
 id: sys:bootstrap
 version: 1.0.0
 spec:
-  initial: initializing
+  initial: sys:bootstrap/init
   states:
-    initializing:
+    sys:bootstrap/init:
       type: atomic
       transitions:
         - event: START_BOOTSTRAP
-          target: security
+          target: sys:bootstrap/security
 
-    security:
+    sys:bootstrap/security:
       type: atomic
       entryActions:
-        - loadSecurityService
+        - securityBootstrap
       transitions:
         - event: SECURITY_READY
-          target: communication
+          target: sys:bootstrap/communication
+        - event: securityFailed
+          target: sys:bootstrap/failed
 
-    communication:
+    sys:bootstrap/communication:
       type: atomic
       entryActions:
-        - loadCommunicationService
+        - communicationBootstrap
       transitions:
         - event: COMMUNICATION_READY
-          target: observability
+          target: sys:bootstrap/observability
+        - event: communicationFailed
+          target: sys:bootstrap/failed
 
-    observability:
+    sys:bootstrap/observability:
       type: atomic
       entryActions:
-        - loadObservabilityService
+        - observabilityBootstrap
       transitions:
         - event: OBSERVABILITY_READY
-          target: lifecycle
+          target: sys:bootstrap/lifecycle
+        - event: observabilityFailed
+          target: sys:bootstrap/failed
 
-    lifecycle:
+    sys:bootstrap/lifecycle:
       type: atomic
       entryActions:
-        - loadLifecycleService
+        - lifecycleBootstrap
       transitions:
         - event: LIFECYCLE_READY
-          target: handoff
+          target: sys:bootstrap/ready
+        - event: lifecycleFailed
+          target: sys:bootstrap/failed
 
-    handoff:
-      type: atomic
-      entryActions:
-        - signalKernelReady
-      transitions:
-        - event: KERNEL_READY
-          target: complete
-
-    complete:
+    sys:bootstrap/ready:
       type: final
+      entryActions:
+        - logSuccess
+
+    sys:bootstrap/failed:
+      type: final
+      entryActions:
+        - logFailure
+        - panic
 `
 
 // CoreServices defines the 4 core services loaded by bootstrap.
