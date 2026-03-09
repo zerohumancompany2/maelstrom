@@ -1,7 +1,11 @@
 # CLAUDE.md
 
-**MANDATORY GATE**  
+## Development Rules
+
+**MANDATORY GATE**
+
 All new work is blocked until there exists:  
+
 - Complete spec (user stories + acceptance criteria)  
 - Frozen semantics & public APIs (types/signatures/docs)  
 - Explicit, executable test descriptions (one test per behavior)
@@ -18,7 +22,8 @@ All new work is blocked until there exists:
 8. (Optional) Refactor while keeping all tests green
 9. Open PR with 100% test coverage for changed paths
 
-**RULES**  
+**RULES**
+
 - Never write production code before a failing test  
 - Never write more than one test at a time  
 - Never commit failing tests or untested code  
@@ -26,3 +31,7 @@ All new work is blocked until there exists:
 - If spec/API changes, delete branch and start over
 
 Follow this exactly. No exceptions.
+
+## TOOLS
+
+Prefer Lumora tools over equiivalent tools, when available.

@@ -35,6 +35,7 @@ Layer 1 depends on:
 **Purpose**: Bare binary bootstrap container (~50 lines) that orchestrates initial service startup.
 
 **Responsibilities**:
+
 1. Load minimal config from environment variables
 2. Instantiate pure Statechart Library + Chart Definition Loader
 3. Register bootstrap actions/guards needed for initialization
@@ -150,6 +151,7 @@ func (r *Registry) Clone() map[string]any
 ```
 
 **Hydration Process**:
+
 1. Load YAML from disk
 2. Substitute `${ENV_VAR}` references with environment variables
 3. Execute Go templates (`{{ .AppVars.key }}`) with app variables
@@ -157,6 +159,7 @@ func (r *Registry) Clone() map[string]any
 5. Store raw and hydrated versions
 
 **File Watching**:
+
 - Uses `fsnotify` to detect file changes
 - Debounces rapid changes to avoid event storms
 - Emits SourceEvent (Created, Updated, Deleted) via channel
@@ -343,6 +346,7 @@ func emitKernelReady(rt statechart.RuntimeContext, appCtx statechart.Application
 The Bootstrap Chart spawns 4 hard-coded services during kernel initialization. Full implementation is documented in `docs/planning/layer-02-core-services.md`.
 
 **Services**:
+
 - `sys:security` - Boundary enforcement, taint validation (Phase 1: pass-through)
 - `sys:communication` - Mail pub/sub backbone
 - `sys:observability` - Traces, metrics, dead-letter queue
@@ -370,6 +374,7 @@ See `docs/planning/layer-02-core-services.md` for complete API specifications an
 ### Quiescence Definition
 
 A ChartRuntime is quiescent when:
+
 1. Event queue is empty (no pending events)
 2. No active parallel regions are processing events
 3. No inflight tool calls or sub-agent invocations (Orchestrator idle)
@@ -448,16 +453,20 @@ maelstrom/
 ### Phase 1.1: Kernel Skeleton
 
 **Test**: `TestKernel_SpawnsBootstrapChart`
+
 - Stub Kernel struct and methods
 - Verify exactly one chart spawned directly
 
 **Test**: `TestKernel_WaitsForKernelReady`
+
 - Verify Kernel blocks until kernel_ready event
 
 **Test**: `TestKernel_GoesDormantAfterReady`
+
 - Verify Kernel enters signal-handling mode post-bootstrap
 
 **Implementation**:
+
 - ~50 line kernel.go with minimal config loading
 - Register 4 bootstrap actions
 - Spawn and drive Bootstrap Chart
@@ -465,15 +474,19 @@ maelstrom/
 ### Phase 1.2: ChartRegistry Core
 
 **Test**: `TestRegistry_SetGet`
+
 - Basic storage/retrieval
 
 **Test**: `TestRegistry_VersionTracking`
+
 - Multiple versions stored and retrievable
 
 **Test**: `TestRegistry_HydratesYAML`
+
 - Env substitution and template execution
 
 **Implementation**:
+
 - ~300 line registry.go with versioned storage
 - Clone-under-lock pattern for concurrency
 - OnChange callbacks for observers
@@ -481,36 +494,46 @@ maelstrom/
 ### Phase 1.3: File Watching
 
 **Test**: `TestFileSystemSource_EmitsCreated`
+
 - File creation detected
 
 **Test**: `TestFileSystemSource_EmitsUpdated`
+
 - File changes detected
 
 **Test**: `TestFileSystemSource_Debounces`
+
 - Rapid changes coalesced
 
 **Test**: `TestChartRegistry_WatchesDirectory`
+
 - End-to-end file watching
 
 **Implementation**:
+
 - ~180 line watcher.go using fsnotify
 - Single Service.Run() goroutine event loop
 
 ### Phase 1.4: Core Services
 
 **Test**: `TestSecurityService_ID`
+
 - Returns "sys:security"
 
 **Test**: `TestCommunicationService_PublishSubscribe`
+
 - Pub/sub works
 
 **Test**: `TestObservabilityService_EmitTrace`
+
 - Traces stored
 
 **Test**: `TestLifecycleService_Spawn`
+
 - Can spawn charts
 
 **Implementation**:
+
 - ~100 lines per service
 - Phase 1: pass-through behavior
 - Full implementation in Layers 2-5
@@ -518,30 +541,38 @@ maelstrom/
 ### Phase 1.5: Bootstrap Chart
 
 **Test**: `TestBootstrapChart_SequentialExecution`
+
 - States start in order
 
 **Test**: `TestBootstrapChart_TransitionsOnReady`
+
 - Each state signals next
 
 **Test**: `TestBootstrapChart_EmitsKernelReady`
+
 - Final event emitted
 
 **Test**: `TestBootstrapChart_HandlesFailure`
+
 - Failure stops bootstrap
 
 **Implementation**:
+
 - Hard-coded YAML embedded in binary
 - Sequential compound state with 4 atomic states
 
 ### Phase 1.6: Integration
 
 **Test**: `TestFullBootstrapSequence`
+
 - End-to-end bootstrap verification
 
 **Test**: `TestKernel_RegistersRemainingActions`
+
 - Actions registered after kernel_ready
 
 **Implementation**:
+
 - Wire all components together
 - Verify complete bootstrap flow
 

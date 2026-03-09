@@ -8,10 +8,12 @@ import (
 
 	"github.com/maelstrom/v3/pkg/bootstrap"
 	"github.com/maelstrom/v3/pkg/runtime"
+	"github.com/maelstrom/v3/pkg/statechart"
 )
 
 // Kernel orchestrates bootstrap and hands off to ChartRegistry.
 type Kernel struct {
+	engine   statechart.Library
 	factory  *runtime.Factory
 	sequence *bootstrap.Sequence
 	runtimes map[string]*runtime.ChartRuntime
@@ -21,6 +23,14 @@ type Kernel struct {
 // New creates a new Kernel.
 func New() *Kernel {
 	return &Kernel{
+		runtimes: make(map[string]*runtime.ChartRuntime),
+	}
+}
+
+// NewWithEngine creates a new Kernel with the given statechart engine.
+func NewWithEngine(engine statechart.Library) *Kernel {
+	return &Kernel{
+		engine:   engine,
 		runtimes: make(map[string]*runtime.ChartRuntime),
 	}
 }
@@ -37,6 +47,21 @@ func (k *Kernel) Start(ctx context.Context) error {
 
 	log.Printf("[kernel] Loaded bootstrap chart: %s v%s", def.ID, def.Version)
 
+	// Spawn bootstrap runtime if engine is available
+	var bootstrapRTID statechart.RuntimeID
+	if k.engine != nil {
+		bootstrapRTID, err = k.engine.Spawn(def, nil)
+		if err != nil {
+			return fmt.Errorf("failed to spawn bootstrap runtime: %w", err)
+		}
+		log.Printf("[kernel] Spawning bootstrap runtime: %s", bootstrapRTID)
+
+		// Start the bootstrap runtime
+		if err := k.engine.Control(bootstrapRTID, statechart.CmdStart); err != nil {
+			return fmt.Errorf("failed to start bootstrap runtime: %w", err)
+		}
+	}
+
 	// Create bootstrap sequence
 	seq := bootstrap.NewSequence()
 	k.mu.Lock()
@@ -45,7 +70,7 @@ func (k *Kernel) Start(ctx context.Context) error {
 
 	// Set up state entry handlers
 	seq.OnStateEnter(func(state string) error {
-		return k.onBootstrapStateEnter(ctx, state)
+		return k.onBootstrapStateEnter(ctx, state, bootstrapRTID)
 	})
 
 	// Set up completion handler
@@ -64,7 +89,7 @@ func (k *Kernel) Start(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func (k *Kernel) onBootstrapStateEnter(ctx context.Context, state string) error {
+func (k *Kernel) onBootstrapStateEnter(ctx context.Context, state string, bootstrapRTID statechart.RuntimeID) error {
 	log.Printf("[kernel] Bootstrap state: %s", state)
 
 	k.mu.RLock()
