@@ -2,6 +2,7 @@ package communication
 
 import (
 	"testing"
+	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
 )
@@ -44,7 +45,7 @@ func TestCommunicationService_PublishReturnsNil(t *testing.T) {
 	}
 }
 
-func TestCommunicationService_SubscribeReturnsNilChannelAndError(t *testing.T) {
+func TestCommunicationService_SubscribeReturnsNonNilChannel(t *testing.T) {
 	svc := NewCommunicationService()
 
 	ch, err := svc.Subscribe("agent:test")
@@ -53,8 +54,8 @@ func TestCommunicationService_SubscribeReturnsNilChannelAndError(t *testing.T) {
 		t.Errorf("Expected Subscribe to return nil error, got %v", err)
 	}
 
-	if ch != nil {
-		t.Error("Expected Subscribe to return nil channel")
+	if ch == nil {
+		t.Error("Expected Subscribe to return non-nil channel")
 	}
 }
 
@@ -91,7 +92,29 @@ func TestCommunicationService_BootstrapChart(t *testing.T) {
 }
 
 func TestCommunicationService_PubSub(t *testing.T) {
-	// Placeholder for future implementation
+	svc := NewCommunicationService()
+	ch, err := svc.Subscribe("test-topic")
+	if err != nil {
+		t.Errorf("Subscribe should return nil error, got: %v", err)
+	}
+	if ch == nil {
+		t.Fatal("Subscribe should return non-nil channel")
+	}
+
+	mail := mail.Mail{Source: "test", Target: "test-topic"}
+	err = svc.Publish(mail)
+	if err != nil {
+		t.Errorf("Publish should return nil, got: %v", err)
+	}
+
+	select {
+	case received := <-ch:
+		if received.Source != mail.Source {
+			t.Errorf("Expected source %s, got %s", mail.Source, received.Source)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Error("Timeout waiting for mail")
+	}
 }
 
 func TestCommunicationService_RoutesMail(t *testing.T) {
