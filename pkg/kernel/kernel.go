@@ -41,6 +41,8 @@ type Kernel struct {
 	orderMu          sync.RWMutex
 	readyEvents      []string
 	eventsMu         sync.RWMutex
+	failService      string
+	failMu           sync.RWMutex
 }
 
 // kernelApplicationContext provides application context with kernel engine access.
@@ -465,6 +467,14 @@ func (k *Kernel) BootstrapServices() error {
 
 // startServiceInOrder starts a service and tracks its state.
 func (k *Kernel) startServiceInOrder(serviceID string) error {
+	k.failMu.RLock()
+	shouldFail := k.failService == serviceID
+	k.failMu.RUnlock()
+
+	if shouldFail {
+		return fmt.Errorf("service %s failed to start", serviceID)
+	}
+
 	k.mu.Lock()
 	k.serviceReady[serviceID] = true
 	k.mu.Unlock()

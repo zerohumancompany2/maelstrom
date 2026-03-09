@@ -792,6 +792,34 @@ func TestKernel_ServiceReadyEvents(t *testing.T) {
 	}
 }
 
+func TestKernel_BootstrapFailure(t *testing.T) {
+	kernel := &Kernel{
+		engine:       statechart.NewEngine(),
+		services:     make(map[string]statechart.RuntimeID),
+		serviceReady: make(map[string]bool),
+		runtimes:     make(map[string]*runtime.ChartRuntime),
+		mailSystem:   communication.NewCommunicationService(),
+		failService:  "sys:communication",
+	}
+
+	err := kernel.BootstrapServices()
+	if err == nil {
+		t.Fatal("BootstrapServices() should return error when service fails")
+	}
+
+	if !strings.Contains(err.Error(), "sys:communication") {
+		t.Errorf("error should mention failed service, got: %v", err)
+	}
+
+	if !kernel.IsServiceReady("sys:security") {
+		t.Error("sys:security should be ready before failure")
+	}
+
+	if kernel.IsServiceReady("sys:communication") {
+		t.Error("sys:communication should not be ready after failure")
+	}
+}
+
 func TestKernel_FullE2EBootstrap(t *testing.T) {
 	kernel := New()
 
