@@ -12,6 +12,16 @@ func TestLifecycleService_NewLifecycleServiceReturnsNonNil(t *testing.T) {
 	}
 }
 
+func TestLifecycleService_IDReturnsCorrectString(t *testing.T) {
+	svc := NewLifecycleService()
+
+	id := svc.ID()
+
+	if id != "sys:lifecycle" {
+		t.Errorf("Expected ID sys:lifecycle, got %s", id)
+	}
+}
+
 func TestLifecycleService_BootstrapChart(t *testing.T) {
 	chart := BootstrapChart()
 
