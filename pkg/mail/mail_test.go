@@ -351,3 +351,103 @@ func TestFullMailFlow(t *testing.T) {
 		t.Errorf("Expected Source '%s', got '%s'", originalMail.Source, deliveredMail.Source)
 	}
 }
+
+func TestCommunicationService_Integration(t *testing.T) {
+	// Test agent-to-agent routing
+	router := NewMailRouter()
+
+	agent1 := &AgentInbox{ID: "agent1"}
+	agent2 := &AgentInbox{ID: "agent2"}
+	router.SubscribeAgent("agent1", agent1)
+	router.SubscribeAgent("agent2", agent2)
+
+	mail1 := Mail{
+		ID:     "msg-001",
+		Source: "agent:agent1",
+		Target: "agent:agent2",
+		Type:   MailTypeUser,
+	}
+
+	err := router.Route(mail1)
+	if err != nil {
+		t.Fatalf("Route failed: %v", err)
+	}
+
+	agent2.mu.RLock()
+	if len(agent2.Messages) != 1 {
+		t.Errorf("Expected 1 message, got %d", len(agent2.Messages))
+	}
+	agent2.mu.RUnlock()
+
+	// Test topic publishing
+	topic := &Topic{Name: "events"}
+	router.SubscribeTopic("events", topic)
+
+	sub1Ch := make(chan Mail, 10)
+	sub2Ch := make(chan Mail, 10)
+	sub1 := &topicSubscriberWrapper{ch: sub1Ch}
+	sub2 := &topicSubscriberWrapper{ch: sub2Ch}
+	topic.Subscribe(sub1)
+	topic.Subscribe(sub2)
+
+	mail2 := Mail{
+		ID:     "msg-002",
+		Source: "sys:events",
+		Target: "topic:events",
+		Type:   MailTypeAssistant,
+	}
+
+	err = router.Route(mail2)
+	if err != nil {
+		t.Fatalf("Topic route failed: %v", err)
+	}
+
+	// Verify both subscribers received the mail
+	select {
+	case received := <-sub1.ch:
+		if received.ID != "msg-002" {
+			t.Errorf("Expected msg-002, got %s", received.ID)
+		}
+	default:
+		t.Error("Subscriber 1 did not receive mail")
+	}
+
+	select {
+	case received := <-sub2.ch:
+		if received.ID != "msg-002" {
+			t.Errorf("Expected msg-002, got %s", received.ID)
+		}
+	default:
+		t.Error("Subscriber 2 did not receive mail")
+	}
+
+	// Test sys service routing
+	serviceInbox := &ServiceInbox{ID: "heartbeat"}
+	router.SubscribeService("heartbeat", serviceInbox)
+
+	mail3 := Mail{
+		ID:     "msg-003",
+		Source: "agent:scheduler",
+		Target: "sys:heartbeat",
+		Type:   MailTypeHeartbeat,
+	}
+
+	err = router.Route(mail3)
+	if err != nil {
+		t.Fatalf("Service route failed: %v", err)
+	}
+
+	serviceInbox.mu.RLock()
+	if len(serviceInbox.Messages) != 1 {
+		t.Errorf("Expected 1 message in service inbox, got %d", len(serviceInbox.Messages))
+	}
+	serviceInbox.mu.RUnlock()
+}
+
+type topicSubscriberWrapper struct {
+	ch chan Mail
+}
+
+func (t *topicSubscriberWrapper) Receive() chan Mail {
+	return t.ch
+}
