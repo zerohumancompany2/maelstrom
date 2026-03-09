@@ -95,3 +95,33 @@ func TestFilterContextBlock_DropBlock(t *testing.T) {
 		t.Errorf("Expected block content to be empty after drop, got: %s", filtered.Content)
 	}
 }
+
+func TestFilterContextBlock_PerBlockOverride(t *testing.T) {
+	ClearAuditLog()
+	contextBlockRegistry = make(map[string]BlockTaintInfo)
+
+	block := ContextBlock{
+		Name:    "audit-block",
+		Content: "This contains SECRET data",
+		TaintPolicy: TaintPolicy{
+			RedactMode: "audit",
+		},
+	}
+
+	globalPolicy := TaintPolicyConfig{
+		Enforcement: EnforcementStrict,
+	}
+
+	filtered, err := FilterContextBlockWithGlobalPolicy(block, DMZBoundary, globalPolicy)
+
+	if err != nil {
+		t.Fatalf("FilterContextBlockWithGlobalPolicy returned error (per-block audit should override global strict): %v", err)
+	}
+
+	if filtered.Name != "audit-block" {
+		t.Errorf("Expected per-block audit mode to allow block through, got name: %s", filtered.Name)
+	}
+	if filtered.Content != "This contains SECRET data" {
+		t.Errorf("Expected block content to be preserved with audit mode, got: %s", filtered.Content)
+	}
+}

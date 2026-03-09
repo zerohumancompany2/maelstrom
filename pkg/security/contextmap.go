@@ -48,6 +48,13 @@ func FilterContextBlock(block ContextBlock, boundary BoundaryType) (ContextBlock
 	return block, nil
 }
 
+func FilterContextBlockWithGlobalPolicy(block ContextBlock, boundary BoundaryType, globalPolicy TaintPolicyConfig) (ContextBlock, error) {
+	if block.TaintPolicy.RedactMode != "" {
+		return FilterContextBlock(block, boundary)
+	}
+	return block, nil
+}
+
 func replaceTaint(content, taint, replacement string) string {
 	result := ""
 	for i := 0; i < len(content); i++ {
