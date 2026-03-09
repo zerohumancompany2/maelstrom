@@ -99,8 +99,18 @@ func TestKernel_ServicesReady(t *testing.T) {
 }
 
 func TestKernel_KernelReadyEvent(t *testing.T) {
-	// Placeholder for future integration test
-	// Verifies KERNEL_READY emitted after all services ready
+	kernel := New()
+
+	// Mark all services as ready
+	kernel.SetServiceReady("sys:security")
+	kernel.SetServiceReady("sys:communication")
+	kernel.SetServiceReady("sys:observability")
+	kernel.SetServiceReady("sys:lifecycle")
+
+	// Verify kernel is ready
+	if !kernel.IsKernelReady() {
+		t.Error("Kernel should be ready after all services are ready")
+	}
 }
 
 func TestKernel_MailSystemRequired(t *testing.T) {

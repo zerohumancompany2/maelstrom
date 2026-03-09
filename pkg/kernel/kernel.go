@@ -349,6 +349,19 @@ func (k *Kernel) SetServiceReady(name string) {
 	k.serviceReady[name] = true
 }
 
+// IsKernelReady returns true if all services are ready.
+func (k *Kernel) IsKernelReady() bool {
+	k.mu.RLock()
+	defer k.mu.RUnlock()
+	requiredServices := []string{"sys:security", "sys:communication", "sys:observability", "sys:lifecycle"}
+	for _, svc := range requiredServices {
+		if !k.serviceReady[svc] {
+			return false
+		}
+	}
+	return true
+}
+
 // Shutdown stops all services.
 func (k *Kernel) Shutdown(ctx context.Context) error {
 	if k.engine == nil {
