@@ -44,6 +44,20 @@ func TestCommunicationService_PublishReturnsNil(t *testing.T) {
 	}
 }
 
+func TestCommunicationService_SubscribeReturnsNilChannelAndError(t *testing.T) {
+	svc := NewCommunicationService()
+
+	ch, err := svc.Subscribe("agent:test")
+
+	if err != nil {
+		t.Errorf("Expected Subscribe to return nil error, got %v", err)
+	}
+
+	if ch != nil {
+		t.Error("Expected Subscribe to return nil channel")
+	}
+}
+
 func TestCommunicationService_BootstrapChart(t *testing.T) {
 	chart := BootstrapChart()
 
