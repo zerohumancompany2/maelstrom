@@ -2,6 +2,8 @@ package lifecycle
 
 import (
 	"testing"
+
+	"github.com/maelstrom/v3/pkg/mail"
 )
 
 func TestLifecycleService_NewLifecycleServiceReturnsNonNil(t *testing.T) {
@@ -19,6 +21,16 @@ func TestLifecycleService_IDReturnsCorrectString(t *testing.T) {
 
 	if id != "sys:lifecycle" {
 		t.Errorf("Expected ID sys:lifecycle, got %s", id)
+	}
+}
+
+func TestLifecycleService_HandleMailReturnsNil(t *testing.T) {
+	svc := NewLifecycleService()
+
+	err := svc.HandleMail(mail.Mail{})
+
+	if err != nil {
+		t.Errorf("Expected HandleMail to return nil, got %v", err)
 	}
 }
 
