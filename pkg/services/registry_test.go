@@ -129,3 +129,57 @@ func TestServiceRegistry_ListEmpty(t *testing.T) {
 		t.Fatalf("List() returned %d names, want 0", len(names))
 	}
 }
+
+func TestAllServicesIntegrateViaRegistry(t *testing.T) {
+	sr := NewServiceRegistry()
+
+	securitySvc := &mockService{id: "sys:security"}
+	commSvc := &mockService{id: "sys:communication"}
+	lifecycleSvc := &mockService{id: "sys:lifecycle"}
+	observabilitySvc := &mockService{id: "sys:observability"}
+
+	err := sr.Register("sys:security", securitySvc)
+	if err != nil {
+		t.Fatalf("Register security: %v", err)
+	}
+	err = sr.Register("sys:communication", commSvc)
+	if err != nil {
+		t.Fatalf("Register communication: %v", err)
+	}
+	err = sr.Register("sys:lifecycle", lifecycleSvc)
+	if err != nil {
+		t.Fatalf("Register lifecycle: %v", err)
+	}
+	err = sr.Register("sys:observability", observabilitySvc)
+	if err != nil {
+		t.Fatalf("Register observability: %v", err)
+	}
+
+	securityRetrieved, ok := sr.Get("sys:security")
+	if !ok || securityRetrieved != securitySvc {
+		t.Fatal("Get sys:security failed")
+	}
+	commRetrieved, ok := sr.Get("sys:communication")
+	if !ok || commRetrieved != commSvc {
+		t.Fatal("Get sys:communication failed")
+	}
+	lifecycleRetrieved, ok := sr.Get("sys:lifecycle")
+	if !ok || lifecycleRetrieved != lifecycleSvc {
+		t.Fatal("Get sys:lifecycle failed")
+	}
+	observabilityRetrieved, ok := sr.Get("sys:observability")
+	if !ok || observabilityRetrieved != observabilitySvc {
+		t.Fatal("Get sys:observability failed")
+	}
+
+	names := sr.List()
+	expected := []string{"sys:communication", "sys:lifecycle", "sys:observability", "sys:security"}
+	if len(names) != len(expected) {
+		t.Fatalf("List() returned %d names, want %d", len(names), len(expected))
+	}
+	for i, name := range expected {
+		if names[i] != name {
+			t.Fatalf("List()[%d] = %q, want %q", i, names[i], name)
+		}
+	}
+}
