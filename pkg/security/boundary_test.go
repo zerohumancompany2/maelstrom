@@ -13,7 +13,13 @@ func TestValidateBoundary_Valid(t *testing.T) {
 }
 
 func TestValidateBoundary_Invalid(t *testing.T) {
-	panic("not implemented")
+	tests := []BoundaryType{"", "public", "unknown"}
+	for _, boundary := range tests {
+		err := ValidateBoundary(boundary)
+		if err == nil {
+			t.Errorf("ValidateBoundary(%q) = nil, want error", boundary)
+		}
+	}
 }
 
 func TestInnerCapabilities(t *testing.T) {
