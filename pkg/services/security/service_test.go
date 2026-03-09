@@ -404,3 +404,50 @@ func TestSecurityService_TaintPropagate_mergeTaints(t *testing.T) {
 		t.Errorf("Expected all taints to be merged, got %v", taints)
 	}
 }
+
+func TestSecurityService_TaintPropagate_nestedObjects(t *testing.T) {
+	svc := NewSecurityService()
+
+	inputObj := map[string]interface{}{
+		"name": "test",
+		"nested": map[string]interface{}{
+			"value": "nested-value",
+			"deep": map[string]interface{}{
+				"data": "deep-data",
+			},
+		},
+	}
+
+	result, err := svc.TaintPropagate(inputObj, []string{"PII"})
+
+	if err != nil {
+		t.Errorf("Expected TaintPropagate to return nil error, got %v", err)
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		t.Error("Expected result to be map[string]interface{}")
+	}
+
+	if _, hasTaints := resultMap["_taints"]; !hasTaints {
+		t.Error("Expected _taints key to be added to root object")
+	}
+
+	nested, ok := resultMap["nested"].(map[string]interface{})
+	if !ok {
+		t.Error("Expected nested to be map[string]interface{}")
+	}
+
+	if _, hasNestedTaints := nested["_taints"]; !hasNestedTaints {
+		t.Error("Expected _taints key to be added to nested object")
+	}
+
+	deep, ok := nested["deep"].(map[string]interface{})
+	if !ok {
+		t.Error("Expected deep to be map[string]interface{}")
+	}
+
+	if _, hasDeepTaints := deep["_taints"]; !hasDeepTaints {
+		t.Error("Expected _taints key to be added to deep object")
+	}
+}

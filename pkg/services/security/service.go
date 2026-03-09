@@ -59,6 +59,20 @@ func (s *SecurityService) TaintPropagate(obj any, newTaints []string) (any, erro
 	existing := result["_taints"].([]string)
 	result["_taints"] = append(existing, newTaints...)
 
+	for key, value := range result {
+		if key == "_taints" {
+			continue
+		}
+		nested, ok := value.(map[string]interface{})
+		if ok {
+			propagated, err := s.TaintPropagate(nested, newTaints)
+			if err != nil {
+				return nil, err
+			}
+			result[key] = propagated
+		}
+	}
+
 	return result, nil
 }
 
