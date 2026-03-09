@@ -19,13 +19,14 @@ type KernelConfig struct {
 
 // Kernel orchestrates bootstrap and hands off to ChartRegistry.
 type Kernel struct {
-	engine   statechart.Library
-	config   KernelConfig
-	factory  *runtime.Factory
-	sequence *bootstrap.Sequence
-	services map[string]statechart.RuntimeID
-	runtimes map[string]*runtime.ChartRuntime
-	mu       sync.RWMutex
+	engine    statechart.Library
+	config    KernelConfig
+	factory   *runtime.Factory
+	sequence  *bootstrap.Sequence
+	services  map[string]statechart.RuntimeID
+	runtimes  map[string]*runtime.ChartRuntime
+	mu        sync.RWMutex
+	readyChan chan struct{}
 }
 
 // New creates a new Kernel.
@@ -101,6 +102,7 @@ func (k *Kernel) Start(ctx context.Context) error {
 	seq := bootstrap.NewSequence()
 	k.mu.Lock()
 	k.sequence = seq
+	k.readyChan = make(chan struct{})
 	k.mu.Unlock()
 
 	// Set up state entry handlers
@@ -112,6 +114,11 @@ func (k *Kernel) Start(ctx context.Context) error {
 	seq.OnComplete(func() {
 		log.Println("[kernel] Bootstrap complete, handing off to ChartRegistry")
 		k.onBootstrapComplete()
+		k.mu.Lock()
+		if k.readyChan != nil {
+			close(k.readyChan)
+		}
+		k.mu.Unlock()
 	})
 
 	// Start the sequence
@@ -120,8 +127,12 @@ func (k *Kernel) Start(ctx context.Context) error {
 	}
 
 	// Wait for completion or cancellation
-	<-ctx.Done()
-	return ctx.Err()
+	select {
+	case <-k.readyChan:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (k *Kernel) onBootstrapStateEnter(ctx context.Context, state string, bootstrapRTID statechart.RuntimeID) error {

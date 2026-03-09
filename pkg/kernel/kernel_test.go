@@ -155,3 +155,20 @@ func TestKernel_Start_SpawnsBootstrapChart(t *testing.T) {
 		t.Error("expected sys:bootstrap service to be registered")
 	}
 }
+
+func TestKernel_Start_WaitsForKernelReady(t *testing.T) {
+	engine := statechart.NewEngine()
+	k := NewWithEngine(engine)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	done := make(chan bool)
+	go func() {
+		_ = k.Start(ctx)
+		done <- true
+	}()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for kernel ready")
+	}
+}
