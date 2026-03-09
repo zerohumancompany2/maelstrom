@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/maelstrom/v3/pkg/mail"
@@ -40,8 +41,8 @@ func (l *LifecycleService) HandleMail(mail mail.Mail) error {
 
 func (l *LifecycleService) Spawn(def statechart.ChartDefinition) (statechart.RuntimeID, error) {
 	if l.engine == nil {
-		id := statechart.RuntimeID("fake-runtime-id")
 		l.mu.Lock()
+		id := statechart.RuntimeID(fmt.Sprintf("fake-runtime-%d", len(l.runtimes)))
 		l.runtimes[id] = RuntimeInfo{
 			ID:           string(id),
 			DefinitionID: def.ID,

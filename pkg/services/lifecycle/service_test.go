@@ -289,3 +289,30 @@ func TestLifecycleService_RuntimeStateUpdate(t *testing.T) {
 		t.Errorf("Expected state 'running', got %v", list[0].ActiveStates)
 	}
 }
+
+func TestLifecycleService_ListWithStates(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def1 := statechart.ChartDefinition{ID: "chart-1", InitialState: "idle"}
+	def2 := statechart.ChartDefinition{ID: "chart-2", InitialState: "running"}
+	rtID1, _ := svc.Spawn(def1)
+	_, _ = svc.Spawn(def2)
+
+	svc.updateRuntimeState(string(rtID1), "active")
+
+	runtimes, _ := svc.List()
+
+	if len(runtimes) != 2 {
+		t.Errorf("Expected 2 runtimes, got %d", len(runtimes))
+	}
+	foundActive := false
+	for _, rt := range runtimes {
+		if rt.ActiveStates[0] == "active" {
+			foundActive = true
+			break
+		}
+	}
+	if !foundActive {
+		t.Error("Expected to find runtime with 'active' state")
+	}
+}
