@@ -132,3 +132,24 @@ func TestHumanGatewayService_ChatEndpoint(t *testing.T) {
 		t.Errorf("Expected status %d, got %d", http.StatusOK, rr.Code)
 	}
 }
+
+func TestHumanGatewayService_ChatSession(t *testing.T) {
+	svc := NewHumanGatewayService()
+
+	session, err := svc.CreateChatSession("test-agent")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	if session == nil {
+		t.Error("Expected non-nil session")
+	}
+
+	if session.AgentID != "test-agent" {
+		t.Errorf("Expected AgentID 'test-agent', got '%s'", session.AgentID)
+	}
+
+	if session.ContextMap == nil {
+		t.Error("Expected non-nil ContextMap")
+	}
+}

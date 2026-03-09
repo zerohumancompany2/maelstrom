@@ -80,3 +80,16 @@ func (h *HumanGatewayService) ChatEndpoint(w http.ResponseWriter, r *http.Reques
 		"status": "ok",
 	})
 }
+
+func (h *HumanGatewayService) CreateChatSession(agentID string) (*ChatSession, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	session := &ChatSession{
+		AgentID:    agentID,
+		Messages:   make([]mail.Mail, 0),
+		ContextMap: make(ContextMapSnapshot),
+	}
+	h.sessions[agentID] = session
+	return session, nil
+}
