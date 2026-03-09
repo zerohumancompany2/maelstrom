@@ -42,6 +42,12 @@ func NewWithEngine(engine statechart.Library) *Kernel {
 	}
 }
 
+// WithConfig sets the kernel configuration.
+func (k *Kernel) WithConfig(cfg KernelConfig) *Kernel {
+	k.config = cfg
+	return k
+}
+
 // Start begins the bootstrap sequence and transitions to runtime.
 func (k *Kernel) Start(ctx context.Context) error {
 	log.Println("[kernel] Starting kernel")

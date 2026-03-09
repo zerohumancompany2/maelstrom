@@ -95,3 +95,18 @@ func TestKernelConfig_DefaultValues(t *testing.T) {
 		t.Errorf("expected AppVars to be nil or empty, got %v", cfg.AppVars)
 	}
 }
+
+func TestKernel_WithConfig_SetsConfig(t *testing.T) {
+	k := New()
+	cfg := KernelConfig{ChartsDir: "/test/charts", AppVars: map[string]string{"key": "value"}}
+	result := k.WithConfig(cfg)
+	if result != k {
+		t.Error("WithConfig should return receiver for chaining")
+	}
+	if k.config.ChartsDir != "/test/charts" {
+		t.Errorf("expected ChartsDir to be /test/charts, got %q", k.config.ChartsDir)
+	}
+	if k.config.AppVars["key"] != "value" {
+		t.Errorf("expected AppVars[key] to be value, got %q", k.config.AppVars["key"])
+	}
+}
