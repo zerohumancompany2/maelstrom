@@ -434,3 +434,17 @@ func TestObservabilityService_TransitionRate(t *testing.T) {
 		t.Errorf("Expected TransitionRate 3, got %f", metrics.TransitionRate)
 	}
 }
+
+func TestObservabilityService_EventRate(t *testing.T) {
+	svc := NewObservabilityService()
+
+	svc.trackEvent("transition")
+	svc.trackEvent("entry")
+	svc.trackEvent("exit")
+
+	metrics := svc.GetMetrics()
+
+	if metrics.EventRate != 3 {
+		t.Errorf("Expected EventRate 3, got %f", metrics.EventRate)
+	}
+}

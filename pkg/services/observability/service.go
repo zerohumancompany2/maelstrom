@@ -127,3 +127,9 @@ func (o *ObservabilityService) trackTransition(from, to string) {
 	defer o.mu.Unlock()
 	o.metrics.TransitionRate++
 }
+
+func (o *ObservabilityService) trackEvent(eventType string) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.metrics.EventRate++
+}
