@@ -659,3 +659,28 @@ func TestCommunicationService_DeduplicationWindow(t *testing.T) {
 		t.Error("Message should still be within deduplication window")
 	}
 }
+
+func TestCommunicationService_DeduplicationExpiry(t *testing.T) {
+	svc := NewCommunicationService()
+
+	correlationID1 := "expire-test-1"
+	correlationID2 := "expire-test-2"
+	window := 100 * time.Millisecond
+
+	svc.trackDeliveryAttempt(correlationID1)
+	svc.trackDeliveryAttempt(correlationID2)
+
+	time.Sleep(150 * time.Millisecond)
+
+	svc.expireOldCorrelationIDs(window)
+
+	isDup1 := svc.isDuplicate(correlationID1)
+	if isDup1 {
+		t.Error("Old correlationID should be expired")
+	}
+
+	isDup2 := svc.isDuplicate(correlationID2)
+	if isDup2 {
+		t.Error("Old correlationID should be expired")
+	}
+}

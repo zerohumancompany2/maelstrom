@@ -214,3 +214,15 @@ func (c *CommunicationService) isWithinDeduplicationWindow(correlationID string,
 	}
 	return time.Since(timestamp) < window
 }
+
+func (c *CommunicationService) expireOldCorrelationIDs(window time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now := time.Now()
+	for corrID, timestamp := range c.correlationTimestamps {
+		if now.Sub(timestamp) > window {
+			delete(c.seenCorrelations, corrID)
+			delete(c.correlationTimestamps, corrID)
+		}
+	}
+}
