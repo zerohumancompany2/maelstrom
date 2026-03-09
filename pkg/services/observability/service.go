@@ -35,14 +35,15 @@ func (o *ObservabilityService) EmitTrace(trace services.Trace) error {
 	return nil
 }
 
-func (o *ObservabilityService) QueryTraces(runtimeID string) ([]services.Trace, error) {
+func (o *ObservabilityService) QueryTraces(filters services.TraceFilters) ([]services.Trace, error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	var result []services.Trace
 	for _, trace := range o.traces {
-		if trace.RuntimeID == runtimeID {
-			result = append(result, trace)
+		if filters.RuntimeID != "" && trace.RuntimeID != filters.RuntimeID {
+			continue
 		}
+		result = append(result, trace)
 	}
 	return result, nil
 }

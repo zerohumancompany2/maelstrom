@@ -48,7 +48,8 @@ func TestObservabilityService_EmitTraceReturnsNil(t *testing.T) {
 func TestObservabilityService_QueryTracesReturnsNilNil(t *testing.T) {
 	svc := NewObservabilityService()
 
-	traces, err := svc.QueryTraces("runtime-123")
+	filters := services.TraceFilters{RuntimeID: "runtime-123"}
+	traces, err := svc.QueryTraces(filters)
 
 	if err != nil {
 		t.Errorf("Expected QueryTraces to return nil error, got %v", err)
@@ -103,7 +104,8 @@ func TestObservabilityService_EmitTrace(t *testing.T) {
 	if err != nil {
 		t.Errorf("EmitTrace should return nil, got: %v", err)
 	}
-	traces, err := svc.QueryTraces("test-runtime")
+	filters := services.TraceFilters{RuntimeID: "test-runtime"}
+	traces, err := svc.QueryTraces(filters)
 	if err != nil {
 		t.Errorf("QueryTraces should return nil error, got: %v", err)
 	}
