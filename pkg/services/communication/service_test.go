@@ -58,6 +58,16 @@ func TestCommunicationService_SubscribeReturnsNilChannelAndError(t *testing.T) {
 	}
 }
 
+func TestCommunicationService_StartReturnsNil(t *testing.T) {
+	svc := NewCommunicationService()
+
+	err := svc.Start()
+
+	if err != nil {
+		t.Errorf("Expected Start to return nil, got %v", err)
+	}
+}
+
 func TestCommunicationService_BootstrapChart(t *testing.T) {
 	chart := BootstrapChart()
 
