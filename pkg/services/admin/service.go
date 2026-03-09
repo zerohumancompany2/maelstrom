@@ -17,6 +17,7 @@ type AdminService interface {
 	ControlAgent(id string, cmd string) error
 	QueryTaints(agentId string) (security.TaintMap, error)
 	InjectEvent(agentId string, event statechart.Event) error
+	ExecuteCommand(cmd string, token string) error
 }
 
 type adminService struct {
@@ -42,5 +43,9 @@ func (s *adminService) QueryTaints(agentId string) (security.TaintMap, error) {
 }
 
 func (s *adminService) InjectEvent(agentId string, event statechart.Event) error {
+	return nil
+}
+
+func (s *adminService) ExecuteCommand(cmd string, token string) error {
 	return nil
 }

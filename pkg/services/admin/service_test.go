@@ -83,3 +83,12 @@ func TestAdmin_BoundaryOuter(t *testing.T) {
 		}
 	}
 }
+
+func TestAdminService_AdminCommand(t *testing.T) {
+	svc := NewAdminService()
+
+	err := svc.ExecuteCommand("test-command", "valid-token")
+	if err != nil {
+		t.Errorf("Expected nil error for valid command, got %v", err)
+	}
+}
