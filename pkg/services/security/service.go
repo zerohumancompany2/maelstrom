@@ -70,6 +70,25 @@ func (s *SecurityService) TaintPropagate(obj any, newTaints []string) (any, erro
 				return nil, err
 			}
 			result[key] = propagated
+			continue
+		}
+
+		slice, ok := value.([]interface{})
+		if ok {
+			var propagatedSlice []interface{}
+			for _, item := range slice {
+				itemMap, ok := item.(map[string]interface{})
+				if ok {
+					propagated, err := s.TaintPropagate(itemMap, newTaints)
+					if err != nil {
+						return nil, err
+					}
+					propagatedSlice = append(propagatedSlice, propagated)
+				} else {
+					propagatedSlice = append(propagatedSlice, item)
+				}
+			}
+			result[key] = propagatedSlice
 		}
 	}
 

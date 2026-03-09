@@ -451,3 +451,57 @@ func TestSecurityService_TaintPropagate_nestedObjects(t *testing.T) {
 		t.Error("Expected _taints key to be added to deep object")
 	}
 }
+
+func TestSecurityService_TaintPropagate_sliceObjects(t *testing.T) {
+	svc := NewSecurityService()
+
+	inputObj := map[string]interface{}{
+		"name": "test",
+		"items": []interface{}{
+			map[string]interface{}{"id": 1, "value": "first"},
+			map[string]interface{}{"id": 2, "value": "second"},
+		},
+	}
+
+	result, err := svc.TaintPropagate(inputObj, []string{"SECRET"})
+
+	if err != nil {
+		t.Errorf("Expected TaintPropagate to return nil error, got %v", err)
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		t.Error("Expected result to be map[string]interface{}")
+	}
+
+	if _, hasTaints := resultMap["_taints"]; !hasTaints {
+		t.Error("Expected _taints key to be added to root object")
+	}
+
+	items, ok := resultMap["items"].([]interface{})
+	if !ok {
+		t.Error("Expected items to be []interface{}")
+	}
+
+	if len(items) != 2 {
+		t.Errorf("Expected 2 items, got %d", len(items))
+	}
+
+	firstItem, ok := items[0].(map[string]interface{})
+	if !ok {
+		t.Error("Expected first item to be map[string]interface{}")
+	}
+
+	if _, hasFirstTaints := firstItem["_taints"]; !hasFirstTaints {
+		t.Error("Expected _taints key to be added to first item")
+	}
+
+	secondItem, ok := items[1].(map[string]interface{})
+	if !ok {
+		t.Error("Expected second item to be map[string]interface{}")
+	}
+
+	if _, hasSecondTaints := secondItem["_taints"]; !hasSecondTaints {
+		t.Error("Expected _taints key to be added to second item")
+	}
+}
