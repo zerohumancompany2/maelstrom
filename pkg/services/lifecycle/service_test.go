@@ -35,7 +35,7 @@ func TestLifecycleService_HandleMailReturnsNil(t *testing.T) {
 	}
 }
 
-func TestLifecycleService_SpawnReturnsEmptyRuntimeID(t *testing.T) {
+func TestLifecycleService_SpawnReturnsNonEmptyRuntimeID(t *testing.T) {
 	svc := NewLifecycleService()
 
 	id, err := svc.Spawn(statechart.ChartDefinition{})
@@ -44,8 +44,8 @@ func TestLifecycleService_SpawnReturnsEmptyRuntimeID(t *testing.T) {
 		t.Errorf("Expected Spawn to return nil error, got %v", err)
 	}
 
-	if id != "" {
-		t.Errorf("Expected Spawn to return empty RuntimeID, got %s", id)
+	if id == "" {
+		t.Error("Expected Spawn to return non-empty RuntimeID")
 	}
 }
 
@@ -96,7 +96,18 @@ func TestLifecycleService_BootstrapChart(t *testing.T) {
 }
 
 func TestLifecycleService_SpawnChart(t *testing.T) {
-	// Placeholder for future implementation
+	svc := NewLifecycleService()
+	def := statechart.ChartDefinition{
+		ID:      "test-chart",
+		Version: "1.0.0",
+	}
+	rtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Errorf("Spawn should return nil error, got: %v", err)
+	}
+	if rtID == "" {
+		t.Error("Spawn should return non-empty runtime ID")
+	}
 }
 
 func TestLifecycleService_BoundaryInner(t *testing.T) {

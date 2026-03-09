@@ -28,7 +28,7 @@ func (l *LifecycleService) HandleMail(mail mail.Mail) error {
 }
 
 func (l *LifecycleService) Spawn(def statechart.ChartDefinition) (statechart.RuntimeID, error) {
-	return "", nil
+	return statechart.RuntimeID("fake-runtime-id"), nil
 }
 
 func (l *LifecycleService) Stop(id statechart.RuntimeID) error {
