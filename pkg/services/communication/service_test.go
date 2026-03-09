@@ -165,3 +165,23 @@ func TestCommunicationService_ID(t *testing.T) {
 		t.Errorf("Expected ID sys:communication, got %s", chart.ID)
 	}
 }
+
+func TestCommunicationService_PublishReturnsAck(t *testing.T) {
+	svc := NewCommunicationService()
+
+	ch, _ := svc.Subscribe("test-topic")
+	m := mail.Mail{Source: "test", Target: "test-topic"}
+
+	ack, err := svc.Publish(m)
+
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if ack.MailID != m.ID {
+		t.Errorf("Expected MailID %s, got %s", m.ID, ack.MailID)
+	}
+	if !ack.Success {
+		t.Error("Expected Success to be true")
+	}
+	_ = ch
+}

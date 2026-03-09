@@ -32,13 +32,18 @@ func (c *CommunicationService) Publish(m mail.Mail) (mail.Ack, error) {
 	if target == "" {
 		target = m.Source
 	}
+	ack := mail.Ack{
+		MailID:  m.ID,
+		Success: false,
+	}
 	for _, ch := range c.subscribers[target] {
 		select {
 		case ch <- m:
+			ack.Success = true
 		default:
 		}
 	}
-	return mail.Ack{}, nil
+	return ack, nil
 }
 
 func (c *CommunicationService) Subscribe(address string) (<-chan mail.Mail, error) {
