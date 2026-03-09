@@ -58,6 +58,10 @@ func (s *SecurityService) PrepareContextForBoundary(runtimeId string, boundary m
 	return nil
 }
 
+func (s *SecurityService) CheckTaintPolicy(taints []string, action string) bool {
+	return true
+}
+
 func (s *SecurityService) NamespaceIsolate(data interface{}, agentID string) interface{} {
 	dataSlice, ok := data.([]interface{})
 	if !ok {

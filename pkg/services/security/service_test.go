@@ -306,3 +306,13 @@ func TestSecurityService_NamespaceIsolate_multipleAgents(t *testing.T) {
 		t.Error("Expected beta-2 for second beta item")
 	}
 }
+
+func TestSecurityService_CheckTaintPolicy_allowed(t *testing.T) {
+	svc := NewSecurityService()
+
+	result := svc.CheckTaintPolicy([]string{"INTERNAL"}, "read")
+
+	if !result {
+		t.Error("Expected CheckTaintPolicy to return true for allowed transition")
+	}
+}
