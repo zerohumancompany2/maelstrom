@@ -311,3 +311,34 @@ func TestObservabilityService_LogDeadLetter(t *testing.T) {
 		t.Error("Expected Logged timestamp to be set")
 	}
 }
+
+func TestObservabilityService_QueryDeadLetters(t *testing.T) {
+	svc := NewObservabilityService()
+
+	entries, err := svc.QueryDeadLetters()
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("Expected 0 dead letter entries, got %d", len(entries))
+	}
+
+	mail1 := mail.Mail{ID: "mail-1", Source: "src-1", Target: "tgt-1", Type: mail.Error}
+	mail2 := mail.Mail{ID: "mail-2", Source: "src-2", Target: "tgt-2", Type: mail.Error}
+	svc.LogDeadLetter(mail1, "reason-1")
+	svc.LogDeadLetter(mail2, "reason-2")
+
+	entries, err = svc.QueryDeadLetters()
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if len(entries) != 2 {
+		t.Errorf("Expected 2 dead letter entries, got %d", len(entries))
+	}
+	if entries[0].Mail.ID != "mail-1" {
+		t.Errorf("Expected first mail ID 'mail-1', got %s", entries[0].Mail.ID)
+	}
+	if entries[1].Reason != "reason-2" {
+		t.Errorf("Expected second reason 'reason-2', got %s", entries[1].Reason)
+	}
+}
