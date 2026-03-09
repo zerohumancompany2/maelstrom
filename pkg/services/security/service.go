@@ -26,6 +26,10 @@ func (s *SecurityService) ValidateBoundary(source, target mail.BoundaryType) err
 	return nil
 }
 
+func (s *SecurityService) ValidateAndSanitize(mail mail.Mail, sourceBoundary, targetBoundary mail.BoundaryType) (mail.Mail, error) {
+	return mail, nil
+}
+
 func (s *SecurityService) Start() error {
 	return nil
 }

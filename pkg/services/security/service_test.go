@@ -96,3 +96,27 @@ func TestSecurityService_ID(t *testing.T) {
 		t.Errorf("Expected ID sys:security, got %s", chart.ID)
 	}
 }
+
+func TestSecurityService_ValidateAndSanitizePassThrough(t *testing.T) {
+	svc := NewSecurityService()
+
+	inputMail := mail.Mail{
+		ID:     "test-mail-1",
+		Source: "agent:test",
+		Target: "sys:security",
+	}
+
+	result, err := svc.ValidateAndSanitize(inputMail, mail.InnerBoundary, mail.DMZBoundary)
+
+	if err != nil {
+		t.Errorf("Expected ValidateAndSanitize to return nil error, got %v", err)
+	}
+
+	if result.ID != inputMail.ID {
+		t.Errorf("Expected mail ID to be unchanged, got %s", result.ID)
+	}
+
+	if result.Source != inputMail.Source {
+		t.Errorf("Expected mail Source to be unchanged, got %s", result.Source)
+	}
+}
