@@ -316,3 +316,28 @@ func TestLifecycleService_ListWithStates(t *testing.T) {
 		t.Error("Expected to find runtime with 'active' state")
 	}
 }
+
+func TestLifecycleService_StateHistory(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{ID: "chart-1", InitialState: "idle"}
+	rtID, _ := svc.Spawn(def)
+
+	svc.updateRuntimeState(string(rtID), "running")
+	svc.updateRuntimeState(string(rtID), "stopped")
+
+	history := svc.getStateHistory(string(rtID))
+
+	if len(history) != 3 {
+		t.Errorf("Expected 3 state transitions, got %d", len(history))
+	}
+	if history[0].From != "" || history[0].To != "idle" {
+		t.Errorf("Expected first transition to idle, got %s -> %s", history[0].From, history[0].To)
+	}
+	if history[1].From != "idle" || history[1].To != "running" {
+		t.Errorf("Expected second transition idle -> running, got %s -> %s", history[1].From, history[1].To)
+	}
+	if history[2].From != "running" || history[2].To != "stopped" {
+		t.Errorf("Expected third transition running -> stopped, got %s -> %s", history[2].From, history[2].To)
+	}
+}

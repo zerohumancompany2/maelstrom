@@ -3,27 +3,31 @@ package lifecycle
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
 
 type LifecycleService struct {
-	mu       sync.Mutex
-	engine   statechart.Library
-	runtimes map[statechart.RuntimeID]RuntimeInfo
+	mu           sync.Mutex
+	engine       statechart.Library
+	runtimes     map[statechart.RuntimeID]RuntimeInfo
+	stateHistory map[string][]StateTransition
 }
 
 func NewLifecycleService(engine statechart.Library) *LifecycleService {
 	return &LifecycleService{
-		engine:   engine,
-		runtimes: make(map[statechart.RuntimeID]RuntimeInfo),
+		engine:       engine,
+		runtimes:     make(map[statechart.RuntimeID]RuntimeInfo),
+		stateHistory: make(map[string][]StateTransition),
 	}
 }
 
 func NewLifecycleServiceWithoutEngine() *LifecycleService {
 	return &LifecycleService{
-		runtimes: make(map[statechart.RuntimeID]RuntimeInfo),
+		runtimes:     make(map[statechart.RuntimeID]RuntimeInfo),
+		stateHistory: make(map[string][]StateTransition),
 	}
 }
 
@@ -43,12 +47,16 @@ func (l *LifecycleService) Spawn(def statechart.ChartDefinition) (statechart.Run
 	if l.engine == nil {
 		l.mu.Lock()
 		id := statechart.RuntimeID(fmt.Sprintf("fake-runtime-%d", len(l.runtimes)))
+		runtimeID := string(id)
 		l.runtimes[id] = RuntimeInfo{
-			ID:           string(id),
+			ID:           runtimeID,
 			DefinitionID: def.ID,
 			Boundary:     mail.InnerBoundary,
 			ActiveStates: []string{def.InitialState},
 			IsRunning:    false,
+		}
+		l.stateHistory[runtimeID] = []StateTransition{
+			{From: "", To: def.InitialState, Timestamp: time.Now()},
 		}
 		l.mu.Unlock()
 		return id, nil
@@ -60,12 +68,16 @@ func (l *LifecycleService) Spawn(def statechart.ChartDefinition) (statechart.Run
 	}
 
 	l.mu.Lock()
+	runtimeID := string(id)
 	l.runtimes[id] = RuntimeInfo{
-		ID:           string(id),
+		ID:           runtimeID,
 		DefinitionID: def.ID,
 		Boundary:     mail.InnerBoundary,
 		ActiveStates: []string{def.InitialState},
 		IsRunning:    false,
+	}
+	l.stateHistory[runtimeID] = []StateTransition{
+		{From: "", To: def.InitialState, Timestamp: time.Now()},
 	}
 	l.mu.Unlock()
 
@@ -106,10 +118,25 @@ func (l *LifecycleService) updateRuntimeState(runtimeID, state string) error {
 	defer l.mu.Unlock()
 	for id, info := range l.runtimes {
 		if info.ID == runtimeID {
+			fromState := ""
+			if len(info.ActiveStates) > 0 {
+				fromState = info.ActiveStates[0]
+			}
 			info.ActiveStates = []string{state}
 			l.runtimes[id] = info
+			l.stateHistory[runtimeID] = append(l.stateHistory[runtimeID], StateTransition{
+				From:      fromState,
+				To:        state,
+				Timestamp: time.Now(),
+			})
 			return nil
 		}
 	}
 	return statechart.ErrRuntimeNotFound
+}
+
+func (l *LifecycleService) getStateHistory(runtimeID string) []StateTransition {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.stateHistory[runtimeID]
 }

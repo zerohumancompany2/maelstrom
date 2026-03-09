@@ -1,6 +1,10 @@
 package lifecycle
 
-import "github.com/maelstrom/v3/pkg/mail"
+import (
+	"time"
+
+	"github.com/maelstrom/v3/pkg/mail"
+)
 
 type RuntimeInfo struct {
 	ID           string
@@ -8,4 +12,10 @@ type RuntimeInfo struct {
 	Boundary     mail.BoundaryType
 	ActiveStates []string
 	IsRunning    bool
+}
+
+type StateTransition struct {
+	From      string
+	To        string
+	Timestamp time.Time
 }
