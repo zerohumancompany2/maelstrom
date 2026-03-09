@@ -1,6 +1,9 @@
 package security
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type SubAgentBoundary struct {
 	ParentBoundary  BoundaryType
@@ -47,7 +50,14 @@ func CheckSubAgentElevation(parentBoundary, childBoundary BoundaryType) bool {
 }
 
 func EmitSubAgentViolation(runtimeId string, violation SubAgentViolation) error {
-	panic("not implemented")
+	taintViolation := TaintViolation{
+		RuntimeID:       runtimeId,
+		SourceBoundary:  violation.ChildBoundary,
+		TargetBoundary:  violation.ParentBoundary,
+		ForbiddenTaints: violation.ForbiddenTaints,
+		Timestamp:       time.Now(),
+	}
+	return ReportViolation(runtimeId, taintViolation)
 }
 
 func getBoundaryLevel(boundary BoundaryType) int {

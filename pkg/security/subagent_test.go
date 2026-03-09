@@ -66,3 +66,27 @@ func TestSubAgentBoundary_ReturnDataTainted(t *testing.T) {
 		t.Errorf("Returned data does not carry DMZ taint, got: %v", taints)
 	}
 }
+
+func TestSubAgentBoundary_ViolationOnElevation(t *testing.T) {
+	// Given: Sub-agent at outer boundary attempts to return inner-boundary data to parent
+	runtimeId := "test-runtime-123"
+	violation := SubAgentViolation{
+		RuntimeID:       runtimeId,
+		ParentBoundary:  InnerBoundary,
+		ChildBoundary:   OuterBoundary,
+		ForbiddenTaints: []string{"INNER_ONLY", "SECRET"},
+	}
+
+	// When: Return data contains inner-boundary taints not allowed for outer boundary
+	err := EmitSubAgentViolation(runtimeId, violation)
+
+	// Then: taint_violation event is emitted to dead-letter queue
+	if err != nil {
+		t.Errorf("EmitSubAgentViolation returned error: %v", err)
+	}
+
+	count := GetViolationCount(runtimeId)
+	if count == 0 {
+		t.Errorf("Expected violation count > 0, got %d", count)
+	}
+}
