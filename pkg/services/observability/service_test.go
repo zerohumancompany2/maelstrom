@@ -2,6 +2,7 @@ package observability
 
 import (
 	"testing"
+	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/services"
@@ -230,5 +231,52 @@ func TestObservabilityService_QueryTracesByEventType(t *testing.T) {
 	}
 	if len(traces) != 2 {
 		t.Errorf("Expected 2 transition events, got %d", len(traces))
+	}
+}
+
+func TestObservabilityService_QueryTracesByTimeRange(t *testing.T) {
+	svc := NewObservabilityService()
+
+	now := time.Now()
+	earlier := now.Add(-2 * time.Hour)
+	within := now.Add(-1 * time.Hour)
+	later := now.Add(1 * time.Hour)
+
+	trace1 := services.Trace{
+		ID:        "trace-1",
+		RuntimeID: "runtime-1",
+		EventType: "transition",
+		StatePath: "state/1",
+		Timestamp: earlier,
+	}
+	trace2 := services.Trace{
+		ID:        "trace-2",
+		RuntimeID: "runtime-1",
+		EventType: "entry",
+		StatePath: "state/2",
+		Timestamp: within,
+	}
+	trace3 := services.Trace{
+		ID:        "trace-3",
+		RuntimeID: "runtime-1",
+		EventType: "exit",
+		StatePath: "state/3",
+		Timestamp: later,
+	}
+	svc.EmitTrace(trace1)
+	svc.EmitTrace(trace2)
+	svc.EmitTrace(trace3)
+
+	filters := services.TraceFilters{
+		FromTime: earlier,
+		ToTime:   within,
+	}
+	traces, err := svc.QueryTraces(filters)
+
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+	if len(traces) != 2 {
+		t.Errorf("Expected 2 traces in time range, got %d", len(traces))
 	}
 }

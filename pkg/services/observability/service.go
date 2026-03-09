@@ -46,6 +46,12 @@ func (o *ObservabilityService) QueryTraces(filters services.TraceFilters) ([]ser
 		if filters.EventType != "" && trace.EventType != filters.EventType {
 			continue
 		}
+		if !filters.FromTime.IsZero() && trace.Timestamp.Before(filters.FromTime) {
+			continue
+		}
+		if !filters.ToTime.IsZero() && trace.Timestamp.After(filters.ToTime) {
+			continue
+		}
 		result = append(result, trace)
 	}
 	return result, nil
