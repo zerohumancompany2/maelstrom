@@ -516,3 +516,24 @@ func TestObservabilityService_QueryDeadLettersMemory(t *testing.T) {
 		t.Error("Expected memory usage to be greater than 0")
 	}
 }
+
+func TestObservabilityService_QueryDeadLettersLargeSet(t *testing.T) {
+	svc := NewObservabilityService()
+
+	for i := 0; i < 10000; i++ {
+		mail := mail.Mail{ID: fmt.Sprintf("mail-%d", i), Source: "src", Target: "tgt", Type: mail.Error}
+		svc.LogDeadLetter(mail, "reason")
+	}
+
+	start := time.Now()
+	filters := &DeadLetterFilters{Reason: "reason"}
+	entries := svc.QueryDeadLettersNoCopy(filters)
+	duration := time.Since(start)
+
+	if len(entries) != 10000 {
+		t.Errorf("Expected 10000 entries, got %d", len(entries))
+	}
+	if duration > 1*time.Second {
+		t.Errorf("Query took too long: %v", duration)
+	}
+}
