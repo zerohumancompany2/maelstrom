@@ -115,6 +115,26 @@ func TestS3DataSource_TagOnWrite(t *testing.T) {
 	if err != nil {
 		t.Errorf("TagOnWrite failed: %v", err)
 	}
+
+	s3ds, ok := ds.(*s3DataSource)
+	if !ok {
+		t.Fatal("DataSource should be *s3DataSource")
+	}
+
+	storedTaints, ok := s3ds.tags[key]
+	if !ok {
+		t.Error("Tags should be stored for key")
+	}
+
+	if len(storedTaints) != len(taints) {
+		t.Errorf("taint length mismatch: got %d, want %d", len(storedTaints), len(taints))
+	}
+
+	for i, expected := range taints {
+		if storedTaints[i] != expected {
+			t.Errorf("taint[%d] mismatch: got %q, want %q", i, storedTaints[i], expected)
+		}
+	}
 }
 
 func TestS3DataSource_GetTaints(t *testing.T) {
@@ -128,13 +148,49 @@ func TestS3DataSource_GetTaints(t *testing.T) {
 		t.Fatalf("NewS3DataSource failed: %v", err)
 	}
 
+	s3ds, ok := ds.(*s3DataSource)
+	if !ok {
+		t.Fatal("DataSource should be *s3DataSource")
+	}
+
+	expectedTaints := []string{"PII", "TOOL_OUTPUT"}
+	s3ds.tags["documents/file.txt"] = expectedTaints
+
 	key := "documents/file.txt"
 	taints, err := ds.GetTaints(key)
 	if err != nil {
 		t.Errorf("GetTaints failed: %v", err)
 	}
 
-	if taints == nil {
-		t.Error("GetTaints should return non-nil slice")
+	if len(taints) != len(expectedTaints) {
+		t.Errorf("taint length mismatch: got %d, want %d", len(taints), len(expectedTaints))
+	}
+
+	for i, expected := range expectedTaints {
+		if taints[i] != expected {
+			t.Errorf("taint[%d] mismatch: got %q, want %q", i, taints[i], expected)
+		}
+	}
+}
+
+func TestS3DataSource_GetTaints_Empty(t *testing.T) {
+	config := map[string]any{
+		"bucket": "my-bucket",
+		"region": "us-east-1",
+	}
+
+	ds, err := NewS3DataSource(config)
+	if err != nil {
+		t.Fatalf("NewS3DataSource failed: %v", err)
+	}
+
+	key := "nonexistent/file.txt"
+	taints, err := ds.GetTaints(key)
+	if err != nil {
+		t.Errorf("GetTaints should not return error for missing key, got: %v", err)
+	}
+
+	if len(taints) != 0 {
+		t.Errorf("GetTaints should return empty slice for missing key, got %d items", len(taints))
 	}
 }

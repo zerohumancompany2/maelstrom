@@ -10,6 +10,7 @@ type s3DataSource struct {
 	region             string
 	endpoint           string
 	allowedForBoundary []security.BoundaryType
+	tags               map[string][]string
 }
 
 func NewS3DataSource(config map[string]any) (DataSource, error) {
@@ -38,15 +39,22 @@ func NewS3DataSource(config map[string]any) (DataSource, error) {
 		region:             region,
 		endpoint:           endpoint,
 		allowedForBoundary: allowedForBoundary,
+		tags:               make(map[string][]string),
 	}, nil
 }
 
 func (s *s3DataSource) TagOnWrite(key string, taints []string) error {
-	return fmt.Errorf("not implemented")
+	s.tags[key] = make([]string, len(taints))
+	copy(s.tags[key], taints)
+	return nil
 }
 
 func (s *s3DataSource) GetTaints(key string) ([]string, error) {
-	return nil, fmt.Errorf("not implemented")
+	taints, ok := s.tags[key]
+	if !ok {
+		return []string{}, nil
+	}
+	return taints, nil
 }
 
 func (s *s3DataSource) ValidateAccess(boundary security.BoundaryType) error {
