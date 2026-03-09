@@ -212,3 +212,40 @@ func TestToolsService_Resolve(t *testing.T) {
 		t.Errorf("Expected name 'test-tool', got '%s'", tool.Name)
 	}
 }
+
+func TestBoundaryAwareTool_ResolvesInnerTools(t *testing.T) {
+	svc := NewToolsService()
+
+	innerTool := ToolDescriptor{
+		Name:      "innerDbQuery",
+		Boundary:  "inner",
+		Schema:    map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string"}}},
+		Isolation: "container",
+	}
+
+	err := svc.Register(innerTool)
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	resolved, err := svc.Resolve("innerDbQuery", "inner")
+	if err != nil {
+		t.Fatalf("Resolve failed for inner caller accessing inner tool: %v", err)
+	}
+
+	if resolved.Name != "innerDbQuery" {
+		t.Errorf("Expected name 'innerDbQuery', got '%s'", resolved.Name)
+	}
+
+	if resolved.Boundary != "inner" {
+		t.Errorf("Expected boundary 'inner', got '%s'", resolved.Boundary)
+	}
+
+	if len(resolved.Schema) == 0 {
+		t.Error("Expected full schema to be returned for inner caller")
+	}
+
+	if _, ok := resolved.Schema["properties"]; !ok {
+		t.Error("Expected schema to contain all fields for inner caller")
+	}
+}

@@ -1,5 +1,17 @@
 package tools
 
+import (
+	"errors"
+
+	"github.com/maelstrom/v3/pkg/security"
+)
+
+var (
+	ErrToolNotFound      = errors.New("tool not found")
+	ErrToolNotAccessible = errors.New("tool not accessible from this boundary")
+	ErrBoundaryViolation = errors.New("boundary violation: unauthorized tool access")
+)
+
 type ToolsService interface {
 	Register(tool ToolDescriptor) error
 	Resolve(name string, callerBoundary string) (ToolDescriptor, error)
@@ -35,10 +47,30 @@ func (s *toolsService) Register(tool ToolDescriptor) error {
 func (s *toolsService) Resolve(name string, callerBoundary string) (ToolDescriptor, error) {
 	tool, ok := s.registry[name]
 	if !ok {
-		var zero ToolDescriptor
-		return zero, nil
+		return ToolDescriptor{}, ErrToolNotFound
 	}
+
+	if !canAccessTool(tool.Boundary, callerBoundary) {
+		return ToolDescriptor{}, ErrToolNotAccessible
+	}
+
 	return tool, nil
+}
+
+func canAccessTool(toolBoundary, callerBoundary string) bool {
+	toolBound := security.BoundaryType(toolBoundary)
+	callerBound := security.BoundaryType(callerBoundary)
+
+	switch callerBound {
+	case security.InnerBoundary:
+		return toolBound == security.InnerBoundary || toolBound == security.DMZBoundary || toolBound == security.OuterBoundary
+	case security.DMZBoundary:
+		return toolBound == security.DMZBoundary || toolBound == security.OuterBoundary
+	case security.OuterBoundary:
+		return toolBound == security.OuterBoundary
+	default:
+		return false
+	}
 }
 
 func (s *toolsService) List(boundaryFilter string) ([]ToolDescriptor, error) {
