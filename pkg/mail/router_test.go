@@ -97,3 +97,41 @@ func TestMailRouter_RouteToService(t *testing.T) {
 	}
 	serviceInbox.mu.RUnlock()
 }
+
+func TestMailRouter_RouteToUnknownAddress(t *testing.T) {
+	router := NewMailRouter()
+
+	// Test route to unregistered agent
+	mail := Mail{
+		ID:     "msg-004",
+		Source: "agent:user-agent",
+		Target: "agent:non-existent",
+		Type:   MailTypeUser,
+	}
+
+	err := router.Route(mail)
+	if err == nil {
+		t.Error("Expected error for unregistered agent")
+	}
+
+	// Test route to unregistered topic
+	mail.Target = "topic:non-existent"
+	err = router.Route(mail)
+	if err == nil {
+		t.Error("Expected error for unregistered topic")
+	}
+
+	// Test route to unregistered service
+	mail.Target = "sys:non-existent"
+	err = router.Route(mail)
+	if err == nil {
+		t.Error("Expected error for unregistered service")
+	}
+
+	// Test route to invalid address format
+	mail.Target = "invalid-format"
+	err = router.Route(mail)
+	if err == nil {
+		t.Error("Expected error for invalid address format")
+	}
+}
