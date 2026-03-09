@@ -132,15 +132,26 @@ func TestKernel_RegisterBootstrapActions_WithNilEngine_NoPanic(t *testing.T) {
 }
 
 func TestKernel_Start_RegistersActionsBeforeSpawn(t *testing.T) {
-	ordered := make(chan string, 2)
 	engine := statechart.NewEngine()
 	k := NewWithEngine(engine)
-	k.RegisterBootstrapActions()
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	go func() {
 		_ = k.Start(ctx)
 	}()
 	time.Sleep(50 * time.Millisecond)
-	_ = ordered
+}
+
+func TestKernel_Start_SpawnsBootstrapChart(t *testing.T) {
+	engine := statechart.NewEngine()
+	k := NewWithEngine(engine)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	go func() {
+		_ = k.Start(ctx)
+	}()
+	time.Sleep(200 * time.Millisecond)
+	if _, ok := k.GetServiceRuntimeID("sys:bootstrap"); !ok {
+		t.Error("expected sys:bootstrap service to be registered")
+	}
 }

@@ -23,6 +23,7 @@ type Kernel struct {
 	config   KernelConfig
 	factory  *runtime.Factory
 	sequence *bootstrap.Sequence
+	services map[string]statechart.RuntimeID
 	runtimes map[string]*runtime.ChartRuntime
 	mu       sync.RWMutex
 }
@@ -30,6 +31,7 @@ type Kernel struct {
 // New creates a new Kernel.
 func New() *Kernel {
 	return &Kernel{
+		services: make(map[string]statechart.RuntimeID),
 		runtimes: make(map[string]*runtime.ChartRuntime),
 	}
 }
@@ -38,6 +40,7 @@ func New() *Kernel {
 func NewWithEngine(engine statechart.Library) *Kernel {
 	return &Kernel{
 		engine:   engine,
+		services: make(map[string]statechart.RuntimeID),
 		runtimes: make(map[string]*runtime.ChartRuntime),
 	}
 }
@@ -82,6 +85,11 @@ func (k *Kernel) Start(ctx context.Context) error {
 			return fmt.Errorf("failed to spawn bootstrap runtime: %w", err)
 		}
 		log.Printf("[kernel] Spawning bootstrap runtime: %s", bootstrapRTID)
+
+		// Register bootstrap service
+		k.mu.Lock()
+		k.services["sys:bootstrap"] = bootstrapRTID
+		k.mu.Unlock()
 
 		// Start the bootstrap runtime
 		if err := k.engine.Control(bootstrapRTID, statechart.CmdStart); err != nil {
@@ -181,4 +189,12 @@ func (k *Kernel) GetRuntimes() map[string]*runtime.ChartRuntime {
 	k.mu.RLock()
 	defer k.mu.RUnlock()
 	return k.runtimes
+}
+
+// GetServiceRuntimeID returns the RuntimeID for a service.
+func (k *Kernel) GetServiceRuntimeID(name string) (statechart.RuntimeID, bool) {
+	k.mu.RLock()
+	defer k.mu.RUnlock()
+	id, ok := k.services[name]
+	return id, ok
 }
