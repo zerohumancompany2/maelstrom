@@ -74,12 +74,47 @@ func (r *MailRouter) SubscribeService(name string, inbox *ServiceInbox) error {
 	return nil
 }
 
+type TopicSubscriber interface {
+	Receive() chan Mail
+}
+
 type Topic struct {
 	Name        string
-	Subscribers []chan Mail
+	Subscribers []TopicSubscriber
 	mu          sync.RWMutex
 }
 
 func (t *Topic) Publish(mail Mail) error {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	for _, sub := range t.Subscribers {
+		ch := sub.Receive()
+		select {
+		case ch <- mail:
+		default:
+		}
+	}
 	return nil
+}
+
+func (t *Topic) Subscribe(sub TopicSubscriber) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.Subscribers = append(t.Subscribers, sub)
+	return nil
+}
+
+func (t *Topic) Unsubscribe(sub TopicSubscriber) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	for i, s := range t.Subscribers {
+		if s == sub {
+			t.Subscribers = append(t.Subscribers[:i], t.Subscribers[i+1:]...)
+			return nil
+		}
+	}
+
+	return errors.New("subscriber not found")
 }
