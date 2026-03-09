@@ -155,3 +155,37 @@ func TestRegistry_Get(t *testing.T) {
 		t.Errorf("Expected no error for unknown name, got %v", err)
 	}
 }
+
+func TestRegistry_List(t *testing.T) {
+	registry := NewRegistry()
+
+	registry.Register("localDisk", func(config map[string]any) (DataSource, error) {
+		return &localDisk{path: "/local"}, nil
+	})
+
+	registry.Register("s3", func(config map[string]any) (DataSource, error) {
+		return &localDisk{path: "/s3"}, nil
+	})
+
+	registry.Register("inMemory", func(config map[string]any) (DataSource, error) {
+		return &localDisk{path: "/memory"}, nil
+	})
+
+	names := registry.List()
+
+	if len(names) != 3 {
+		t.Errorf("Expected 3 registered sources, got %d", len(names))
+	}
+
+	expectedNames := map[string]bool{
+		"localDisk": true,
+		"s3":        true,
+		"inMemory":  true,
+	}
+
+	for _, name := range names {
+		if !expectedNames[name] {
+			t.Errorf("Unexpected name in list: %s", name)
+		}
+	}
+}
