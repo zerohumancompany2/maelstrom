@@ -118,7 +118,44 @@ func TestCommunicationService_PubSub(t *testing.T) {
 }
 
 func TestCommunicationService_RoutesMail(t *testing.T) {
-	// Placeholder for future implementation
+	svc := NewCommunicationService()
+
+	agentCh, _ := svc.Subscribe("agent:test-agent")
+	topicCh, _ := svc.Subscribe("topic:test-topic")
+	sysCh, _ := svc.Subscribe("sys:security")
+
+	err := svc.Publish(mail.Mail{Source: "test", Target: "agent:test-agent"})
+	if err != nil {
+		t.Errorf("Publish to agent failed: %v", err)
+	}
+
+	select {
+	case <-agentCh:
+	case <-time.After(100 * time.Millisecond):
+		t.Error("Timeout waiting for agent mail")
+	}
+
+	err = svc.Publish(mail.Mail{Source: "test", Target: "topic:test-topic"})
+	if err != nil {
+		t.Errorf("Publish to topic failed: %v", err)
+	}
+
+	select {
+	case <-topicCh:
+	case <-time.After(100 * time.Millisecond):
+		t.Error("Timeout waiting for topic mail")
+	}
+
+	err = svc.Publish(mail.Mail{Source: "test", Target: "sys:security"})
+	if err != nil {
+		t.Errorf("Publish to sys failed: %v", err)
+	}
+
+	select {
+	case <-sysCh:
+	case <-time.After(100 * time.Millisecond):
+		t.Error("Timeout waiting for sys mail")
+	}
 }
 
 func TestCommunicationService_ID(t *testing.T) {
