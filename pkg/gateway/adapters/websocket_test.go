@@ -2,8 +2,11 @@ package adapters
 
 import (
 	"encoding/json"
+	"net/http"
 	"testing"
+	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/maelstrom/v3/pkg/mail"
 )
 
@@ -51,5 +54,32 @@ func TestWebSocketAdapter_Bidirectional(t *testing.T) {
 	}
 	if result["source"] != "agent:bot" {
 		t.Errorf("Expected source 'agent:bot', got '%v'", result["source"])
+	}
+}
+
+func TestWebSocketAdapter_WSConnection(t *testing.T) {
+	adapter := NewWebSocketAdapter()
+
+	err := adapter.StartServer("127.0.0.1:18081")
+	if err != nil {
+		t.Fatalf("Expected nil error, got %v", err)
+	}
+	defer adapter.StopServer()
+
+	time.Sleep(100 * time.Millisecond)
+
+	conn, resp, err := websocket.DefaultDialer.Dial("ws://127.0.0.1:18081/ws", nil)
+	if err != nil {
+		t.Fatalf("Expected successful dial, got %v", err)
+	}
+	defer conn.Close()
+
+	if resp.StatusCode != http.StatusSwitchingProtocols {
+		t.Errorf("Expected status 101, got %d", resp.StatusCode)
+	}
+
+	err = conn.WriteMessage(websocket.TextMessage, []byte(`{"test": "hello"}`))
+	if err != nil {
+		t.Fatalf("Expected successful write, got %v", err)
 	}
 }
