@@ -118,3 +118,15 @@ func TestKernel_RegisterBootstrapActions_RegistersFourActions(t *testing.T) {
 	k := NewWithEngine(engine)
 	k.RegisterBootstrapActions()
 }
+
+func TestKernel_RegisterBootstrapActions_WithNilEngine_NoPanic(t *testing.T) {
+	k := New()
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("RegisterBootstrapActions should not panic with nil engine")
+			}
+		}()
+		k.RegisterBootstrapActions()
+	}()
+}
