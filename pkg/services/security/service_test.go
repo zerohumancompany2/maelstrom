@@ -96,3 +96,82 @@ func TestSecurityService_ID(t *testing.T) {
 		t.Errorf("Expected ID sys:security, got %s", chart.ID)
 	}
 }
+
+func TestSecurityService_ValidateAndSanitizePassThrough(t *testing.T) {
+	svc := NewSecurityService()
+
+	inputMail := mail.Mail{
+		ID:     "test-mail-1",
+		Source: "agent:test",
+		Target: "sys:security",
+	}
+
+	result, err := svc.ValidateAndSanitize(inputMail, mail.InnerBoundary, mail.DMZBoundary)
+
+	if err != nil {
+		t.Errorf("Expected ValidateAndSanitize to return nil error, got %v", err)
+	}
+
+	if result.ID != inputMail.ID {
+		t.Errorf("Expected mail ID to be unchanged, got %s", result.ID)
+	}
+
+	if result.Source != inputMail.Source {
+		t.Errorf("Expected mail Source to be unchanged, got %s", result.Source)
+	}
+}
+
+func TestSecurityService_TaintPropagateReturnsObject(t *testing.T) {
+	svc := NewSecurityService()
+
+	inputObj := "test-string"
+
+	result, err := svc.TaintPropagate(inputObj, []string{"PII", "SECRET"})
+
+	if err != nil {
+		t.Errorf("Expected TaintPropagate to return nil error, got %v", err)
+	}
+
+	resultStr, ok := result.(string)
+	if !ok {
+		t.Error("Expected result to be string type")
+	}
+
+	if resultStr != inputObj {
+		t.Errorf("Expected object to be unchanged, got %s", resultStr)
+	}
+}
+
+func TestSecurityService_ReportTaintsReturnsEmptyMap(t *testing.T) {
+	svc := NewSecurityService()
+
+	result, err := svc.ReportTaints("runtime-123")
+
+	if err != nil {
+		t.Errorf("Expected ReportTaints to return nil error, got %v", err)
+	}
+
+	if result == nil {
+		t.Error("Expected ReportTaints to return non-nil TaintMap")
+	}
+
+	if len(result) != 0 {
+		t.Errorf("Expected empty TaintMap, got %d entries", len(result))
+	}
+}
+
+func TestSecurityService_PrepareContextForBoundaryNoOp(t *testing.T) {
+	svc := NewSecurityService()
+
+	err := svc.PrepareContextForBoundary("runtime-123", mail.InnerBoundary)
+
+	if err != nil {
+		t.Errorf("Expected PrepareContextForBoundary to return nil for InnerBoundary, got %v", err)
+	}
+
+	err = svc.PrepareContextForBoundary("runtime-123", mail.OuterBoundary)
+
+	if err != nil {
+		t.Errorf("Expected PrepareContextForBoundary to return nil for OuterBoundary, got %v", err)
+	}
+}
