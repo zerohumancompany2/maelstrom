@@ -42,6 +42,12 @@ func (r *MailRouter) Route(mail Mail) error {
 			return errors.New("topic not found: " + id)
 		}
 		return topic.Publish(mail)
+	case AddressTypeSys:
+		inbox, exists := r.services[id]
+		if !exists {
+			return errors.New("service not found: " + id)
+		}
+		return inbox.Push(mail)
 	default:
 		return errors.New("unknown address type")
 	}
@@ -100,6 +106,8 @@ type ServiceInbox struct {
 }
 
 func (si *ServiceInbox) Push(mail Mail) error {
-	// TODO: implement
+	si.mu.Lock()
+	defer si.mu.Unlock()
+	si.Messages = append(si.Messages, mail)
 	return nil
 }

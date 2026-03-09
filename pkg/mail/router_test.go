@@ -71,3 +71,29 @@ func TestMailRouter_RouteToTopic(t *testing.T) {
 		t.Errorf("Expected nil error, got %v", err)
 	}
 }
+
+func TestMailRouter_RouteToService(t *testing.T) {
+	router := NewMailRouter()
+
+	serviceInbox := &ServiceInbox{ID: "heartbeat"}
+	router.SubscribeService("heartbeat", serviceInbox)
+
+	mail := Mail{
+		ID:     "msg-003",
+		Source: "agent:scheduler",
+		Target: "sys:heartbeat",
+		Type:   MailTypeHeartbeat,
+	}
+
+	err := router.Route(mail)
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	// Verify message was pushed to service inbox
+	serviceInbox.mu.RLock()
+	if len(serviceInbox.Messages) != 1 {
+		t.Errorf("Expected 1 message in service inbox, got %d", len(serviceInbox.Messages))
+	}
+	serviceInbox.mu.RUnlock()
+}
