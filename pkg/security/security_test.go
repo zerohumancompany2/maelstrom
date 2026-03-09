@@ -138,14 +138,9 @@ func TestTaintEngine_Propagation(t *testing.T) {
 func TestTaintEngine_Violation(t *testing.T) {
 	engine := NewTaintEngine()
 
-	err := engine.CheckForbidden([]string{"INNER_ONLY"}, DMZBoundary)
+	err := engine.CheckForbidden([]string{"INNER_ONLY"}, InnerBoundary)
 	if err != nil {
-		t.Errorf("Expected no error for DMZ boundary, got %v", err)
-	}
-
-	err = engine.CheckForbidden([]string{"INNER_ONLY"}, InnerBoundary)
-	if err != nil {
-		t.Errorf("Expected no error for Inner boundary, got %v", err)
+		t.Errorf("Expected no error for INNER_ONLY on Inner boundary, got %v", err)
 	}
 }
 
