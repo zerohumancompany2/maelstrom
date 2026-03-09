@@ -35,7 +35,7 @@ type MailMetadata struct {
 	Cost     float64
 	Boundary BoundaryType
 	Taints   []string
-	Stream   bool
+	Stream   *StreamChunk
 	IsFinal  bool
 }
 
