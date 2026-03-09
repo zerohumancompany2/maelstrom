@@ -26,7 +26,18 @@ func ValidateSubAgentBoundary(parentBoundary, childBoundary BoundaryType) error 
 }
 
 func TaintSubAgentReturn(data any, subAgentBoundary BoundaryType) (any, error) {
-	panic("not implemented")
+	marker := createSubAgentTaintMarker(subAgentBoundary)
+	switch v := data.(type) {
+	case map[string]interface{}:
+		existingTaints, _ := v["_taints"].([]string)
+		taints := make([]string, len(existingTaints)+1)
+		copy(taints, existingTaints)
+		taints = append(taints, marker)
+		v["_taints"] = taints
+		return v, nil
+	default:
+		return data, nil
+	}
 }
 
 func CheckSubAgentElevation(parentBoundary, childBoundary BoundaryType) bool {
@@ -59,7 +70,16 @@ func isStricterOrEqual(childBoundary, parentBoundary BoundaryType) bool {
 }
 
 func createSubAgentTaintMarker(boundary BoundaryType) string {
-	panic("not implemented")
+	switch boundary {
+	case InnerBoundary:
+		return "INNER"
+	case DMZBoundary:
+		return "DMZ"
+	case OuterBoundary:
+		return "OUTER"
+	default:
+		return string(boundary)
+	}
 }
 
 func formatSubAgentViolationError(parentBoundary, childBoundary BoundaryType) error {

@@ -31,3 +31,38 @@ func TestSubAgentBoundary_CannotElevate(t *testing.T) {
 		t.Errorf("CheckSubAgentElevation(DMZBoundary, InnerBoundary) = true, want false (dmz→inner forbidden)")
 	}
 }
+
+func TestSubAgentBoundary_ReturnDataTainted(t *testing.T) {
+	// Given: Sub-agent at dmz boundary completes and returns data to parent at inner boundary
+	subAgentBoundary := DMZBoundary
+	data := map[string]interface{}{"result": "test data"}
+
+	// When: Return data is passed through boundary validation
+	taintedData, err := TaintSubAgentReturn(data, subAgentBoundary)
+
+	// Then: Data is tainted with DMZ boundary marker before reaching parent
+	if err != nil {
+		t.Fatalf("TaintSubAgentReturn returned error: %v", err)
+	}
+
+	taintedMap, ok := taintedData.(map[string]interface{})
+	if !ok {
+		t.Errorf("TaintSubAgentReturn returned non-map type: %T", taintedData)
+	}
+
+	taints, hasTaints := taintedMap["_taints"].([]string)
+	if !hasTaints {
+		t.Errorf("Tainted data does not have _taints field")
+	}
+
+	found := false
+	for _, t := range taints {
+		if t == "DMZ" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Returned data does not carry DMZ taint, got: %v", taints)
+	}
+}
