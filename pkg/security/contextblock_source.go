@@ -1,5 +1,10 @@
 package security
 
+import (
+	"fmt"
+	"strings"
+)
+
 type Session struct {
 	Messages []Message
 }
@@ -29,10 +34,18 @@ const (
 )
 
 func AssembleSource(block *ContextBlock, session *Session, memorySvc MemoryService, toolRegistry *ToolRegistry) ([]byte, error) {
-	if block.Source == string(SourceStatic) {
+	switch SourceType(block.Source) {
+	case SourceStatic:
 		return assembleStatic(block)
+	case SourceSession:
+		return assembleSession(block, session)
+	case SourceMemoryService:
+		return assembleMemoryService(block, memorySvc)
+	case SourceToolRegistry:
+		return assembleToolRegistry(block, toolRegistry)
+	default:
+		return nil, fmt.Errorf("unsupported source type: %s", block.Source)
 	}
-	return nil, nil
 }
 
 func assembleStatic(block *ContextBlock) ([]byte, error) {
@@ -40,7 +53,31 @@ func assembleStatic(block *ContextBlock) ([]byte, error) {
 }
 
 func assembleSession(block *ContextBlock, session *Session) ([]byte, error) {
-	return nil, nil
+	if session == nil || len(session.Messages) == 0 {
+		return []byte(""), nil
+	}
+
+	n := block.N
+	if n <= 0 {
+		n = 10
+	}
+
+	messages := session.Messages
+	if n >= len(messages) {
+		n = len(messages)
+	}
+
+	lastN := messages[len(messages)-n:]
+
+	var builder strings.Builder
+	for i, msg := range lastN {
+		if i > 0 {
+			builder.WriteString("\n")
+		}
+		builder.WriteString(fmt.Sprintf("%s: %s", msg.Role, msg.Content))
+	}
+
+	return []byte(builder.String()), nil
 }
 
 func assembleMemoryService(block *ContextBlock, memorySvc MemoryService) ([]byte, error) {
