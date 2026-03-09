@@ -182,3 +182,51 @@ func TestFilterContextBlock_Audit(t *testing.T) {
 		t.Errorf("Expected audit log to contain VIOLATION, got: %s", lastLog)
 	}
 }
+
+func TestContextMap_TokenBudgetEnforcement(t *testing.T) {
+	block1 := &ContextBlock{
+		Name:      "block1",
+		Content:   strings.Repeat("a", 2000),
+		MaxTokens: 2000,
+		Priority:  1,
+		Eviction:  "summarize",
+	}
+	block2 := &ContextBlock{
+		Name:      "block2",
+		Content:   strings.Repeat("b", 1500),
+		MaxTokens: 1500,
+		Priority:  5,
+		Eviction:  "summarize",
+	}
+	block3 := &ContextBlock{
+		Name:      "block3",
+		Content:   strings.Repeat("c", 1500),
+		MaxTokens: 1500,
+		Priority:  10,
+		Eviction:  "summarize",
+	}
+
+	blocks := []*ContextBlock{block1, block2, block3}
+	totalTokens := 5000
+	budget := 4000
+
+	cm := NewContextMap(blocks, budget)
+	result, err := cm.AssembleWithBudget()
+
+	if err != nil {
+		t.Fatalf("AssembleWithBudget returned error: %v", err)
+	}
+
+	if len(result) == 0 {
+		t.Fatal("Expected some blocks to be returned")
+	}
+
+	total := 0
+	for _, block := range result {
+		total += block.MaxTokens
+	}
+
+	if total > budget {
+		t.Errorf("Expected total tokens <= %d, got %d (total was %d before assembly)", budget, total, totalTokens)
+	}
+}
