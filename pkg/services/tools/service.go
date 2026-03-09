@@ -6,6 +6,8 @@ type ToolsService interface {
 	List(boundaryFilter string) ([]ToolDescriptor, error)
 	Invoke(toolName string, args map[string]any, callerBoundary string) (any, error)
 	Unregister(name string) error
+	RegisterByName(name string, tool ToolDescriptor) error
+	ResolveByName(name string) (ToolDescriptor, error)
 }
 
 type ToolDescriptor struct {
@@ -74,4 +76,18 @@ func (s *toolsService) Invoke(toolName string, args map[string]any, callerBounda
 
 func (s *toolsService) Unregister(name string) error {
 	return nil
+}
+
+func (s *toolsService) RegisterByName(name string, tool ToolDescriptor) error {
+	s.registry[name] = tool
+	return nil
+}
+
+func (s *toolsService) ResolveByName(name string) (ToolDescriptor, error) {
+	tool, ok := s.registry[name]
+	if !ok {
+		var zero ToolDescriptor
+		return zero, nil
+	}
+	return tool, nil
 }
