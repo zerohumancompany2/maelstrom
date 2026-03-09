@@ -23,7 +23,17 @@ func TestValidateBoundary_Invalid(t *testing.T) {
 }
 
 func TestInnerCapabilities(t *testing.T) {
-	panic("not implemented")
+	caps := GetBoundaryCapabilities(InnerBoundary)
+	expected := Capabilities{
+		CanReadSecrets:       true,
+		CanWriteSecrets:      true,
+		RequiresSanitization: false,
+		IngressOnly:          false,
+		MailOnlyTransitions:  false,
+	}
+	if caps != expected {
+		t.Errorf("GetBoundaryCapabilities(InnerBoundary) = %v, want %v", caps, expected)
+	}
 }
 
 func TestDMZCapabilities(t *testing.T) {

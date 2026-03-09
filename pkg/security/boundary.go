@@ -20,5 +20,32 @@ func ValidateBoundary(boundary BoundaryType) error {
 }
 
 func GetBoundaryCapabilities(boundary BoundaryType) Capabilities {
-	panic("not implemented")
+	switch boundary {
+	case InnerBoundary:
+		return Capabilities{
+			CanReadSecrets:       true,
+			CanWriteSecrets:      true,
+			RequiresSanitization: false,
+			IngressOnly:          false,
+			MailOnlyTransitions:  false,
+		}
+	case DMZBoundary:
+		return Capabilities{
+			CanReadSecrets:       false,
+			CanWriteSecrets:      false,
+			RequiresSanitization: true,
+			IngressOnly:          false,
+			MailOnlyTransitions:  true,
+		}
+	case OuterBoundary:
+		return Capabilities{
+			CanReadSecrets:       false,
+			CanWriteSecrets:      false,
+			RequiresSanitization: true,
+			IngressOnly:          true,
+			MailOnlyTransitions:  true,
+		}
+	default:
+		return Capabilities{}
+	}
 }
