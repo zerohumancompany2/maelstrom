@@ -13,8 +13,8 @@ func TestNamespaceIsolate_CreateView(t *testing.T) {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	if view.RuntimeID != runtimeId {
-		t.Errorf("Expected RuntimeID %s, got %s", runtimeId, view.RuntimeID)
+	if view.ChartID != runtimeId {
+		t.Errorf("Expected ChartID %s, got %s", runtimeId, view.ChartID)
 	}
 
 	if view.Operation != operation {
@@ -24,7 +24,6 @@ func TestNamespaceIsolate_CreateView(t *testing.T) {
 
 func TestNamespaceIsolate_FilterData(t *testing.T) {
 	view, _ := NamespaceIsolate("agent-123", "read")
-	view.Boundary = DMZBoundary
 
 	data := map[string]interface{}{
 		"_taints": []string{"INNER_ONLY", "TOOL_OUTPUT"},
