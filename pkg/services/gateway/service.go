@@ -144,10 +144,43 @@ func normalizeContent(rawMessage any) (string, error) {
 }
 
 // NormalizeOutbound normalizes outbound mail to channel-specific format
-func (g *gatewayService) NormalizeOutbound(mail *mail.Mail, adapterName string) (any, error) {
-	return map[string]any{
-		"content":  mail.Content,
-		"boundary": string(mail.Metadata.Boundary),
+func (g *gatewayService) NormalizeOutbound(m *mail.Mail, adapterName string) (any, error) {
+	result := map[string]any{
+		"content":  m.Content,
+		"boundary": string(m.Metadata.Boundary),
 		"adapter":  adapterName,
-	}, nil
+	}
+
+	boundary := m.Metadata.Boundary
+	if boundary == mail.OuterBoundary {
+		return stripSensitiveMetadata(result), nil
+	}
+	if boundary == mail.DMZBoundary {
+		return allowLimitedMetadata(result), nil
+	}
+	if boundary == mail.InnerBoundary {
+		return result, nil
+	}
+	return result, nil
+}
+
+func stripSensitiveMetadata(data map[string]any) map[string]any {
+	result := make(map[string]any)
+	for k, v := range data {
+		if k != "tokens" && k != "internal" && k != "secret" {
+			result[k] = v
+		}
+	}
+	return result
+}
+
+func allowLimitedMetadata(data map[string]any) map[string]any {
+	result := make(map[string]any)
+	allowedKeys := []string{"content", "boundary", "adapter"}
+	for _, key := range allowedKeys {
+		if v, exists := data[key]; exists {
+			result[key] = v
+		}
+	}
+	return result
 }

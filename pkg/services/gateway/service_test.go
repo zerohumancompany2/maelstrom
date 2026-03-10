@@ -34,6 +34,12 @@ func TestGatewayService_RegisterAdapter_DuplicateReturnsError(t *testing.T) {
 // TestGatewayService_NormalizeInbound - Spec: arch-v1.md L670-671
 func TestGatewayService_NormalizeInbound(t *testing.T) {
 	svc := NewGatewayService()
+
+	// Register adapter first
+	if err := svc.RegisterAdapter("webhook", &WebhookAdapter{}); err != nil {
+		t.Fatalf("Failed to register adapter: %v", err)
+	}
+
 	rawMessage := map[string]any{
 		"from":    "user@example.com",
 		"subject": "Test Message",
@@ -199,5 +205,88 @@ func TestGatewayService_NormalizeInbound_ContentNormalization(t *testing.T) {
 
 	if content == "" {
 		t.Error("Expected non-empty normalized content")
+	}
+}
+
+// TestGatewayService_NormalizeOutbound_BoundaryEnforcement - Spec: arch-v1.md L261-270
+func TestGatewayService_NormalizeOutbound_BoundaryEnforcement(t *testing.T) {
+	svc := NewGatewayService()
+
+	// Test OuterBoundary - sensitive metadata should be stripped
+	outerMail := &mail.Mail{
+		Type:    mail.MailTypeAssistant,
+		Content: "Response content",
+		Metadata: mail.MailMetadata{
+			Boundary: mail.OuterBoundary,
+			Tokens:   100,
+		},
+	}
+
+	outerResult, err := svc.NormalizeOutbound(outerMail, "webhook")
+	if err != nil {
+		t.Fatalf("NormalizeOutbound failed for outer boundary: %v", err)
+	}
+
+	outerMap, ok := outerResult.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected result to be map[string]any, got %T", outerResult)
+	}
+
+	// Verify sensitive data is stripped
+	if _, hasTokens := outerMap["tokens"]; hasTokens {
+		t.Error("Expected tokens to be stripped for outer boundary")
+	}
+
+	// Test DMZBoundary - limited metadata allowed
+	dmzMail := &mail.Mail{
+		Type:    mail.MailTypeAssistant,
+		Content: "DMZ Response",
+		Metadata: mail.MailMetadata{
+			Boundary: mail.DMZBoundary,
+			Tokens:   50,
+		},
+	}
+
+	dmzResult, err := svc.NormalizeOutbound(dmzMail, "webhook")
+	if err != nil {
+		t.Fatalf("NormalizeOutbound failed for dmz boundary: %v", err)
+	}
+
+	dmzMap, ok := dmzResult.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected result to be map[string]any, got %T", dmzResult)
+	}
+
+	// Verify only allowed keys are present for DMZ
+	allowedKeys := map[string]bool{"content": true, "boundary": true, "adapter": true}
+	for key := range dmzMap {
+		if !allowedKeys[key] {
+			t.Errorf("DMZ boundary should only allow limited metadata, found unexpected key: %s", key)
+		}
+	}
+
+	// Test InnerBoundary - full metadata allowed
+	innerMail := &mail.Mail{
+		Type:    mail.MailTypeAssistant,
+		Content: "Inner Response",
+		Metadata: mail.MailMetadata{
+			Boundary: mail.InnerBoundary,
+			Tokens:   200,
+		},
+	}
+
+	innerResult, err := svc.NormalizeOutbound(innerMail, "webhook")
+	if err != nil {
+		t.Fatalf("NormalizeOutbound failed for inner boundary: %v", err)
+	}
+
+	innerMap, ok := innerResult.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected result to be map[string]any, got %T", innerResult)
+	}
+
+	// Verify content is present for inner boundary
+	if innerMap["content"] != "Inner Response" {
+		t.Error("Expected content to be preserved for inner boundary")
 	}
 }
