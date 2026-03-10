@@ -5,6 +5,7 @@ import (
 
 	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/services/admin"
+	"github.com/maelstrom/v3/pkg/services/communication"
 	"github.com/maelstrom/v3/pkg/services/datasources"
 	"github.com/maelstrom/v3/pkg/services/gateway"
 	"github.com/maelstrom/v3/pkg/services/heartbeat"
@@ -60,4 +61,76 @@ func TestServicesIntegration_HandleMail(t *testing.T) {
 			_ = handleMailFunc.HandleMail(testMail)
 		})
 	}
+}
+
+func TestServicesIntegration_MailExchange(t *testing.T) {
+	commSvc := communication.NewCommunicationService()
+
+	// Setup mail exchange between services
+	senderService := gateway.NewGatewayService()
+	receiverService := memory.NewMemoryService()
+
+	// Create test mail
+	testMail := mail.Mail{
+		ID:     "mail-exchange-test-1",
+		Type:   mail.MailTypeUser,
+		Source: "sys:gateway",
+		Target: "sys:memory",
+		Content: map[string]any{
+			"message": "exchange test message",
+			"data":    []string{"item1", "item2"},
+		},
+		Metadata: mail.MailMetadata{
+			Boundary: mail.InnerBoundary,
+			Tokens:   10,
+			Model:    "test-model",
+		},
+	}
+
+	// Subscribe receiver to target address
+	receiverChan, err := commSvc.Subscribe("sys:memory")
+	if err != nil {
+		t.Fatalf("Failed to subscribe: %v", err)
+	}
+
+	// Publish mail
+	ack, err := commSvc.Publish(testMail)
+	if err != nil {
+		t.Fatalf("Failed to publish: %v", err)
+	}
+
+	// Verify mail was delivered
+	if !ack.Success {
+		t.Error("Mail was not successfully delivered")
+	}
+
+	// Read mail from receiver channel
+	select {
+	case receivedMail := <-receiverChan:
+		// Verify content preserved
+		if receivedContent, ok := receivedMail.Content.(map[string]any); ok {
+			if testContent, ok := testMail.Content.(map[string]any); ok {
+				if receivedContent["message"] != testContent["message"] {
+					t.Error("Mail content message not preserved")
+				}
+			}
+		}
+
+		// Verify metadata preserved
+		if receivedMail.Metadata.Boundary != testMail.Metadata.Boundary {
+			t.Error("Mail metadata boundary not preserved")
+		}
+		if receivedMail.Metadata.Tokens != testMail.Metadata.Tokens {
+			t.Error("Mail metadata tokens not preserved")
+		}
+		if receivedMail.Metadata.Model != testMail.Metadata.Model {
+			t.Error("Mail metadata model not preserved")
+		}
+	default:
+		t.Error("Mail not received by receiver")
+	}
+
+	// Test HandleMail on sender and receiver
+	_ = senderService.HandleMail(testMail)
+	_ = receiverService.HandleMail(testMail)
 }

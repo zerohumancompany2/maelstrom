@@ -17,6 +17,9 @@ type DatasourceService interface {
 	ValidateAccess(path string, boundary security.BoundaryType) error
 	Register(name string, ds datasource.DataSource) error
 	AttachTaintsOnRead(m *mail.Mail, path string) *mail.Mail
+	HandleMail(mail mail.Mail) error
+	Start() error
+	Stop() error
 }
 
 type datasourceService struct {

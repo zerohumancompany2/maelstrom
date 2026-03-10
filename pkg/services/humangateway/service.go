@@ -10,24 +10,37 @@ import (
 	"sync"
 )
 
-type HumanGatewayService struct {
+// HumanGatewayService interface for human gateway operations
+type HumanGatewayService interface {
+	ID() string
+	HandleChat(agentID, message string) (mail.Mail, error)
+	GetSession(agentID string) *ChatSession
+	CreateSession(agentID string) *ChatSession
+	ChatEndpoint(w http.ResponseWriter, r *http.Request)
+	CreateChatSession(agentID string) (*ChatSession, error)
+	HandleMail(mail mail.Mail) error
+	Start() error
+	Stop() error
+}
+
+type humanGatewayService struct {
 	id       string
 	sessions map[string]*ChatSession
 	mu       sync.RWMutex
 }
 
-func NewHumanGatewayService() *HumanGatewayService {
-	return &HumanGatewayService{
+func NewHumanGatewayService() HumanGatewayService {
+	return &humanGatewayService{
 		id:       "sys:human-gateway",
 		sessions: make(map[string]*ChatSession),
 	}
 }
 
-func (h *HumanGatewayService) ID() string {
+func (h *humanGatewayService) ID() string {
 	return h.id
 }
 
-func (h *HumanGatewayService) HandleChat(agentID, message string) (mail.Mail, error) {
+func (h *humanGatewayService) HandleChat(agentID, message string) (mail.Mail, error) {
 	b := make([]byte, 8)
 	rand.Read(b)
 	id := fmt.Sprintf("human-gateway-%x", b)
@@ -55,13 +68,13 @@ func (h *HumanGatewayService) HandleChat(agentID, message string) (mail.Mail, er
 	}, nil
 }
 
-func (h *HumanGatewayService) GetSession(agentID string) *ChatSession {
+func (h *humanGatewayService) GetSession(agentID string) *ChatSession {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return h.sessions[agentID]
 }
 
-func (h *HumanGatewayService) CreateSession(agentID string) *ChatSession {
+func (h *humanGatewayService) CreateSession(agentID string) *ChatSession {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -74,14 +87,14 @@ func (h *HumanGatewayService) CreateSession(agentID string) *ChatSession {
 	return session
 }
 
-func (h *HumanGatewayService) ChatEndpoint(w http.ResponseWriter, r *http.Request) {
+func (h *humanGatewayService) ChatEndpoint(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"status": "ok",
 	})
 }
 
-func (h *HumanGatewayService) CreateChatSession(agentID string) (*ChatSession, error) {
+func (h *humanGatewayService) CreateChatSession(agentID string) (*ChatSession, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -94,14 +107,14 @@ func (h *HumanGatewayService) CreateChatSession(agentID string) (*ChatSession, e
 	return session, nil
 }
 
-func (h *HumanGatewayService) HandleMail(m mail.Mail) error {
+func (h *humanGatewayService) HandleMail(m mail.Mail) error {
 	return nil
 }
 
-func (h *HumanGatewayService) Start() error {
+func (h *humanGatewayService) Start() error {
 	return nil
 }
 
-func (h *HumanGatewayService) Stop() error {
+func (h *humanGatewayService) Stop() error {
 	return nil
 }

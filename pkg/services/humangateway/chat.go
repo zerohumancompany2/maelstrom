@@ -22,7 +22,7 @@ type ActionItem struct {
 	Payload any
 }
 
-func (h *HumanGatewayService) ParseActionItem(message string) ([]ActionItem, error) {
+func (h *humanGatewayService) ParseActionItem(message string) ([]ActionItem, error) {
 	var items []ActionItem
 
 	if strings.Contains(message, "@pause") {
@@ -47,7 +47,7 @@ func (h *HumanGatewayService) ParseActionItem(message string) ([]ActionItem, err
 
 func SanitizeContextForBoundary(ctx ContextMapSnapshot, boundary mail.BoundaryType) ContextMapSnapshot {
 	sanitized := make(ContextMapSnapshot)
-	
+
 	forbiddenTaints := map[string]bool{
 		"FORBIDDEN": true,
 		"INTERNAL":  true,
@@ -80,7 +80,7 @@ func SanitizeContextForBoundary(ctx ContextMapSnapshot, boundary mail.BoundaryTy
 	return sanitized
 }
 
-func (h *HumanGatewayService) SendMessage(session *ChatSession, message string) error {
+func (h *humanGatewayService) SendMessage(session *ChatSession, message string) error {
 	if session == nil {
 		return fmt.Errorf("nil session")
 	}
@@ -103,7 +103,7 @@ func (h *HumanGatewayService) SendMessage(session *ChatSession, message string) 
 	return nil
 }
 
-func (h *HumanGatewayService) AddAgentReply(session *ChatSession, reply mail.Mail) error {
+func (h *humanGatewayService) AddAgentReply(session *ChatSession, reply mail.Mail) error {
 	if session == nil {
 		return fmt.Errorf("nil session")
 	}

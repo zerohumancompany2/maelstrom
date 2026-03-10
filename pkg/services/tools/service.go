@@ -22,6 +22,9 @@ type ToolsService interface {
 	Unregister(name string) error
 	RegisterByName(name string, tool ToolDescriptor) error
 	ResolveByName(name string) (ToolDescriptor, error)
+	HandleMail(mail mail.Mail) error
+	Start() error
+	Stop() error
 }
 
 type ToolDescriptor struct {

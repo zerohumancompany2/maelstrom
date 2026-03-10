@@ -16,6 +16,9 @@ type AdminService interface {
 	QueryTaints(agentId string) (security.TaintMap, error)
 	InjectEvent(agentId string, event statechart.Event) error
 	ExecuteCommand(cmd string, token string) error
+	HandleMail(mail mail.Mail) error
+	Start() error
+	Stop() error
 }
 
 type adminService struct {

@@ -41,6 +41,9 @@ type PersistenceService interface {
 	AppendEvent(runtimeId string, event statechart.Event) error
 	GetEvents(runtimeId string, since string) ([]EventLogEntry, error)
 	Migrate(runtimeId string, newDef statechart.ChartDefinition, policy MigrationPolicy) error
+	HandleMail(mail mail.Mail) error
+	Start() error
+	Stop() error
 }
 
 type persistenceService struct {

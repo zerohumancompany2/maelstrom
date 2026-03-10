@@ -23,6 +23,9 @@ type HeartbeatService interface {
 	TriggerAll() error
 	TriggerWakeUp(agentID string) error
 	GetInbox(agentID string) *mail.AgentInbox
+	HandleMail(mail mail.Mail) error
+	Start() error
+	Stop() error
 }
 
 // BootstrapChart returns the chart definition for sys:heartbeat

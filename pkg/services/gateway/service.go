@@ -36,6 +36,9 @@ type GatewayService interface {
 	GetAdapter(name string) (ChannelAdapter, bool)
 	NormalizeInbound(adapterName string, rawMessage any) (*mail.Mail, error)
 	NormalizeOutbound(mail *mail.Mail, adapterName string) (any, error)
+	HandleMail(mail mail.Mail) error
+	Start() error
+	Stop() error
 }
 
 // gatewayService implements GatewayService
