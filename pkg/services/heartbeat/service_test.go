@@ -4,6 +4,16 @@ import (
 	"testing"
 )
 
+// arch-v1.md L469: HeartbeatService must return ID "sys:heartbeat"
+func TestHeartbeatService_ID(t *testing.T) {
+	svc := NewHeartbeatService()
+
+	id := svc.ID()
+	if id != "sys:heartbeat" {
+		t.Errorf("Expected ID 'sys:heartbeat', got '%s'", id)
+	}
+}
+
 func TestHeartbeat_Schedule(t *testing.T) {
 	svc := NewHeartbeatService()
 

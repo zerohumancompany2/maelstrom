@@ -29,6 +29,10 @@ func (s *heartbeatService) Schedule(agentId string, cron string, template string
 	return nil
 }
 
+func (s *heartbeatService) ID() string {
+	return "sys:heartbeat"
+}
+
 func (s *heartbeatService) Unschedule(agentId string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

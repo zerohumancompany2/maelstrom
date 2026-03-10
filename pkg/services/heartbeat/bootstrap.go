@@ -11,6 +11,7 @@ type Schedule struct {
 
 // HeartbeatService interface for heartbeat operations
 type HeartbeatService interface {
+	ID() string
 	Schedule(agentId string, cron string, template string) error
 	Unschedule(agentId string) error
 	Trigger(agentId string) error
