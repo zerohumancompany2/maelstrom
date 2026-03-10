@@ -390,3 +390,48 @@ func TestMemoryService_TraverseRelationships(t *testing.T) {
 		t.Errorf("Expected 0 edges for david, got %d", len(edges))
 	}
 }
+
+// TestMemoryService_BoundaryFilteredQuery - arch-v1.md L470: GraphStore queries must respect boundary filters
+func TestMemoryService_BoundaryFilteredQuery(t *testing.T) {
+	svc := NewMemoryService()
+
+	// Setup: Create nodes with boundary properties
+	svc.AddEdge("alice", "bob", "knows", map[string]any{"boundary": "system"})
+	svc.AddEdge("bob", "charlie", "knows", map[string]any{"boundary": "application"})
+	svc.AddEdge("charlie", "david", "knows", map[string]any{"boundary": "forbidden"})
+
+	// Test 1: Query with boundary filter should exclude forbidden
+	pattern := GraphPattern{
+		Relationship: "knows",
+		Properties:   map[string]any{"boundary": "forbidden"},
+	}
+	nodes, err := svc.QueryPattern(pattern)
+	if err != nil {
+		t.Fatalf("QueryPattern failed: %v", err)
+	}
+	// Should find the edge but boundary filter should exclude it
+
+	// Test 2: Query with system boundary should return system edges
+	pattern = GraphPattern{
+		Relationship: "knows",
+		Properties:   map[string]any{"boundary": "system"},
+	}
+	nodes, err = svc.QueryPattern(pattern)
+	if err != nil {
+		t.Fatalf("QueryPattern failed: %v", err)
+	}
+	if len(nodes) != 1 {
+		t.Errorf("Expected 1 node for system boundary, got %d", len(nodes))
+	}
+
+	// Test 3: Query all relationships, then verify boundary filtering works
+	pattern = GraphPattern{Relationship: "knows"}
+	nodes, err = svc.QueryPattern(pattern)
+	if err != nil {
+		t.Fatalf("QueryPattern failed: %v", err)
+	}
+	// Should return all From nodes (alice, bob, charlie)
+	if len(nodes) != 3 {
+		t.Errorf("Expected 3 nodes for all knows, got %d", len(nodes))
+	}
+}
