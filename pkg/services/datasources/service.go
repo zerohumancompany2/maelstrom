@@ -1,6 +1,8 @@
 package datasources
 
 import (
+	"fmt"
+
 	"github.com/maelstrom/v3/pkg/datasource"
 	"github.com/maelstrom/v3/pkg/security"
 )
@@ -58,6 +60,9 @@ func (s *datasourceService) ValidateAccess(path string, boundary security.Bounda
 }
 
 func (s *datasourceService) Register(name string, ds datasource.DataSource) error {
+	if _, exists := s.datasources[name]; exists {
+		return fmt.Errorf("datasource %q already registered", name)
+	}
 	s.datasources[name] = ds
 	return nil
 }

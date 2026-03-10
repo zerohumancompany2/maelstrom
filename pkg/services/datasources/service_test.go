@@ -16,6 +16,23 @@ func TestDataSourceService_ID(t *testing.T) {
 	}
 }
 
+// TestDataSourceService_Register - arch-v1.md L473: register data sources with duplicate detection
+func TestDataSourceService_Register(t *testing.T) {
+	svc := NewDatasourceService()
+
+	// Register first datasource
+	err := svc.Register("localDisk", &LocalDiskDatasource{})
+	if err != nil {
+		t.Fatalf("Register localDisk failed: %v", err)
+	}
+
+	// Register duplicate should fail
+	err = svc.Register("localDisk", &S3Datasource{})
+	if err == nil {
+		t.Error("Expected error for duplicate registration, got nil")
+	}
+}
+
 func TestDatasources_Register(t *testing.T) {
 	svc := NewDatasourceService()
 
