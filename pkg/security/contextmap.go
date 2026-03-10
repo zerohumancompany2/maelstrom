@@ -176,12 +176,41 @@ func isBoundaryAllowed(allowed []BoundaryType, boundary BoundaryType) bool {
 
 func FilterContextBlockWithGlobalPolicy(block ContextBlock, boundary BoundaryType, globalPolicy TaintPolicyConfig) (ContextBlock, error) {
 	if block.TaintPolicy.RedactMode == "strict" || globalPolicy.Enforcement == EnforcementStrict {
+		if block.TaintPolicy.RedactMode == "audit" {
+			return filterWithAuditEnforcement(block, boundary, globalPolicy)
+		}
 		return filterWithStrictEnforcement(block, boundary, globalPolicy)
 	}
 	if block.TaintPolicy.RedactMode != "" {
 		return FilterContextBlock(block, boundary)
 	}
 	return block, nil
+}
+
+func filterWithAuditEnforcement(block ContextBlock, boundary BoundaryType, globalPolicy TaintPolicyConfig) (ContextBlock, error) {
+	allowedSet := make(map[string]bool)
+	for _, t := range globalPolicy.AllowedOnExit {
+		allowedSet[t] = true
+	}
+
+	forbiddenTaints := getBlockForbiddenTaints(block, allowedSet)
+	if len(forbiddenTaints) == 0 {
+		return block, nil
+	}
+
+	logAuditViolationWithTaints(block, boundary, forbiddenTaints)
+	return block, nil
+}
+
+func logAuditViolationWithTaints(block ContextBlock, boundary BoundaryType, forbiddenTaints []string) {
+	taintList := ""
+	for i, t := range forbiddenTaints {
+		if i > 0 {
+			taintList += ", "
+		}
+		taintList += t
+	}
+	auditLog = append(auditLog, fmt.Sprintf("VIOLATION at %s: block %s with forbidden taints [%s]", boundary, block.Name, taintList))
 }
 
 func filterWithStrictEnforcement(block ContextBlock, boundary BoundaryType, globalPolicy TaintPolicyConfig) (ContextBlock, error) {

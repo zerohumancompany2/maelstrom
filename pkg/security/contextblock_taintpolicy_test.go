@@ -87,6 +87,7 @@ func TestContextBlock_TaintPolicy_OVERRIDES_GLOBAL(t *testing.T) {
 	block := ContextBlock{
 		Name:    "audit-block",
 		Content: "This contains PII data",
+		Taints:  TaintSet{"PII": true},
 		TaintPolicy: TaintPolicy{
 			RedactMode: "audit",
 		},
