@@ -653,3 +653,44 @@ func TestToolRegistry_InnerToolsInvisible(t *testing.T) {
 		t.Errorf("Inner caller should access outer tool: %v", err)
 	}
 }
+
+// arch-v1.md L472: Tool registry and resolution
+// arch-v1.md L488: resolve(name, callerBoundary) → ToolDescriptor | notFound
+// arch-v1.md L261-270: Boundary types (outer, DMZ, inner) and enforcement rules
+func TestToolRegistry_BoundaryEnforcement(t *testing.T) {
+	svc := NewToolsService()
+
+	innerTool := ToolDescriptor{
+		Name:      "inner-db-query",
+		Boundary:  "inner",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "container",
+	}
+
+	if err := svc.Register(innerTool); err != nil {
+		t.Fatalf("Register inner tool failed: %v", err)
+	}
+
+	_, err := svc.Resolve("inner-db-query", "outer")
+	if err == nil {
+		t.Fatal("Expected error when outer caller tries to access inner tool")
+	}
+
+	if err != ErrToolNotAccessible {
+		t.Errorf("Expected ErrToolNotAccessible, got %v", err)
+	}
+
+	_, err = svc.Resolve("inner-db-query", "dmz")
+	if err == nil {
+		t.Fatal("Expected error when dmz caller tries to access inner tool")
+	}
+
+	if err != ErrToolNotAccessible {
+		t.Errorf("Expected ErrToolNotAccessible, got %v", err)
+	}
+
+	_, err = svc.Resolve("inner-db-query", "inner")
+	if err != nil {
+		t.Errorf("Inner caller should access inner tool: %v", err)
+	}
+}
