@@ -15,3 +15,10 @@ var PolicySeqContinue = ExecutionPolicy{
 	MaxRetries: 1,
 	Isolation:  "process",
 }
+
+// PolicySeqFailFast executes tools sequentially, stopping on first failure.
+var PolicySeqFailFast = ExecutionPolicy{
+	Mode:       "seq_failfast",
+	MaxRetries: 2,
+	Isolation:  "strict",
+}

@@ -24,3 +24,24 @@ func TestExecutionPolicy_SeqContinueStructure(t *testing.T) {
 		t.Errorf("Expected Isolation to be 'process', got '%s'", PolicySeqContinue.Isolation)
 	}
 }
+
+func TestExecutionPolicy_SeqFailFastStructure(t *testing.T) {
+	// Given
+	// PolicySeqFailFast should be defined
+
+	// When
+	// Access PolicySeqFailFast fields
+
+	// Then
+	if PolicySeqFailFast.Mode != "seq_failfast" {
+		t.Errorf("Expected Mode to be 'seq_failfast', got '%s'", PolicySeqFailFast.Mode)
+	}
+
+	if PolicySeqFailFast.MaxRetries != 2 {
+		t.Errorf("Expected MaxRetries to be 2, got %d", PolicySeqFailFast.MaxRetries)
+	}
+
+	if PolicySeqFailFast.Isolation != "strict" {
+		t.Errorf("Expected Isolation to be 'strict', got '%s'", PolicySeqFailFast.Isolation)
+	}
+}
