@@ -336,3 +336,41 @@ func TestDataSourceService_TaintAttachment(t *testing.T) {
 		}
 	}
 }
+
+// TestHotreloadableServices_DatasourcesTainting - spec: arch-v1.md L473, L489 (tagOnWrite and getTaints)
+func TestHotreloadableServices_DatasourcesTainting(t *testing.T) {
+	svc := NewDatasourceService()
+	testPath := "/tmp/test-file-datasources.txt"
+
+	taints := []string{"USER_SUPPLIED", "PII"}
+	err := svc.TagOnWrite(testPath, taints)
+	if err != nil {
+		t.Errorf("Expected no error tagging file, got %v", err)
+	}
+
+	retrievedTaints, err := svc.GetTaints(testPath)
+	if err != nil {
+		t.Fatalf("Expected no error getting taints, got %v", err)
+	}
+
+	if len(retrievedTaints) != 2 {
+		t.Errorf("Expected 2 taints, got %d", len(retrievedTaints))
+	}
+
+	foundUserSupplied := false
+	foundPII := false
+	for _, t := range retrievedTaints {
+		if t == "USER_SUPPLIED" {
+			foundUserSupplied = true
+		}
+		if t == "PII" {
+			foundPII = true
+		}
+	}
+	if !foundUserSupplied {
+		t.Error("Expected USER_SUPPLIED taint")
+	}
+	if !foundPII {
+		t.Error("Expected PII taint")
+	}
+}
