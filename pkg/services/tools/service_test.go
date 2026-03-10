@@ -395,3 +395,51 @@ func TestToolRegistry_Resolve(t *testing.T) {
 		t.Errorf("Expected ErrToolNotFound for unknown tool, got %v", err)
 	}
 }
+
+// arch-v1.md L472: Tool registry and resolution
+// arch-v1.md L488: resolve(name, callerBoundary) → ToolDescriptor | notFound
+func TestToolRegistry_ListTools(t *testing.T) {
+	svc := NewToolsService()
+
+	tools, err := svc.List("")
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+
+	if len(tools) != 0 {
+		t.Errorf("Expected empty list, got %d tools", len(tools))
+	}
+
+	tool1 := ToolDescriptor{
+		Name:      "tool-1",
+		Boundary:  "inner",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "container",
+	}
+
+	tool2 := ToolDescriptor{
+		Name:      "tool-2",
+		Boundary:  "outer",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "sandbox",
+	}
+
+	err = svc.Register(tool1)
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	err = svc.Register(tool2)
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	tools, err = svc.List("")
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+
+	if len(tools) != 2 {
+		t.Errorf("Expected 2 tools, got %d", len(tools))
+	}
+}
