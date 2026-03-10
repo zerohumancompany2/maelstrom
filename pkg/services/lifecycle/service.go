@@ -207,3 +207,35 @@ func (l *LifecycleService) checkQuiescence(runtimeID string) (bool, error) {
 	}
 	return true, nil
 }
+
+func (l *LifecycleService) prepareForReload(runtimeID string, timeoutMs int) error {
+	l.mu.Lock()
+	_, exists := l.runtimes[statechart.RuntimeID(runtimeID)]
+	if !exists {
+		l.mu.Unlock()
+		return statechart.ErrRuntimeNotFound
+	}
+	l.mu.Unlock()
+
+	timeout := time.Duration(timeoutMs) * time.Millisecond
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+
+	done := make(chan bool)
+	go func() {
+		for {
+			isQuiescent, err := l.checkQuiescence(runtimeID)
+			if err == nil && isQuiescent {
+				done <- true
+				return
+			}
+		}
+	}()
+
+	select {
+	case <-done:
+		return nil
+	case <-time.After(timeout):
+		return statechart.ErrQuiescenceTimeout
+	}
+}

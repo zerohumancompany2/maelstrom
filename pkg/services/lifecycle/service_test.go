@@ -506,3 +506,23 @@ func TestHotReload_QuiescenceNoInflightTools(t *testing.T) {
 		t.Error("Expected runtime to be quiescent with no inflight tool calls")
 	}
 }
+
+func TestHotReload_PrepareForReload(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+	}
+
+	rtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	err = svc.prepareForReload(string(rtID), 1000)
+	if err != nil {
+		t.Fatalf("prepareForReload should return nil error for quiescent runtime, got: %v", err)
+	}
+}
