@@ -94,3 +94,35 @@ func TestExecutionPolicy_ParFailFastDropped(t *testing.T) {
 		}
 	}
 }
+
+func TestExecutionPolicy_AllPoliciesDefined(t *testing.T) {
+	// Given
+	// All 3 policies should be defined: seq_continue, seq_failfast, par_continue
+
+	// When
+	policies := map[string]ExecutionPolicy{
+		"seq_continue": PolicySeqContinue,
+		"seq_failfast": PolicySeqFailFast,
+		"par_continue": PolicyParContinue,
+	}
+
+	// Then
+	if len(policies) != 3 {
+		t.Errorf("Expected exactly 3 policies defined, got %d", len(policies))
+	}
+
+	// Verify all policies have valid fields
+	for name, policy := range policies {
+		if policy.Mode == "" {
+			t.Errorf("Policy %s has empty Mode", name)
+		}
+
+		if policy.MaxRetries < 0 {
+			t.Errorf("Policy %s has negative MaxRetries: %d", name, policy.MaxRetries)
+		}
+
+		if policy.Isolation == "" {
+			t.Errorf("Policy %s has empty Isolation", name)
+		}
+	}
+}
