@@ -12,6 +12,7 @@ import (
 	"github.com/maelstrom/v3/pkg/runtime"
 	"github.com/maelstrom/v3/pkg/security"
 	"github.com/maelstrom/v3/pkg/services/communication"
+	"github.com/maelstrom/v3/pkg/services/platform"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
 
@@ -23,27 +24,29 @@ type KernelConfig struct {
 
 // Kernel orchestrates bootstrap and hands off to ChartRegistry.
 type Kernel struct {
-	engine           statechart.Library
-	config           KernelConfig
-	factory          *runtime.Factory
-	sequence         *bootstrap.Sequence
-	bootstrapRTID    statechart.RuntimeID
-	services         map[string]statechart.RuntimeID
-	serviceReady     map[string]bool
-	runtimes         map[string]*runtime.ChartRuntime
-	appCtx           statechart.ApplicationContext
-	mailSystem       *communication.CommunicationService
-	mu               sync.RWMutex
-	readyChan        chan struct{}
-	onCompleteCalled atomic.Bool
-	logOutput        []string
-	logMu            sync.RWMutex
-	serviceOrder     []string
-	orderMu          sync.RWMutex
-	readyEvents      []string
-	eventsMu         sync.RWMutex
-	failService      string
-	failMu           sync.RWMutex
+	engine               statechart.Library
+	config               KernelConfig
+	factory              *runtime.Factory
+	sequence             *bootstrap.Sequence
+	bootstrapRTID        statechart.RuntimeID
+	services             map[string]statechart.RuntimeID
+	serviceReady         map[string]bool
+	runtimes             map[string]*runtime.ChartRuntime
+	appCtx               statechart.ApplicationContext
+	mailSystem           *communication.CommunicationService
+	chartRegistry        *platform.ChartRegistry
+	mu                   sync.RWMutex
+	readyChan            chan struct{}
+	onCompleteCalled     atomic.Bool
+	logOutput            []string
+	logMu                sync.RWMutex
+	serviceOrder         []string
+	orderMu              sync.RWMutex
+	readyEvents          []string
+	eventsMu             sync.RWMutex
+	failService          string
+	failMu               sync.RWMutex
+	chartRegistryRunning atomic.Bool
 }
 
 // kernelApplicationContext provides application context with kernel engine access.
@@ -555,4 +558,21 @@ func (k *Kernel) Shutdown(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// GetChartRegistry returns the ChartRegistry instance.
+func (k *Kernel) GetChartRegistry() *platform.ChartRegistry {
+	k.mu.RLock()
+	defer k.mu.RUnlock()
+	return k.chartRegistry
+}
+
+// IsChartRegistryRunning returns true if ChartRegistry is running.
+func (k *Kernel) IsChartRegistryRunning() bool {
+	return k.chartRegistryRunning.Load()
+}
+
+// SetChartRegistryRunning sets the ChartRegistry running state.
+func (k *Kernel) SetChartRegistryRunning(running bool) {
+	k.chartRegistryRunning.Store(running)
 }
