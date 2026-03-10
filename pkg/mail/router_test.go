@@ -1,6 +1,9 @@
 package mail
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 type mockTopicSubscriber struct {
 	ch chan Mail
@@ -262,5 +265,65 @@ func TestMailRouter_RouteWithSecurity_Validation(t *testing.T) {
 
 	if !mockService.validateCalled {
 		t.Error("Expected ValidateAndSanitize to be called")
+	}
+}
+
+type mockSecurityServiceWithViolation struct {
+	validateCalled  bool
+	violationCalled bool
+	violation       any
+}
+
+func (m *mockSecurityServiceWithViolation) ValidateAndSanitize(mail any, src, tgt BoundaryType) (any, error) {
+	m.validateCalled = true
+	if mailObj, ok := mail.(Mail); ok {
+		for _, taint := range mailObj.Metadata.Taints {
+			if taint == "PII" || taint == "SECRET" {
+				m.violationCalled = true
+				m.violation = map[string]interface{}{
+					"sourceBoundary":  string(src),
+					"targetBoundary":  string(tgt),
+					"forbiddenTaints": []string{taint},
+				}
+				return mail, fmt.Errorf("taint %q is forbidden", taint)
+			}
+		}
+	}
+	return mail, nil
+}
+
+func (m *mockSecurityServiceWithViolation) MarkTaint(obj any, taints []string) (any, error) {
+	return obj, nil
+}
+
+func TestMailRouter_BoundaryValidation_ForbiddenTransition(t *testing.T) {
+	router := NewMailRouter()
+
+	serviceInbox := &ServiceInbox{ID: "test-service"}
+	router.SubscribeService("test-service", serviceInbox)
+
+	mockService := &mockSecurityServiceWithViolation{}
+
+	mail := Mail{
+		ID:     "msg-002",
+		Source: "agent:inner-agent",
+		Target: "sys:test-service",
+		Type:   MailTypeUser,
+		Metadata: MailMetadata{
+			Taints: []string{"PII", "SECRET"},
+		},
+	}
+
+	err := router.RouteWithSecurity(mail, mockService)
+	if err == nil {
+		t.Error("Expected error for forbidden taints")
+	}
+
+	if !mockService.validateCalled {
+		t.Error("Expected ValidateAndSanitize to be called")
+	}
+
+	if !mockService.violationCalled {
+		t.Error("Expected violation to be detected")
 	}
 }
