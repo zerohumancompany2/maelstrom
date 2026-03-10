@@ -365,3 +365,37 @@ func TestHumanGatewayService_AgentReply(t *testing.T) {
 		t.Error("Expected error for nil session")
 	}
 }
+
+// TestHumanGateway_HandleMail_ChatInterface - spec: arch-v1.md L471 (chat interface)
+func TestHumanGateway_HandleMail_ChatInterface(t *testing.T) {
+	svc := NewHumanGatewayService()
+	agentID := "test-agent-001"
+
+	session, err := svc.CreateChatSession(agentID)
+	if err != nil {
+		t.Fatalf("Expected no error creating session, got %v", err)
+	}
+	if session.AgentID != agentID {
+		t.Errorf("Expected AgentID '%s', got '%s'", agentID, session.AgentID)
+	}
+
+	mailMsg := mail.Mail{
+		ID:      "mail-001",
+		Type:    mail.MailTypeHumanFeedback,
+		Source:  "human",
+		Target:  "agent:" + agentID,
+		Content: "Hello, agent!",
+	}
+	err = svc.HandleMail(mailMsg)
+	if err != nil {
+		t.Errorf("Expected no error handling mail, got %v", err)
+	}
+
+	updatedSession, err := svc.CreateChatSession(agentID + "-check")
+	if err != nil {
+		t.Fatalf("Expected no error getting session, got %v", err)
+	}
+	if updatedSession == nil {
+		t.Error("Expected session to be non-nil")
+	}
+}
