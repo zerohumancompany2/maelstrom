@@ -563,3 +563,93 @@ func TestToolRegistry_BoundaryFiltering(t *testing.T) {
 		t.Errorf("Expected 3 tools for empty filter, got %d", len(tools))
 	}
 }
+
+// arch-v1.md L472: Tool registry and resolution
+// arch-v1.md L488: resolve(name, callerBoundary) → ToolDescriptor | notFound
+// arch-v1.md L261-270: Boundary types (outer, DMZ, inner) and enforcement rules
+func TestToolRegistry_InnerToolsInvisible(t *testing.T) {
+	svc := NewToolsService()
+
+	innerTool := ToolDescriptor{
+		Name:      "inner-db-query",
+		Boundary:  "inner",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "container",
+	}
+
+	dmzTool := ToolDescriptor{
+		Name:      "dmz-web-search",
+		Boundary:  "dmz",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "sandbox",
+	}
+
+	outerTool := ToolDescriptor{
+		Name:      "outer-http-client",
+		Boundary:  "outer",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "sandbox",
+	}
+
+	if err := svc.Register(innerTool); err != nil {
+		t.Fatalf("Register inner tool failed: %v", err)
+	}
+	if err := svc.Register(dmzTool); err != nil {
+		t.Fatalf("Register dmz tool failed: %v", err)
+	}
+	if err := svc.Register(outerTool); err != nil {
+		t.Fatalf("Register outer tool failed: %v", err)
+	}
+
+	_, err := svc.Resolve("inner-db-query", "outer")
+	if err == nil {
+		t.Fatal("Expected error when outer caller tries to access inner tool")
+	}
+
+	if err != ErrToolNotAccessible {
+		t.Errorf("Expected ErrToolNotAccessible, got %v", err)
+	}
+
+	_, err = svc.Resolve("inner-db-query", "dmz")
+	if err == nil {
+		t.Fatal("Expected error when dmz caller tries to access inner tool")
+	}
+
+	if err != ErrToolNotAccessible {
+		t.Errorf("Expected ErrToolNotAccessible, got %v", err)
+	}
+
+	_, err = svc.Resolve("dmz-web-search", "outer")
+	if err == nil {
+		t.Fatal("Expected error when outer caller tries to access dmz tool")
+	}
+
+	if err != ErrToolNotAccessible {
+		t.Errorf("Expected ErrToolNotAccessible, got %v", err)
+	}
+
+	_, err = svc.Resolve("dmz-web-search", "dmz")
+	if err != nil {
+		t.Errorf("DMZ caller should access DMZ tool: %v", err)
+	}
+
+	_, err = svc.Resolve("dmz-web-search", "inner")
+	if err != nil {
+		t.Errorf("Inner caller should access DMZ tool: %v", err)
+	}
+
+	_, err = svc.Resolve("outer-http-client", "outer")
+	if err != nil {
+		t.Errorf("Outer caller should access outer tool: %v", err)
+	}
+
+	_, err = svc.Resolve("outer-http-client", "dmz")
+	if err != nil {
+		t.Errorf("DMZ caller should access outer tool: %v", err)
+	}
+
+	_, err = svc.Resolve("outer-http-client", "inner")
+	if err != nil {
+		t.Errorf("Inner caller should access outer tool: %v", err)
+	}
+}
