@@ -2,6 +2,7 @@ package integration
 
 import (
 	"testing"
+	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
 	pkgsecurity "github.com/maelstrom/v3/pkg/security"
@@ -513,4 +514,78 @@ func TestLayer7_integrationAllHotReloadableServicesLoad(t *testing.T) {
 			t.Errorf("Failed to start datasources service: %v", err)
 		}
 	})
+}
+
+func TestLayer7_integrationEndToEndServiceCommunication(t *testing.T) {
+	// Create communication service for mail exchange
+	commSvc := communication.NewCommunicationService()
+	err := commSvc.Start()
+	if err != nil {
+		t.Fatalf("Failed to start communication service: %v", err)
+	}
+
+	// Create sender and receiver services
+	senderSvc := gateway.NewGatewayService()
+	receiverSvc := memory.NewMemoryService()
+
+	err = senderSvc.Start()
+	if err != nil {
+		t.Fatalf("Failed to start sender service: %v", err)
+	}
+
+	err = receiverSvc.Start()
+	if err != nil {
+		t.Fatalf("Failed to start receiver service: %v", err)
+	}
+
+	// Subscribe receiver to a topic
+	receiverChan, err := commSvc.Subscribe("sys:memory")
+	if err != nil {
+		t.Fatalf("Failed to subscribe receiver: %v", err)
+	}
+
+	// Create test mail
+	testMail := mail.Mail{
+		ID:     "e2e-test-1",
+		Type:   mail.MailTypeUser,
+		Source: "sys:gateway",
+		Target: "sys:memory",
+		Content: map[string]any{
+			"message": "end-to-end communication test",
+		},
+		Metadata: mail.MailMetadata{
+			Boundary: mail.InnerBoundary,
+		},
+	}
+
+	// Publish mail
+	ack, err := commSvc.Publish(testMail)
+	if err != nil {
+		t.Fatalf("Failed to publish mail: %v", err)
+	}
+
+	// Verify mail was delivered
+	if !ack.Success {
+		t.Error("Mail was not successfully delivered")
+	}
+
+	// Verify receiver gets the mail
+	select {
+	case receivedMail := <-receiverChan:
+		if receivedMail.ID != testMail.ID {
+			t.Errorf("Expected mail ID %s, got %s", testMail.ID, receivedMail.ID)
+		}
+		if receivedMail.Source != testMail.Source {
+			t.Errorf("Expected source %s, got %s", testMail.Source, receivedMail.Source)
+		}
+		if receivedMail.Target != testMail.Target {
+			t.Errorf("Expected target %s, got %s", testMail.Target, receivedMail.Target)
+		}
+	case <-time.After(1 * time.Second):
+		t.Error("Timeout waiting for mail delivery")
+	}
+
+	// Test that both services can HandleMail
+	_ = senderSvc.HandleMail(testMail)
+	_ = receiverSvc.HandleMail(testMail)
 }
