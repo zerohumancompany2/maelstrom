@@ -1,12 +1,18 @@
 package gateway
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/maelstrom/v3/pkg/mail"
+)
 
 // ChannelAdapter interface defines the contract for channel adapters
 type ChannelAdapter interface {
 	Name() string
 	Handle(r *http.Request) error
 	Stream() bool
+	NormalizeInbound(rawMessage any) (*mail.Mail, error)
+	NormalizeOutbound(mail *mail.Mail) (any, error)
 }
 
 // WebhookAdapter implements HTTP webhook channel adapter
@@ -26,6 +32,20 @@ func (w *WebhookAdapter) Stream() bool {
 	return false
 }
 
+func (w *WebhookAdapter) NormalizeInbound(rawMessage any) (*mail.Mail, error) {
+	return &mail.Mail{
+		Type:    mail.MailReceived,
+		Content: rawMessage,
+		Metadata: mail.MailMetadata{
+			Adapter: "webhook",
+		},
+	}, nil
+}
+
+func (w *WebhookAdapter) NormalizeOutbound(mail *mail.Mail) (any, error) {
+	return mail.Content, nil
+}
+
 // WebSocketAdapter implements bidirectional WebSocket channel adapter
 type WebSocketAdapter struct {
 	// Add fields as needed
@@ -41,6 +61,20 @@ func (ws *WebSocketAdapter) Handle(r *http.Request) error {
 
 func (ws *WebSocketAdapter) Stream() bool {
 	return true
+}
+
+func (ws *WebSocketAdapter) NormalizeInbound(rawMessage any) (*mail.Mail, error) {
+	return &mail.Mail{
+		Type:    mail.MailReceived,
+		Content: rawMessage,
+		Metadata: mail.MailMetadata{
+			Adapter: "websocket",
+		},
+	}, nil
+}
+
+func (ws *WebSocketAdapter) NormalizeOutbound(mail *mail.Mail) (any, error) {
+	return mail.Content, nil
 }
 
 // SSEAdapter implements Server-Sent Events channel adapter
@@ -60,6 +94,20 @@ func (sse *SSEAdapter) Stream() bool {
 	return true
 }
 
+func (sse *SSEAdapter) NormalizeInbound(rawMessage any) (*mail.Mail, error) {
+	return &mail.Mail{
+		Type:    mail.MailReceived,
+		Content: rawMessage,
+		Metadata: mail.MailMetadata{
+			Adapter: "sse",
+		},
+	}, nil
+}
+
+func (sse *SSEAdapter) NormalizeOutbound(mail *mail.Mail) (any, error) {
+	return mail.Content, nil
+}
+
 // SMTPAdapter implements email/SMTP channel adapter
 type SMTPAdapter struct {
 	// Add fields as needed
@@ -75,4 +123,18 @@ func (s *SMTPAdapter) Handle(r *http.Request) error {
 
 func (s *SMTPAdapter) Stream() bool {
 	return false
+}
+
+func (s *SMTPAdapter) NormalizeInbound(rawMessage any) (*mail.Mail, error) {
+	return &mail.Mail{
+		Type:    mail.MailReceived,
+		Content: rawMessage,
+		Metadata: mail.MailMetadata{
+			Adapter: "smtp",
+		},
+	}, nil
+}
+
+func (s *SMTPAdapter) NormalizeOutbound(mail *mail.Mail) (any, error) {
+	return mail.Content, nil
 }
