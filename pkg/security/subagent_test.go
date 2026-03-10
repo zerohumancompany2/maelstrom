@@ -1,6 +1,7 @@
 package security
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -123,5 +124,39 @@ func TestAllowedOnExit_SubAgentReturn_CleanDataPasses(t *testing.T) {
 
 	if resultMap["value"] != 42 {
 		t.Errorf("Expected value unchanged, got '%v'", resultMap["value"])
+	}
+}
+
+func TestAllowedOnExit_SubAgentReturn_TaintedDataBlocked(t *testing.T) {
+	ClearAuditLog()
+
+	// Given: A sub-agent returns a result containing tainted data (e.g., PII, SECRET)
+	taintedData := map[string]interface{}{
+		"email":    "user@example.com",
+		"password": "secret123",
+		"_taints":  []string{"PII", "SECRET"},
+	}
+
+	// Given: A policy that denies the taint types
+	policy := &AllowedOnExitPolicy{
+		AllowedOnExit: []string{"TOOL_OUTPUT", "PUBLIC"},
+		Enforcement:   EnforcementStrict,
+	}
+
+	// When: allowedOnExit check is performed and policy denies the taint types
+	result, err := CheckSubAgentReturn(taintedData, policy)
+
+	// Then: Tainted data is blocked, violation is logged, parent receives sanitized result
+	if err == nil {
+		t.Fatal("Expected error blocking forbidden taints, got nil")
+	}
+
+	if result != nil {
+		t.Error("Expected nil result when blocked, got non-nil")
+	}
+
+	expectedErr := "forbidden taints"
+	if !strings.Contains(err.Error(), expectedErr) {
+		t.Errorf("Expected error containing '%s', got '%s'", expectedErr, err.Error())
 	}
 }
