@@ -42,5 +42,37 @@ func (h *IsolationHooks) ReplaceDefinition(oldDef, newDef *ToolDefinition) error
 }
 
 func (h *IsolationHooks) OnToolExecution(input any) (any, error) {
-	return nil, errors.New("not implemented")
+	if input == nil {
+		return nil, errors.New("input cannot be nil")
+	}
+
+	switch v := input.(type) {
+	case map[string]interface{}:
+		result := make(map[string]interface{})
+		existingTaints := make(map[string]bool)
+
+		if taints, ok := v["_taints"].([]string); ok {
+			for _, t := range taints {
+				existingTaints[t] = true
+			}
+		}
+
+		existingTaints["TOOL_OUTPUT"] = true
+		mergedTaints := make([]string, 0, len(existingTaints))
+		for t := range existingTaints {
+			mergedTaints = append(mergedTaints, t)
+		}
+		result["_taints"] = mergedTaints
+
+		for k, val := range v {
+			if k == "_taints" {
+				continue
+			}
+			result[k] = val
+		}
+
+		return result, nil
+	default:
+		return input, nil
+	}
 }

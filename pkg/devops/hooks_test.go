@@ -33,3 +33,49 @@ func TestIsolationHooks_ReplaceDefinition_Accept(t *testing.T) {
 		t.Errorf("Expected isolation to remain strict, got %v", newDef.Isolation)
 	}
 }
+
+func TestIsolationHooks_OnToolExecution_TaintPropagation(t *testing.T) {
+	// Given: A tool execution hook with input data tainted ["USER_SUPPLIED"]
+	hooks := NewIsolationHooks()
+	input := map[string]interface{}{
+		"_taints": []string{"USER_SUPPLIED"},
+		"data":    "test input",
+	}
+
+	// When: onToolExecution hook processes the input and produces output
+	output, err := hooks.OnToolExecution(input)
+
+	// Then: Output data carries taint ["USER_SUPPLIED", "TOOL_OUTPUT"]
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	outputMap, ok := output.(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected output to be map[string]interface{}")
+	}
+
+	taints, ok := outputMap["_taints"].([]string)
+	if !ok {
+		t.Fatal("Expected _taints field in output")
+	}
+
+	hasUserSupplied := false
+	hasToolOutput := false
+	for _, t := range taints {
+		if t == "USER_SUPPLIED" {
+			hasUserSupplied = true
+		}
+		if t == "TOOL_OUTPUT" {
+			hasToolOutput = true
+		}
+	}
+
+	if !hasUserSupplied {
+		t.Error("Expected USER_SUPPLIED taint to be preserved")
+	}
+
+	if !hasToolOutput {
+		t.Error("Expected TOOL_OUTPUT taint to be added")
+	}
+}
