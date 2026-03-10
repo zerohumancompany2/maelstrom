@@ -121,5 +121,9 @@ func (g *gatewayService) NormalizeInbound(adapterName string, rawMessage any) (*
 
 // NormalizeOutbound normalizes outbound mail to channel-specific format
 func (g *gatewayService) NormalizeOutbound(mail *mail.Mail, adapterName string) (any, error) {
-	return nil, errors.New("not implemented")
+	return map[string]any{
+		"content":  mail.Content,
+		"boundary": string(mail.Metadata.Boundary),
+		"adapter":  adapterName,
+	}, nil
 }

@@ -54,6 +54,36 @@ func TestGatewayService_NormalizeInbound(t *testing.T) {
 	}
 }
 
+// TestGatewayService_NormalizeOutbound - Spec: arch-v1.md L671, L261-270
+func TestGatewayService_NormalizeOutbound(t *testing.T) {
+	svc := NewGatewayService()
+	outboundMail := &mail.Mail{
+		Type:    mail.MailTypeAssistant,
+		Content: "Response from assistant",
+		Metadata: mail.MailMetadata{
+			Boundary: mail.InnerBoundary,
+		},
+	}
+
+	result, err := svc.NormalizeOutbound(outboundMail, "webhook")
+	if err != nil {
+		t.Fatalf("NormalizeOutbound failed: %v", err)
+	}
+
+	resultMap, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected result to be map[string]any, got %T", result)
+	}
+
+	if resultMap["content"] != outboundMail.Content {
+		t.Error("Expected content to be preserved in result")
+	}
+
+	if resultMap["boundary"] != string(mail.InnerBoundary) {
+		t.Errorf("Expected boundary 'inner', got '%s'", resultMap["boundary"])
+	}
+}
+
 func TestGateway_RegisterAdapter(t *testing.T) {
 	// Test: Register webhook, websocket, sse, smtp adapters
 	svc := NewGatewayService()
