@@ -49,3 +49,43 @@ func TestE2E_BoundaryEnforcement_ForbiddenTransitionBlocked(t *testing.T) {
 		t.Error("Expected outer agent to not receive the blocked message")
 	}
 }
+
+func TestE2E_BoundaryEnforcement_ContextMapFiltering(t *testing.T) {
+	runtime := NewE2ERuntime()
+	if err := runtime.Start(); err != nil {
+		t.Fatalf("Failed to start runtime: %v", err)
+	}
+	defer runtime.Stop()
+
+	taintPolicy := security.TaintPolicy{
+		RedactMode: "redact",
+		RedactRules: []security.RedactRule{
+			{Taint: "INNER_ONLY", Replacement: "[REDACTED]"},
+			{Taint: "PII", Replacement: "[REDACTED]"},
+		},
+		AllowedForBoundary: []security.BoundaryType{security.DMZBoundary},
+	}
+	dmzAgent := runtime.CreateAgent("dmz-agent", mail.DMZBoundary, taintPolicy)
+	if dmzAgent == nil {
+		t.Fatal("Failed to create DMZ agent")
+	}
+
+	_, err := runtime.AssembleContextMap("dmz-agent")
+	if err != nil {
+		t.Fatalf("Failed to assemble ContextMap: %v", err)
+	}
+
+	taintedData := map[string]interface{}{
+		"data":    "sensitive content",
+		"_taints": []string{"INNER_ONLY", "PII"},
+	}
+
+	allowed, err := runtime.securityService.CheckTaintPolicy(taintedData, mail.DMZBoundary, taintPolicy)
+	if err != nil {
+		t.Fatalf("CheckTaintPolicy failed: %v", err)
+	}
+
+	if allowed {
+		t.Error("Expected tainted data to be filtered for DMZ boundary")
+	}
+}
