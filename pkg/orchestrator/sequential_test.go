@@ -33,8 +33,41 @@ func TestSequential_Continue_ExecutesAllTools(t *testing.T) {
 }
 
 func TestSequential_Continue_AccumulatesAllResults(t *testing.T) {
-	// Stub - test not yet implemented
-	t.Fatal("test not implemented")
+	// Given
+	executor := NewSequentialExecutor(PolicySeqContinue)
+	toolCalls := []ToolCall{
+		{Name: "success-tool", Arguments: map[string]any{"arg": "value1"}},
+		{Name: "fail-tool", Arguments: map[string]any{"should": "fail"}},
+		{Name: "another-success", Arguments: map[string]any{"arg": "value3"}},
+	}
+
+	// When
+	results, err := executor.Execute(toolCalls)
+
+	// Then
+	if err != nil {
+		t.Errorf("Expected Execute() to return nil error, got %v", err)
+	}
+
+	if len(results) != 3 {
+		t.Errorf("Expected 3 results, got %d", len(results))
+	}
+
+	expectedNames := []string{"success-tool", "fail-tool", "another-success"}
+	for i, result := range results {
+		output, ok := result.Output.(map[string]any)
+		if !ok {
+			t.Errorf("Expected result %d output to be map[string]any", i)
+			continue
+		}
+		if tool, ok := output["tool"].(string); ok {
+			if tool != expectedNames[i] {
+				t.Errorf("Expected result %d to be for tool '%s', got '%s'", i, expectedNames[i], tool)
+			}
+		} else {
+			t.Errorf("Expected result %d to have 'tool' field", i)
+		}
+	}
 }
 
 func TestSequential_FailFast_StopsOnFirstFailure(t *testing.T) {
