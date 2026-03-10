@@ -50,6 +50,20 @@ func TestAdminService_ControlAgent(t *testing.T) {
 	}
 }
 
+// TestAdminService_QueryTaints - spec: arch-v1.md L467, L485
+func TestAdminService_QueryTaints(t *testing.T) {
+	svc := NewAdminService()
+
+	taints, err := svc.QueryTaints("nonexistent-agent")
+	if err != nil {
+		t.Fatalf("QueryTaints failed: %v", err)
+	}
+
+	if taints == nil {
+		t.Error("Expected non-nil taints map")
+	}
+}
+
 func TestAdmin_2FARequired(t *testing.T) {
 	svc := NewAdminService()
 

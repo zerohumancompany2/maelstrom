@@ -71,7 +71,7 @@ func (s *adminService) ControlAgent(id string, action string) error {
 }
 
 func (s *adminService) QueryTaints(agentId string) (security.TaintMap, error) {
-	return security.TaintMap{}, nil
+	return s.taintEngine.ReportTaints(agentId)
 }
 
 func (s *adminService) InjectEvent(agentId string, event statechart.Event) error {
