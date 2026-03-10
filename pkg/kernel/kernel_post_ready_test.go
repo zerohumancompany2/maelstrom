@@ -260,3 +260,51 @@ spec:
 		t.Errorf("Core services validation failed: %v", err)
 	}
 }
+
+// TestBootstrap_kernelReadySignalEmitted verifies KERNEL_READY signal is emitted
+func TestBootstrap_kernelReadySignalEmitted(t *testing.T) {
+	kernel := New()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Start kernel
+	err := kernel.Start(ctx)
+	if err != nil && err != context.DeadlineExceeded {
+		t.Logf("Kernel start returned: %v", err)
+	}
+
+	// Verify KERNEL_READY was emitted by checking sequence
+	seq := kernel.GetSequence()
+	if seq == nil {
+		t.Fatal("Sequence should not be nil")
+	}
+
+	if !seq.GetKernelReadyEmitted() {
+		t.Error("KERNEL_READY event should be emitted")
+	}
+
+	// Verify KERNEL_READY was emitted after LIFECYCLE_READY
+	events := seq.GetEventsHandled()
+	lifecycleReadyIdx := -1
+	kernelReadyIdx := -1
+
+	for i, event := range events {
+		if event == "LIFECYCLE_READY" {
+			lifecycleReadyIdx = i
+		}
+		if event == "KERNEL_READY" {
+			kernelReadyIdx = i
+		}
+	}
+
+	if lifecycleReadyIdx == -1 {
+		t.Error("LIFECYCLE_READY event should be present")
+	}
+	if kernelReadyIdx == -1 {
+		t.Error("KERNEL_READY event should be present")
+	}
+	if lifecycleReadyIdx != -1 && kernelReadyIdx != -1 && kernelReadyIdx <= lifecycleReadyIdx {
+		t.Error("KERNEL_READY should be emitted after LIFECYCLE_READY")
+	}
+}
