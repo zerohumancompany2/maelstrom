@@ -133,6 +133,19 @@ func TestSequential_FailFast_ReturnsPartialResults(t *testing.T) {
 }
 
 func TestSequential_EmptyToolList_ReturnsEmptyResults(t *testing.T) {
-	// Stub - test not yet implemented
-	t.Fatal("test not implemented")
+	// Given
+	executor := NewSequentialExecutor(PolicySeqContinue)
+	toolCalls := []ToolCall{}
+
+	// When
+	results, err := executor.Execute(toolCalls)
+
+	// Then
+	if err != nil {
+		t.Errorf("Expected Execute() to return nil error, got %v", err)
+	}
+
+	if len(results) != 0 {
+		t.Errorf("Expected 0 results for empty tool list, got %d", len(results))
+	}
 }
