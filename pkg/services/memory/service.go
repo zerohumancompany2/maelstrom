@@ -58,13 +58,21 @@ func (s *memoryService) Store(runtimeId string, content string, metadata map[str
 	// Generate unique ID
 	id := generateUniqueID(content, metadata)
 	
+	// Extract boundary safely
+	boundary := ""
+	if metadata != nil {
+		if b, ok := metadata["boundary"].(string); ok {
+			boundary = b
+		}
+	}
+	
 	// Create and store memory item
 	item := MemoryItem{
 		ID:       id,
 		Content:  content,
 		Vector:   vector,
 		Metadata: metadata,
-		Boundary: metadata["boundary"].(string),
+		Boundary: boundary,
 	}
 	
 	err = s.vectorStore.Store(item)
