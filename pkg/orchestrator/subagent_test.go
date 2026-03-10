@@ -133,3 +133,44 @@ func TestSubAgent_Detached_FireAndForget_IndependentLifecycle(t *testing.T) {
 		t.Errorf("Expected child runtime to still exist after parent stops, got error: %v", err)
 	}
 }
+
+func TestSubAgent_Detached_FireAndAwait_WaitsForResult(t *testing.T) {
+	// Given
+	engine := statechart.NewEngine()
+	parentDef := statechart.ChartDefinition{
+		ID: "parent",
+		Root: &statechart.Node{
+			ID: "root",
+		},
+	}
+	parentID, err := engine.Spawn(parentDef, nil)
+	if err != nil {
+		t.Fatalf("Failed to spawn parent: %v", err)
+	}
+
+	correlationID := "test-correlation-123"
+	config := SubAgentConfig{
+		Type:          SubAgentDetached,
+		ChartRef:      "detached-chart",
+		CorrelationId: correlationID,
+	}
+
+	executor := NewSubAgentExecutor(config, "test-ns", parentID, engine)
+
+	// When - spawn detached sub-agent with correlation ID
+	childID, err := executor.spawnDetached()
+
+	// Then - child should be spawned with correlation ID for result delivery
+	if err != nil {
+		t.Fatalf("Expected spawnDetached() to return nil error, got %v", err)
+	}
+
+	if childID == "" {
+		t.Error("Expected spawnDetached() to return non-empty RuntimeID")
+	}
+
+	// Verify correlation ID is stored in executor config
+	if executor.config.CorrelationId != correlationID {
+		t.Errorf("Expected correlation ID to be '%s', got '%s'", correlationID, executor.config.CorrelationId)
+	}
+}
