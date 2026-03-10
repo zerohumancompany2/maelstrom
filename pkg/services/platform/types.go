@@ -155,3 +155,37 @@ func (cr *ChartRegistry) LoadPlatformServices() ([]PlatformService, error) {
 
 	return services, nil
 }
+
+// GetCoreServices returns all services marked as core.
+func (cr *ChartRegistry) GetCoreServices(services []PlatformService) []PlatformService {
+	var core []PlatformService
+	for _, svc := range services {
+		if svc.Metadata.Core {
+			core = append(core, svc)
+		}
+	}
+	return core
+}
+
+// GetNonCoreServices returns all services not marked as core.
+func (cr *ChartRegistry) GetNonCoreServices(services []PlatformService) []PlatformService {
+	var nonCore []PlatformService
+	for _, svc := range services {
+		if !svc.Metadata.Core {
+			nonCore = append(nonCore, svc)
+		}
+	}
+	return nonCore
+}
+
+// ValidateCoreServices validates core service requirements.
+// Returns error if any core service is missing requiredForKernelReady.
+func (cr *ChartRegistry) ValidateCoreServices(services []PlatformService) error {
+	coreServices := cr.GetCoreServices(services)
+	for _, svc := range coreServices {
+		if !svc.Spec.RequiredForKernelReady {
+			return fmt.Errorf("core service %s should have requiredForKernelReady: true", svc.Metadata.Name)
+		}
+	}
+	return nil
+}

@@ -233,3 +233,173 @@ invalid yaml content: [
 		assert.Error(t, err)
 	})
 }
+
+// TestPlatformServiceYAML_CoreServices tests core service handling
+// Core services (metadata.core: true) treated specially
+// requiredForKernelReady enforced
+// Core service detection works
+func TestPlatformServiceYAML_CoreServices(t *testing.T) {
+	t.Run("detects core services", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		files := map[string]string{
+			"gateway.yaml": `
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:gateway
+  core: true
+spec:
+  chartRef: gateway-v1
+`,
+			"tools.yaml": `
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:tools
+spec:
+  chartRef: tools-v1
+`,
+		}
+
+		for name, content := range files {
+			err := os.WriteFile(filepath.Join(tmpDir, name), []byte(content), 0644)
+			require.NoError(t, err)
+		}
+
+		registry := NewChartRegistry(tmpDir)
+		services, err := registry.LoadPlatformServices()
+		require.NoError(t, err)
+
+		coreServices := registry.GetCoreServices(services)
+		assert.Len(t, coreServices, 1)
+		assert.Equal(t, "sys:gateway", coreServices[0].Metadata.Name)
+	})
+
+	t.Run("enforces requiredForKernelReady on core services", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		yamlContent := `
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:gateway
+  core: true
+spec:
+  chartRef: gateway-v1
+  requiredForKernelReady: true
+`
+		err := os.WriteFile(filepath.Join(tmpDir, "gateway.yaml"), []byte(yamlContent), 0644)
+		require.NoError(t, err)
+
+		registry := NewChartRegistry(tmpDir)
+		services, err := registry.LoadPlatformServices()
+		require.NoError(t, err)
+
+		// Validate core service requirements
+		err = registry.ValidateCoreServices(services)
+		require.NoError(t, err)
+
+		// Check that core services have requiredForKernelReady
+		coreServices := registry.GetCoreServices(services)
+		for _, svc := range coreServices {
+			assert.True(t, svc.Spec.RequiredForKernelReady, "core services must be requiredForKernelReady")
+		}
+	})
+
+	t.Run("warns if core service missing requiredForKernelReady", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		yamlContent := `
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:gateway
+  core: true
+spec:
+  chartRef: gateway-v1
+`
+		err := os.WriteFile(filepath.Join(tmpDir, "gateway.yaml"), []byte(yamlContent), 0644)
+		require.NoError(t, err)
+
+		registry := NewChartRegistry(tmpDir)
+		services, err := registry.LoadPlatformServices()
+		require.NoError(t, err)
+
+		// This should warn but not fail
+		warnings := registry.ValidateCoreServices(services)
+		assert.Error(t, warnings)
+		assert.Contains(t, warnings.Error(), "core service sys:gateway should have requiredForKernelReady: true")
+	})
+
+	t.Run("non-core services can omit requiredForKernelReady", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		yamlContent := `
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:tools
+spec:
+  chartRef: tools-v1
+`
+		err := os.WriteFile(filepath.Join(tmpDir, "tools.yaml"), []byte(yamlContent), 0644)
+		require.NoError(t, err)
+
+		registry := NewChartRegistry(tmpDir)
+		services, err := registry.LoadPlatformServices()
+		require.NoError(t, err)
+
+		// Non-core services should not have warnings
+		err = registry.ValidateCoreServices(services)
+		assert.NoError(t, err)
+	})
+
+	t.Run("counts core vs non-core services", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		files := map[string]string{
+			"gateway.yaml": `
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:gateway
+  core: true
+spec:
+  chartRef: gateway-v1
+`,
+			"heartbeat.yaml": `
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:heartbeat
+  core: true
+spec:
+  chartRef: heartbeat-v1
+`,
+			"tools.yaml": `
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:tools
+spec:
+  chartRef: tools-v1
+`,
+		}
+
+		for name, content := range files {
+			err := os.WriteFile(filepath.Join(tmpDir, name), []byte(content), 0644)
+			require.NoError(t, err)
+		}
+
+		registry := NewChartRegistry(tmpDir)
+		services, err := registry.LoadPlatformServices()
+		require.NoError(t, err)
+
+		coreServices := registry.GetCoreServices(services)
+		nonCoreServices := registry.GetNonCoreServices(services)
+
+		assert.Len(t, coreServices, 2)
+		assert.Len(t, nonCoreServices, 1)
+	})
+}
