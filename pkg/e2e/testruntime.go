@@ -461,7 +461,7 @@ func (r *E2ERuntime) TriggerViolation(agentID, violationType string, taints []st
 		Type:      mail.MailTypeTaintViolation,
 		Source:    agentID,
 		Target:    "sys:observability",
-		Content:   map[string]interface{}{"type": violationType, "taints": taints},
+		Content:   map[string]interface{}{"type": violationType, "forbidden_taints": taints},
 		CreatedAt: time.Now(),
 		Metadata: mail.MailMetadata{
 			Taints: taints,

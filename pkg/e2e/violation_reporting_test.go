@@ -90,3 +90,103 @@ func TestE2E_ViolationReporting_TaintViolationFlow(t *testing.T) {
 		}
 	}
 }
+
+func TestE2E_ViolationReporting_MultiTypeAggregation(t *testing.T) {
+	runtime := NewE2ERuntime()
+	if err := runtime.Start(); err != nil {
+		t.Fatalf("Failed to start runtime: %v", err)
+	}
+	defer runtime.Stop()
+
+	agentA := runtime.CreateAgent("agent-a", mail.DMZBoundary, security.TaintPolicy{})
+	if agentA == nil {
+		t.Fatal("Failed to create agent A")
+	}
+
+	agentB := runtime.CreateAgent("agent-b", mail.DMZBoundary, security.TaintPolicy{})
+	if agentB == nil {
+		t.Fatal("Failed to create agent B")
+	}
+
+	agentC := runtime.CreateAgent("agent-c", mail.DMZBoundary, security.TaintPolicy{})
+	if agentC == nil {
+		t.Fatal("Failed to create agent C")
+	}
+
+	outerAgent := runtime.CreateAgent("outer-agent", mail.OuterBoundary, security.TaintPolicy{})
+	if outerAgent == nil {
+		t.Fatal("Failed to create outer agent")
+	}
+
+	runtime.TriggerViolation("agent-a", "INNER_ONLY", []string{"INNER_ONLY"})
+
+	runtime.TriggerViolation("agent-b", "BOUNDARY", []string{"BOUNDARY"})
+
+	runtime.TriggerViolation("agent-c", "ISOLATION", []string{"ISOLATION"})
+
+	deadLetterQueue := runtime.GetDeadLetterQueue()
+	violationCount := 0
+	for _, v := range deadLetterQueue {
+		if v.Type == mail.MailTypeTaintViolation {
+			violationCount++
+		}
+	}
+	if violationCount != 3 {
+		t.Errorf("Expected 3 violations in dead-letter queue, got %d", violationCount)
+	}
+
+	violations := runtime.GetViolations()
+	if len(violations) != 3 {
+		t.Errorf("Expected 3 violations stored in sys:observability, got %d", len(violations))
+	}
+
+	metrics := runtime.GetMetrics()
+	totalViolations, ok := metrics["taint_violations_total"].(int)
+	if !ok || totalViolations != 3 {
+		t.Errorf("Expected taint_violations_total to be 3, got %d", totalViolations)
+	}
+
+	byType, ok := metrics["taint_violations_by_type"].(map[string]int)
+	if !ok {
+		t.Error("Expected taint_violations_by_type metric")
+	}
+	innerOnlyCount, ok := byType["INNER_ONLY"]
+	if !ok || innerOnlyCount != 1 {
+		t.Errorf("Expected taint_violations_by_type{type=\"INNER_ONLY\"} = 1, got %d", innerOnlyCount)
+	}
+	boundaryCount, ok := byType["BOUNDARY"]
+	if !ok || boundaryCount != 1 {
+		t.Errorf("Expected taint_violations_by_type{type=\"BOUNDARY\"} = 1, got %d", boundaryCount)
+	}
+	isolationCount, ok := byType["ISOLATION"]
+	if !ok || isolationCount != 1 {
+		t.Errorf("Expected taint_violations_by_type{type=\"ISOLATION\"} = 1, got %d", isolationCount)
+	}
+
+	queryResults := runtime.QueryViolations(map[string]interface{}{})
+	if len(queryResults) != 3 {
+		t.Errorf("Expected 3 violations from query, got %d", len(queryResults))
+	}
+
+	foundTypes := make(map[string]bool)
+	for _, v := range queryResults {
+		foundTypes[v.Type] = true
+	}
+	if !foundTypes["INNER_ONLY"] {
+		t.Error("Expected INNER_ONLY violation in query results")
+	}
+	if !foundTypes["BOUNDARY"] {
+		t.Error("Expected BOUNDARY violation in query results")
+	}
+	if !foundTypes["ISOLATION"] {
+		t.Error("Expected ISOLATION violation in query results")
+	}
+
+	runtime.TriggerViolation("agent-a", "INNER_ONLY", []string{"INNER_ONLY"})
+
+	afterRetryMetrics := runtime.GetMetrics()
+	afterRetryTotal, ok := afterRetryMetrics["taint_violations_total"].(int)
+	if !ok || afterRetryTotal != 4 {
+		t.Errorf("Expected taint_violations_total to be 4 after retry, got %d", afterRetryTotal)
+	}
+}
