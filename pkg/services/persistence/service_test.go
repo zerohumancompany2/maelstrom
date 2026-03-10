@@ -135,6 +135,55 @@ func TestPersistenceService_AppendEvent(t *testing.T) {
 	}
 }
 
+// TestPersistenceService_QueryEvents verifies QueryEvents returns events with filters in chronological order
+// Spec Reference: arch-v1.md L468 (event sourcing)
+func TestPersistenceService_QueryEvents(t *testing.T) {
+	ps := NewPersistenceService().(*persistenceService)
+
+	runtimeID := statechart.RuntimeID("query-test-events")
+
+	// Append multiple events
+	for i := 0; i < 5; i++ {
+		event := statechart.Event{
+			Type:          "test:event",
+			Payload:       map[string]any{"index": i},
+			CorrelationID: string(runtimeID),
+			Source:        "test-source",
+		}
+		if err := ps.AppendEvent(string(runtimeID), event); err != nil {
+			t.Fatalf("AppendEvent failed: %v", err)
+		}
+	}
+
+	// Query all events
+	allEvents, err := ps.GetEvents(string(runtimeID), "")
+	if err != nil {
+		t.Fatalf("GetEvents failed: %v", err)
+	}
+
+	if len(allEvents) != 5 {
+		t.Errorf("Expected 5 events, got %d", len(allEvents))
+	}
+
+	// Verify chronological order (timestamps should be non-decreasing)
+	for i := 1; i < len(allEvents); i++ {
+		if allEvents[i].Timestamp.Before(allEvents[i-1].Timestamp) {
+			t.Errorf("Events not in chronological order: event %d timestamp is before event %d", i, i-1)
+		}
+	}
+
+	// Query events since a specific event ID
+	sinceID := allEvents[2].ID
+	sinceEvents, err := ps.GetEvents(string(runtimeID), sinceID)
+	if err != nil {
+		t.Fatalf("GetEvents since failed: %v", err)
+	}
+
+	if len(sinceEvents) != 2 {
+		t.Errorf("Expected 2 events since ID, got %d", len(sinceEvents))
+	}
+}
+
 func TestPersistence_SnapshotCreate(t *testing.T) {
 	ps := NewPersistenceService().(*persistenceService)
 
