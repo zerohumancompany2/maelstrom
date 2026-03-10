@@ -109,3 +109,45 @@ func TestServiceDiscovery_registryListsAllServices(t *testing.T) {
 		}
 	}
 }
+
+func TestServiceDiscovery_registryReportsServiceDependencies(t *testing.T) {
+	sr := NewServiceRegistry()
+
+	// Register services with dependencies
+	sr.RegisterWithDependencies("sys:security", &mockService{id: "sys:security"}, []string{})
+	sr.RegisterWithDependencies("sys:communication", &mockService{id: "sys:communication"}, []string{"sys:security"})
+	sr.RegisterWithDependencies("sys:observability", &mockService{id: "sys:observability"}, []string{"sys:security", "sys:communication"})
+
+	// Get dependencies for a service
+	deps := sr.GetDependencies("sys:communication")
+	if len(deps) != 1 {
+		t.Fatalf("GetDependencies('sys:communication') returned %d deps, want 1", len(deps))
+	}
+	if deps[0] != "sys:security" {
+		t.Fatalf("GetDependencies('sys:communication') returned %q, want %q", deps[0], "sys:security")
+	}
+
+	// Get dependencies for service with multiple deps
+	deps = sr.GetDependencies("sys:observability")
+	if len(deps) != 2 {
+		t.Fatalf("GetDependencies('sys:observability') returned %d deps, want 2", len(deps))
+	}
+
+	// Get dependents (services that depend on this service)
+	dependents := sr.GetDependents("sys:security")
+	if len(dependents) != 2 {
+		t.Fatalf("GetDependents('sys:security') returned %d dependents, want 2", len(dependents))
+	}
+
+	// Get dependents for leaf service
+	dependents = sr.GetDependents("sys:observability")
+	if len(dependents) != 0 {
+		t.Fatalf("GetDependents('sys:observability') returned %d dependents, want 0", len(dependents))
+	}
+
+	// Get dependencies for non-existent service
+	deps = sr.GetDependencies("sys:nonexistent")
+	if len(deps) != 0 {
+		t.Fatalf("GetDependencies('sys:nonexistent') returned %d deps, want 0", len(deps))
+	}
+}

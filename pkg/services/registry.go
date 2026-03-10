@@ -32,6 +32,8 @@ type ServiceRegistry struct {
 	capabilities map[string][]string // service -> capabilities
 	capIndex     map[string][]string // capability -> service IDs
 	health       map[string]string   // service -> health status
+	dependencies map[string][]string // service -> dependencies
+	dependents   map[string][]string // service -> dependents (reverse index)
 }
 
 // NewServiceRegistry creates a new ServiceRegistry.
@@ -42,6 +44,8 @@ func NewServiceRegistry() *ServiceRegistry {
 		capabilities: make(map[string][]string),
 		capIndex:     make(map[string][]string),
 		health:       make(map[string]string),
+		dependencies: make(map[string][]string),
+		dependents:   make(map[string][]string),
 	}
 }
 
@@ -197,6 +201,48 @@ func (sr *ServiceRegistry) DiscoverServices() []Service {
 		services = append(services, svc)
 	}
 	return services
+}
+
+// RegisterWithDependencies registers a service with the given dependencies.
+// Returns error if service is already registered.
+func (sr *ServiceRegistry) RegisterWithDependencies(name string, svc Service, deps []string) error {
+	sr.mu.Lock()
+	defer sr.mu.Unlock()
+	if _, exists := sr.services[name]; exists {
+		return ErrAlreadyRegistered
+	}
+	sr.services[name] = svc
+	sr.dependencies[name] = deps
+	for _, dep := range deps {
+		sr.dependents[dep] = append(sr.dependents[dep], name)
+	}
+	return nil
+}
+
+// GetDependencies returns the dependencies of a service.
+func (sr *ServiceRegistry) GetDependencies(serviceID string) []string {
+	sr.mu.RLock()
+	defer sr.mu.RUnlock()
+	deps, ok := sr.dependencies[serviceID]
+	if !ok {
+		return []string{}
+	}
+	result := make([]string, len(deps))
+	copy(result, deps)
+	return result
+}
+
+// GetDependents returns all services that depend on the given service.
+func (sr *ServiceRegistry) GetDependents(serviceID string) []string {
+	sr.mu.RLock()
+	defer sr.mu.RUnlock()
+	deps, ok := sr.dependents[serviceID]
+	if !ok {
+		return []string{}
+	}
+	result := make([]string, len(deps))
+	copy(result, deps)
+	return result
 }
 
 // TODO: implement lifecycle tracking (registered, running, stopped)
