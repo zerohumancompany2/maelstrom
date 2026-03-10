@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/maelstrom/v3/pkg/security"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
 
@@ -11,6 +12,7 @@ type SnapshotRecord struct {
 	ID        string
 	RuntimeID string
 	State     map[string]any
+	Taints    []string
 	Timestamp time.Time
 }
 
@@ -33,7 +35,7 @@ const (
 )
 
 type PersistenceService interface {
-	Snapshot(runtimeId string) (SnapshotRecord, error)
+	Snapshot(runtimeId string, policy security.EnforcementPolicy) (SnapshotRecord, error)
 	Restore(snapshotId string, def statechart.ChartDefinition) (statechart.RuntimeID, error)
 	AppendEvent(runtimeId string, event statechart.Event) error
 	GetEvents(runtimeId string, since string) ([]EventLogEntry, error)
@@ -43,21 +45,34 @@ type PersistenceService interface {
 type persistenceService struct {
 	snapshots map[string]SnapshotRecord
 	events    map[string][]EventLogEntry
+	state     map[string]map[string]any
+	taints    map[string][]string
+	security  security.TaintEngine
 }
 
 func NewPersistenceService() PersistenceService {
 	return &persistenceService{
 		snapshots: make(map[string]SnapshotRecord),
 		events:    make(map[string][]EventLogEntry),
+		state:     make(map[string]map[string]any),
+		taints:    make(map[string][]string),
+		security:  security.NewTaintEngine(),
 	}
 }
 
-func (s *persistenceService) Snapshot(runtimeId string) (SnapshotRecord, error) {
+func (s *persistenceService) Snapshot(runtimeId string, policy security.EnforcementPolicy) (SnapshotRecord, error) {
 	id := runtimeId + "-snap-" + time.Now().Format("20060102150405")
+
+	runtimeTaints := s.taints[runtimeId]
+	if err := s.security.EnforceAllowedOnExit(runtimeTaints, policy); err != nil {
+		return SnapshotRecord{}, err
+	}
+
 	snap := SnapshotRecord{
 		ID:        id,
 		RuntimeID: runtimeId,
-		State:     make(map[string]any),
+		State:     s.state[runtimeId],
+		Taints:    runtimeTaints,
 		Timestamp: time.Now(),
 	}
 	s.snapshots[id] = snap

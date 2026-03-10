@@ -3,6 +3,7 @@ package persistence
 import (
 	"testing"
 
+	"github.com/maelstrom/v3/pkg/security"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
 
@@ -10,7 +11,8 @@ func TestPersistence_SnapshotCreate(t *testing.T) {
 	svc := NewPersistenceService()
 
 	runtimeID := statechart.RuntimeID("test-runtime-1")
-	snap, err := svc.Snapshot(string(runtimeID))
+	policy := security.EnforcementPolicy{AllowedOnExit: []string{}, Enforcement: "strict"}
+	snap, err := svc.Snapshot(string(runtimeID), policy)
 
 	if err != nil {
 		t.Fatalf("Snapshot failed: %v", err)
@@ -38,7 +40,8 @@ func TestPersistence_SnapshotRestore(t *testing.T) {
 
 	originalID := statechart.RuntimeID("restore-test-1")
 
-	snap, err := svc.Snapshot(string(originalID))
+	policy := security.EnforcementPolicy{AllowedOnExit: []string{}, Enforcement: "strict"}
+	snap, err := svc.Snapshot(string(originalID), policy)
 	if err != nil {
 		t.Fatalf("Snapshot failed: %v", err)
 	}
@@ -220,5 +223,51 @@ func TestPersistence_MigrateClean(t *testing.T) {
 
 	if len(events) != 0 {
 		t.Errorf("Expected 0 events in cleanStart mode, got %d", len(events))
+	}
+}
+
+func TestSnapshot_AllowedOnExit_EnforcesPolicy(t *testing.T) {
+	ps := NewPersistenceService().(*persistenceService)
+
+	runtimeID := statechart.RuntimeID("test-runtime-allowed")
+	taints := []string{"TOOL_OUTPUT", "USER_SUPPLIED"}
+
+	ps.taints[string(runtimeID)] = taints
+	ps.state[string(runtimeID)] = map[string]any{"data": "test state"}
+
+	policy := security.EnforcementPolicy{
+		AllowedOnExit: []string{"TOOL_OUTPUT", "USER_SUPPLIED"},
+		Enforcement:   "strict",
+	}
+
+	snap, err := ps.Snapshot(string(runtimeID), policy)
+
+	if err != nil {
+		t.Fatalf("Snapshot failed: %v", err)
+	}
+
+	if snap.ID == "" {
+		t.Error("Expected snapshot ID to be non-empty")
+	}
+
+	if snap.RuntimeID != string(runtimeID) {
+		t.Errorf("Expected RuntimeID %s, got %s", runtimeID, snap.RuntimeID)
+	}
+
+	if len(snap.Taints) != len(taints) {
+		t.Errorf("Expected %d taints, got %d", len(taints), len(snap.Taints))
+	}
+
+	for _, taint := range taints {
+		found := false
+		for _, stored := range snap.Taints {
+			if stored == taint {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected taint %s to be stored", taint)
+		}
 	}
 }

@@ -168,6 +168,12 @@ type TaintEngine interface {
 	ReportTaints(chartID string) (TaintMap, error)
 	AttachTaint(obj any, taints []string) (any, error)
 	StripTaint(obj any, forbiddenTaints []string) (any, []string, error)
+	EnforceAllowedOnExit(taints []string, policy EnforcementPolicy) error
+}
+
+type EnforcementPolicy struct {
+	AllowedOnExit []string
+	Enforcement   string
 }
 
 type taintEngineImpl struct {
@@ -399,6 +405,20 @@ func (e *taintEngineImpl) attachTaintToMap(m map[string]interface{}, taints []st
 	}
 	result["_taints"] = taints
 	return result, nil
+}
+
+func (e *taintEngineImpl) EnforceAllowedOnExit(taints []string, policy EnforcementPolicy) error {
+	allowedSet := make(map[string]bool)
+	for _, t := range policy.AllowedOnExit {
+		allowedSet[t] = true
+	}
+
+	for _, taint := range taints {
+		if !allowedSet[taint] {
+			return fmt.Errorf("taint %s is not allowed on exit", taint)
+		}
+	}
+	return nil
 }
 
 type BoundaryService interface {
