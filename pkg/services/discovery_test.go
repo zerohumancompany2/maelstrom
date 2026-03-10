@@ -38,6 +38,47 @@ func TestServiceDiscovery_registryFindsByCapability(t *testing.T) {
 	}
 }
 
+func TestServiceDiscovery_registryReportsHealthStatus(t *testing.T) {
+	sr := NewServiceRegistry()
+
+	// Register services with capabilities
+	sr.RegisterWithCapabilities("sys:security", &mockService{id: "sys:security"}, []string{"auth"})
+	sr.RegisterWithCapabilities("sys:communication", &mockService{id: "sys:communication"}, []string{"messaging"})
+
+	// Initially all services should be unknown health
+	health := sr.GetHealthStatus("sys:security")
+	if health != "unknown" {
+		t.Fatalf("GetHealthStatus() returned %q for new service, want %q", health, "unknown")
+	}
+
+	// Update health to healthy
+	sr.UpdateHealthStatus("sys:security", "healthy")
+	health = sr.GetHealthStatus("sys:security")
+	if health != "healthy" {
+		t.Fatalf("GetHealthStatus() returned %q, want %q", health, "healthy")
+	}
+
+	// Update health to unhealthy
+	sr.UpdateHealthStatus("sys:security", "unhealthy")
+	health = sr.GetHealthStatus("sys:security")
+	if health != "unhealthy" {
+		t.Fatalf("GetHealthStatus() returned %q, want %q", health, "unhealthy")
+	}
+
+	// Get health of non-existent service
+	health = sr.GetHealthStatus("sys:nonexistent")
+	if health != "unknown" {
+		t.Fatalf("GetHealthStatus() returned %q for non-existent service, want %q", health, "unknown")
+	}
+
+	// Get all unhealthy services
+	sr.UpdateHealthStatus("sys:communication", "unhealthy")
+	unhealthyServices := sr.GetUnhealthyServices()
+	if len(unhealthyServices) != 2 {
+		t.Fatalf("GetUnhealthyServices() returned %d services, want 2", len(unhealthyServices))
+	}
+}
+
 func TestServiceDiscovery_registryListsAllServices(t *testing.T) {
 	sr := NewServiceRegistry()
 

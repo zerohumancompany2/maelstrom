@@ -31,6 +31,7 @@ type ServiceRegistry struct {
 	lifecycles   map[string]string   // service -> lifecycle state
 	capabilities map[string][]string // service -> capabilities
 	capIndex     map[string][]string // capability -> service IDs
+	health       map[string]string   // service -> health status
 }
 
 // NewServiceRegistry creates a new ServiceRegistry.
@@ -40,6 +41,7 @@ func NewServiceRegistry() *ServiceRegistry {
 		lifecycles:   make(map[string]string),
 		capabilities: make(map[string][]string),
 		capIndex:     make(map[string][]string),
+		health:       make(map[string]string),
 	}
 }
 
@@ -97,6 +99,38 @@ func (sr *ServiceRegistry) FindByCapability(capability string) []Service {
 		}
 	}
 	return services
+}
+
+// GetHealthStatus returns the health status of a service.
+func (sr *ServiceRegistry) GetHealthStatus(serviceID string) string {
+	sr.mu.RLock()
+	defer sr.mu.RUnlock()
+	if status, ok := sr.health[serviceID]; ok {
+		return status
+	}
+	return "unknown"
+}
+
+// UpdateHealthStatus updates the health status of a service.
+func (sr *ServiceRegistry) UpdateHealthStatus(serviceID string, status string) {
+	sr.mu.Lock()
+	defer sr.mu.Unlock()
+	sr.health[serviceID] = status
+}
+
+// GetUnhealthyServices returns all services with unhealthy status.
+func (sr *ServiceRegistry) GetUnhealthyServices() []Service {
+	sr.mu.RLock()
+	defer sr.mu.RUnlock()
+	unhealthy := make([]Service, 0)
+	for id, status := range sr.health {
+		if status == "unhealthy" {
+			if svc, ok := sr.services[id]; ok {
+				unhealthy = append(unhealthy, svc)
+			}
+		}
+	}
+	return unhealthy
 }
 
 // GetState retrieves the lifecycle state of a service.
