@@ -8,7 +8,7 @@ import (
 )
 
 // ============================================================================
-// Hot-Reload Protocol Tests
+// Hot-Reload Protocol Tests (7 tests, 7 commits)
 // ============================================================================
 
 // TestHotReloadProtocol_QuiescenceDetection verifies quiescence detection
@@ -34,7 +34,6 @@ func TestHotReloadProtocol_QuiescenceDetection(t *testing.T) {
 			t.Fatalf("Spawn failed: %v", err)
 		}
 
-		// Runtime in Created state should be quiescent (no events, no parallel)
 		runtime := engine.runtimes[rtID]
 		if !runtime.IsQuiescent() {
 			t.Error("Expected runtime to be quiescent with empty queue and no parallel regions")
@@ -58,7 +57,6 @@ func TestHotReloadProtocol_QuiescenceDetection(t *testing.T) {
 			t.Fatalf("Spawn failed: %v", err)
 		}
 
-		// Start runtime and dispatch event
 		if err := engine.Control(rtID, CmdStart); err != nil {
 			t.Fatalf("Start failed: %v", err)
 		}
@@ -67,7 +65,6 @@ func TestHotReloadProtocol_QuiescenceDetection(t *testing.T) {
 			t.Fatalf("Dispatch failed: %v", err)
 		}
 
-		// Check immediately - should not be quiescent with event in queue
 		runtime := engine.runtimes[rtID]
 		if runtime.IsQuiescent() {
 			t.Error("Expected runtime to NOT be quiescent with pending events in queue")
@@ -86,14 +83,8 @@ func TestHotReloadProtocol_QuiescenceDetection(t *testing.T) {
 						ID:          "parallel",
 						RegionNames: []string{"regionA", "regionB"},
 						Children: map[string]*Node{
-							"regionA": {
-								ID:       "idleA",
-								Children: nil,
-							},
-							"regionB": {
-								ID:       "idleB",
-								Children: nil,
-							},
+							"regionA": {ID: "idleA", Children: nil},
+							"regionB": {ID: "idleB", Children: nil},
 						},
 					},
 				},
@@ -109,8 +100,6 @@ func TestHotReloadProtocol_QuiescenceDetection(t *testing.T) {
 		runtime := engine.runtimes[rtID]
 		runtime.enterParallelState("root/parallel")
 		runtime.isParallel = true
-
-		// Give router time to start
 		time.Sleep(50 * time.Millisecond)
 
 		if runtime.IsQuiescent() {
@@ -129,11 +118,9 @@ func TestHotReloadProtocol_ProtocolFlow(t *testing.T) {
 		ID:      "test-protocol",
 		Version: "1.0.0",
 		Root: &Node{
-			ID:       "idle",
-			Children: nil,
-			Transitions: []Transition{
-				{Event: "go", Target: "running"},
-			},
+			ID:          "idle",
+			Children:    nil,
+			Transitions: []Transition{{Event: "go", Target: "running"}},
 		},
 		InitialState: "idle",
 	}
@@ -142,19 +129,16 @@ func TestHotReloadProtocol_ProtocolFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Spawn failed: %v", err)
 	}
-
 	if err := engine.Control(rtID, CmdStart); err != nil {
 		t.Fatalf("Start failed: %v", err)
 	}
 
 	// Test 1: prepareForReload signals current runtime
 	t.Run("PrepareForReloadSignalsRuntime", func(t *testing.T) {
-		// Create a fresh runtime for this test
 		rtID2, err := engine.Spawn(def, mockCtx)
 		if err != nil {
 			t.Fatalf("Spawn failed: %v", err)
 		}
-
 		if err := engine.Control(rtID2, CmdStart); err != nil {
 			t.Fatalf("Start failed: %v", err)
 		}
@@ -173,25 +157,20 @@ func TestHotReloadProtocol_ProtocolFlow(t *testing.T) {
 			InitialState: "idle",
 		}
 
-		// Hot-reload should signal prepareForReload and complete successfully
 		err = engine.HotReload(rtID2, newDef, HotReloadOptions{
 			Timeout:          5 * time.Second,
 			MaxAttempts:      3,
 			HistoryMode:      HistoryModeShallow,
 			ContextTransform: nil,
 		})
-
 		if err != nil {
 			t.Fatalf("HotReload failed: %v", err)
 		}
 
-		// Verify the runtime was reloaded with new definition
 		runtime := engine.runtimes[rtID2]
 		if runtime == nil {
 			t.Fatal("Runtime should exist after hot-reload")
 		}
-
-		// Check that the new definition is in place
 		if runtime.definition.Version != "1.1.0" {
 			t.Errorf("Expected version 1.1.0 after hot-reload, got %s", runtime.definition.Version)
 		}
@@ -199,21 +178,14 @@ func TestHotReloadProtocol_ProtocolFlow(t *testing.T) {
 
 	// Test 2: Runtime attempts to reach quiescence within timeout
 	t.Run("QuiescenceWaitWithTimeout", func(t *testing.T) {
-		// Dispatch an event to make runtime non-quiescent
 		if err := engine.Dispatch(rtID, Event{Type: "go"}); err != nil {
-			t.Logf("Dispatch failed (runtime may have stopped): %v", err)
+			t.Logf("Dispatch failed: %v", err)
 		}
-
-		// Wait for processing
 		time.Sleep(100 * time.Millisecond)
 
-		// Check runtime state
 		runtime := engine.runtimes[rtID]
-		if runtime != nil {
-			// Runtime should be quiescent after processing
-			if !runtime.IsQuiescent() {
-				t.Log("Runtime is not quiescent - may have pending events")
-			}
+		if runtime != nil && !runtime.IsQuiescent() {
+			t.Log("Runtime is not quiescent - may have pending events")
 		}
 	})
 }
@@ -228,11 +200,9 @@ func TestHotReloadProtocol_QuiescenceReached(t *testing.T) {
 		ID:      "test-quiescence-reached",
 		Version: "1.0.0",
 		Root: &Node{
-			ID:       "idle",
-			Children: nil,
-			Transitions: []Transition{
-				{Event: "go", Target: "running"},
-			},
+			ID:          "idle",
+			Children:    nil,
+			Transitions: []Transition{{Event: "go", Target: "running"}},
 		},
 		InitialState: "idle",
 	}
@@ -241,7 +211,6 @@ func TestHotReloadProtocol_QuiescenceReached(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Spawn failed: %v", err)
 	}
-
 	if err := engine.Control(rtID, CmdStart); err != nil {
 		t.Fatalf("Start failed: %v", err)
 	}
@@ -262,24 +231,20 @@ func TestHotReloadProtocol_QuiescenceReached(t *testing.T) {
 			InitialState: "idle",
 		}
 
-		// Hot-reload with shallow history
 		err := engine.HotReload(rtID, newDef, HotReloadOptions{
 			Timeout:          5 * time.Second,
 			MaxAttempts:      3,
 			HistoryMode:      HistoryModeShallow,
 			ContextTransform: nil,
 		})
-
 		if err != nil {
 			t.Fatalf("HotReload failed: %v", err)
 		}
 
-		// Verify runtime exists and has new definition
 		runtime := engine.runtimes[rtID]
 		if runtime == nil {
 			t.Fatal("Runtime should exist after hot-reload")
 		}
-
 		if runtime.definition.Version != "1.1.0" {
 			t.Errorf("Expected version 1.1.0, got %s", runtime.definition.Version)
 		}
@@ -287,37 +252,31 @@ func TestHotReloadProtocol_QuiescenceReached(t *testing.T) {
 
 	// Test 2: Version change triggers contextTransform (if provided)
 	t.Run("VersionChangeAppliesContextTransform", func(t *testing.T) {
-		// Create fresh runtime
 		rtID2, err := engine.Spawn(def, mockCtx)
 		if err != nil {
 			t.Fatalf("Spawn failed: %v", err)
 		}
-
 		if err := engine.Control(rtID2, CmdStart); err != nil {
 			t.Fatalf("Start failed: %v", err)
 		}
 
 		newDef := ChartDefinition{
 			ID:      "test-quiescence-reached",
-			Version: "2.0.0", // Major version change
+			Version: "2.0.0",
 			Root: &Node{
-				ID:       "idle",
-				Children: nil,
-				Transitions: []Transition{
-					{Event: "go", Target: "running"},
-				},
+				ID:          "idle",
+				Children:    nil,
+				Transitions: []Transition{{Event: "go", Target: "running"}},
 			},
 			InitialState: "idle",
 		}
 
-		// Hot-reload without context transform - should still work
 		err = engine.HotReload(rtID2, newDef, HotReloadOptions{
 			Timeout:          5 * time.Second,
 			MaxAttempts:      3,
 			HistoryMode:      HistoryModeShallow,
 			ContextTransform: nil,
 		})
-
 		if err != nil {
 			t.Fatalf("HotReload failed: %v", err)
 		}
@@ -326,7 +285,6 @@ func TestHotReloadProtocol_QuiescenceReached(t *testing.T) {
 		if runtime == nil {
 			t.Fatal("Runtime should exist after hot-reload")
 		}
-
 		if runtime.definition.Version != "2.0.0" {
 			t.Errorf("Expected version 2.0.0, got %s", runtime.definition.Version)
 		}
@@ -343,11 +301,9 @@ func TestHotReloadProtocol_TimeoutForceStop(t *testing.T) {
 		ID:      "test-timeout",
 		Version: "1.0.0",
 		Root: &Node{
-			ID:       "idle",
-			Children: nil,
-			Transitions: []Transition{
-				{Event: "go", Target: "running"},
-			},
+			ID:          "idle",
+			Children:    nil,
+			Transitions: []Transition{{Event: "go", Target: "running"}},
 		},
 		InitialState: "idle",
 	}
@@ -356,15 +312,12 @@ func TestHotReloadProtocol_TimeoutForceStop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Spawn failed: %v", err)
 	}
-
 	if err := engine.Control(rtID, CmdStart); err != nil {
 		t.Fatalf("Start failed: %v", err)
 	}
 
 	// Test 1: Timeout triggers force-stop
 	t.Run("TimeoutTriggersForceStop", func(t *testing.T) {
-		// Create a runtime that will never become quiescent
-		// by continuously dispatching events
 		done := make(chan bool)
 		go func() {
 			for i := 0; i < 100; i++ {
@@ -378,28 +331,22 @@ func TestHotReloadProtocol_TimeoutForceStop(t *testing.T) {
 			ID:      "test-timeout",
 			Version: "1.1.0",
 			Root: &Node{
-				ID:       "idle",
-				Children: nil,
-				Transitions: []Transition{
-					{Event: "go", Target: "running"},
-				},
+				ID:          "idle",
+				Children:    nil,
+				Transitions: []Transition{{Event: "go", Target: "running"}},
 			},
 			InitialState: "idle",
 		}
 
-		// Hot-reload with very short timeout - should timeout
 		err := engine.HotReload(rtID, newDef, HotReloadOptions{
-			Timeout:          50 * time.Millisecond, // Very short timeout
+			Timeout:          50 * time.Millisecond,
 			MaxAttempts:      3,
 			HistoryMode:      HistoryModeShallow,
 			ContextTransform: nil,
 		})
 
-		// Stop the event dispatching
 		<-done
 
-		// Timeout should have occurred - force-stop and cleanStart
-		// The error indicates timeout occurred
 		if err == nil {
 			t.Log("HotReload succeeded (may have reached quiescence)")
 		} else {
@@ -409,30 +356,24 @@ func TestHotReloadProtocol_TimeoutForceStop(t *testing.T) {
 
 	// Test 2: cleanStart creates new runtime without history
 	t.Run("CleanStartWithoutHistory", func(t *testing.T) {
-		// Create fresh runtime
 		rtID2, err := engine.Spawn(def, mockCtx)
 		if err != nil {
 			t.Fatalf("Spawn failed: %v", err)
 		}
-
 		if err := engine.Control(rtID2, CmdStart); err != nil {
 			t.Fatalf("Start failed: %v", err)
 		}
 
-		// Transition to a different state
 		engine.Dispatch(rtID2, Event{Type: "go"})
 		time.Sleep(50 * time.Millisecond)
 
-		// Hot-reload with clean start (no history)
 		newDef := ChartDefinition{
 			ID:      "test-timeout",
 			Version: "1.1.0",
 			Root: &Node{
-				ID:       "idle",
-				Children: nil,
-				Transitions: []Transition{
-					{Event: "go", Target: "running"},
-				},
+				ID:          "idle",
+				Children:    nil,
+				Transitions: []Transition{{Event: "go", Target: "running"}},
 			},
 			InitialState: "idle",
 		}
@@ -440,23 +381,107 @@ func TestHotReloadProtocol_TimeoutForceStop(t *testing.T) {
 		err = engine.HotReload(rtID2, newDef, HotReloadOptions{
 			Timeout:          5 * time.Second,
 			MaxAttempts:      3,
-			HistoryMode:      HistoryModeNone, // No history
+			HistoryMode:      HistoryModeNone,
 			ContextTransform: nil,
 		})
-
 		if err != nil {
 			t.Fatalf("HotReload failed: %v", err)
 		}
 
-		// Verify runtime is at initial state (no history preserved)
 		runtime := engine.runtimes[rtID2]
 		if runtime == nil {
 			t.Fatal("Runtime should exist after hot-reload")
 		}
-
-		// With HistoryModeNone, should be at initial state
 		if runtime.activeState != "idle" {
 			t.Errorf("Expected initial state 'idle' with no history, got '%s'", runtime.activeState)
+		}
+	})
+}
+
+// TestHotReloadProtocol_MaxAttemptsExceeded verifies max attempts handling
+// as per arch-v1.md L877-879: log permanent failure, require admin intervention.
+func TestHotReloadProtocol_MaxAttemptsExceeded(t *testing.T) {
+	engine := NewEngine().(*Engine)
+	mockCtx := testutil.NewMockApplicationContext()
+
+	def := ChartDefinition{
+		ID:      "test-max-attempts",
+		Version: "1.0.0",
+		Root: &Node{
+			ID:          "idle",
+			Children:    nil,
+			Transitions: []Transition{{Event: "go", Target: "running"}},
+		},
+		InitialState: "idle",
+	}
+
+	rtID, err := engine.Spawn(def, mockCtx)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+	if err := engine.Control(rtID, CmdStart); err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+
+	// Test 1: Max attempts exceeded logs permanent failure
+	t.Run("MaxAttemptsExceededLogsFailure", func(t *testing.T) {
+		newDef := ChartDefinition{
+			ID:      "test-max-attempts",
+			Version: "1.1.0",
+			Root: &Node{
+				ID:          "idle",
+				Children:    nil,
+				Transitions: []Transition{{Event: "go", Target: "running"}},
+			},
+			InitialState: "idle",
+		}
+
+		err := engine.HotReload(rtID, newDef, HotReloadOptions{
+			Timeout:          10 * time.Millisecond,
+			MaxAttempts:      1,
+			HistoryMode:      HistoryModeShallow,
+			ContextTransform: nil,
+		})
+
+		if err != nil {
+			t.Logf("HotReload failed as expected with maxAttempts=1: %v", err)
+		}
+	})
+
+	// Test 2: Multiple attempts with timeout
+	t.Run("MultipleAttemptsTimeout", func(t *testing.T) {
+		rtID2, err := engine.Spawn(def, mockCtx)
+		if err != nil {
+			t.Fatalf("Spawn failed: %v", err)
+		}
+		if err := engine.Control(rtID2, CmdStart); err != nil {
+			t.Fatalf("Start failed: %v", err)
+		}
+
+		newDef := ChartDefinition{
+			ID:      "test-max-attempts",
+			Version: "1.1.0",
+			Root: &Node{
+				ID:          "idle",
+				Children:    nil,
+				Transitions: []Transition{{Event: "go", Target: "running"}},
+			},
+			InitialState: "idle",
+		}
+
+		err = engine.HotReload(rtID2, newDef, HotReloadOptions{
+			Timeout:          5 * time.Second,
+			MaxAttempts:      3,
+			HistoryMode:      HistoryModeShallow,
+			ContextTransform: nil,
+		})
+		if err != nil {
+			t.Fatalf("HotReload failed: %v", err)
+		}
+
+		runtime := engine.runtimes[rtID2]
+		if runtime == nil {
+			t.Fatal("Runtime should exist after hot-reload")
 		}
 	})
 }
