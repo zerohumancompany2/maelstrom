@@ -14,6 +14,28 @@ func TestHeartbeatService_ID(t *testing.T) {
 	}
 }
 
+// arch-v1.md L469: HeartbeatService must schedule wake-ups using cron expressions
+func TestHeartbeatService_Schedule(t *testing.T) {
+	svc := NewHeartbeatService()
+
+	err := svc.Schedule("agent-1", "0 * * * *", "default template")
+	if err != nil {
+		t.Fatalf("Schedule failed: %v", err)
+	}
+
+	sched, err := svc.GetSchedule("agent-1")
+	if err != nil {
+		t.Fatalf("GetSchedule failed: %v", err)
+	}
+
+	if sched.CronExpr != "0 * * * *" {
+		t.Errorf("Expected cron '0 * * * *', got %s", sched.CronExpr)
+	}
+	if sched.Template != "default template" {
+		t.Errorf("Expected template 'default template', got %s", sched.Template)
+	}
+}
+
 func TestHeartbeat_Schedule(t *testing.T) {
 	svc := NewHeartbeatService()
 
@@ -89,7 +111,7 @@ func TestHeartbeat_Unschedule(t *testing.T) {
 	}
 }
 
-func TestHeartbeatService_Schedule(t *testing.T) {
+func TestHeartbeatService_ScheduleCron(t *testing.T) {
 	svc := NewHeartbeatService()
 
 	err := svc.ScheduleCron("0 * * * *")
@@ -98,7 +120,7 @@ func TestHeartbeatService_Schedule(t *testing.T) {
 	}
 }
 
-func TestHeartbeatService_Trigger(t *testing.T) {
+func TestHeartbeatService_TriggerAll(t *testing.T) {
 	svc := NewHeartbeatService()
 
 	err := svc.TriggerAll()
