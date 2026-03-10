@@ -818,6 +818,68 @@ func TestApplicationContext_BoundaryFilter_HidesForbidden(t *testing.T) {
 	}
 }
 
+func TestApplicationContext_Namespace_Isolation(t *testing.T) {
+	namespace1 := "agent-1"
+	namespace2 := "agent-2"
+	testKey := "shared-key"
+	value1 := "agent-1-value"
+	value2 := "agent-2-value"
+
+	appCtx1 := &kernelApplicationContext{
+		kernel:    &Kernel{},
+		data:      make(map[string]interface{}),
+		taints:    make(map[string][]string),
+		namespace: namespace1,
+	}
+
+	appCtx2 := &kernelApplicationContext{
+		kernel:    &Kernel{},
+		data:      make(map[string]interface{}),
+		taints:    make(map[string][]string),
+		namespace: namespace2,
+	}
+
+	err := appCtx1.Set(testKey, value1, []string{"AGENT_1"}, "inner")
+	if err != nil {
+		t.Fatalf("appCtx1.Set() returned error: %v", err)
+	}
+
+	err = appCtx2.Set(testKey, value2, []string{"AGENT_2"}, "inner")
+	if err != nil {
+		t.Fatalf("appCtx2.Set() returned error: %v", err)
+	}
+
+	if appCtx1.Namespace() != namespace1 {
+		t.Errorf("appCtx1.Namespace(): expected %q, got %q", namespace1, appCtx1.Namespace())
+	}
+
+	if appCtx2.Namespace() != namespace2 {
+		t.Errorf("appCtx2.Namespace(): expected %q, got %q", namespace2, appCtx2.Namespace())
+	}
+
+	value1Retrieved, _, err := appCtx1.Get(testKey, "inner")
+	if err != nil {
+		t.Fatalf("appCtx1.Get() returned error: %v", err)
+	}
+
+	value2Retrieved, _, err := appCtx2.Get(testKey, "inner")
+	if err != nil {
+		t.Fatalf("appCtx2.Get() returned error: %v", err)
+	}
+
+	if value1Retrieved != value1 {
+		t.Errorf("appCtx1.Get() value: expected %v, got %v", value1, value1Retrieved)
+	}
+
+	if value2Retrieved != value2 {
+		t.Errorf("appCtx2.Get() value: expected %v, got %v", value2, value2Retrieved)
+	}
+
+	if value1Retrieved == value2Retrieved {
+		t.Error("Namespaces should be isolated - values should not be the same")
+	}
+}
+
 func TestKernel_BootstrapServices(t *testing.T) {
 	kernel := &Kernel{
 		engine:       statechart.NewEngine(),

@@ -48,10 +48,11 @@ type Kernel struct {
 
 // kernelApplicationContext provides application context with kernel engine access.
 type kernelApplicationContext struct {
-	kernel *Kernel
-	data   map[string]interface{}
-	taints map[string][]string
-	mu     sync.RWMutex
+	kernel    *Kernel
+	data      map[string]interface{}
+	taints    map[string][]string
+	namespace string
+	mu        sync.RWMutex
 }
 
 func (k *kernelApplicationContext) Get(key string, callerBoundary string) (interface{}, []string, error) {
@@ -82,7 +83,7 @@ func (k *kernelApplicationContext) Set(key string, value interface{}, taints []s
 }
 
 func (k *kernelApplicationContext) Namespace() string {
-	return "sys:kernel"
+	return k.namespace
 }
 
 // New creates a new Kernel.
