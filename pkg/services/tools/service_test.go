@@ -804,3 +804,55 @@ func TestHotreloadableServices_ToolsToolDescriptor(t *testing.T) {
 		t.Errorf("Expected Type 'tool', got '%s'", resolved.Type)
 	}
 }
+
+// TestHotreloadableServices_ToolsBoundaryFiltering - spec: arch-v1.md L487 (boundary filtering on resolve)
+func TestHotreloadableServices_ToolsBoundaryFiltering(t *testing.T) {
+	svc := NewToolsService()
+
+	innerTool := ToolDescriptor{Name: "innerDb", Boundary: "inner", Schema: map[string]any{}, Isolation: "strict"}
+	dmzTool := ToolDescriptor{Name: "webSearch", Boundary: "dmz", Schema: map[string]any{}, Isolation: "container"}
+	outerTool := ToolDescriptor{Name: "publicApi", Boundary: "outer", Schema: map[string]any{}, Isolation: "process"}
+
+	svc.Register(innerTool)
+	svc.Register(dmzTool)
+	svc.Register(outerTool)
+
+	_, err := svc.Resolve("innerDb", "inner")
+	if err != nil {
+		t.Errorf("Inner should access inner tool, got %v", err)
+	}
+	_, err = svc.Resolve("webSearch", "inner")
+	if err != nil {
+		t.Errorf("Inner should access dmz tool, got %v", err)
+	}
+	_, err = svc.Resolve("publicApi", "inner")
+	if err != nil {
+		t.Errorf("Inner should access outer tool, got %v", err)
+	}
+
+	_, err = svc.Resolve("innerDb", "dmz")
+	if err == nil {
+		t.Error("DMZ should not access inner tool")
+	}
+	_, err = svc.Resolve("webSearch", "dmz")
+	if err != nil {
+		t.Errorf("DMZ should access dmz tool, got %v", err)
+	}
+	_, err = svc.Resolve("publicApi", "dmz")
+	if err != nil {
+		t.Errorf("DMZ should access outer tool, got %v", err)
+	}
+
+	_, err = svc.Resolve("innerDb", "outer")
+	if err == nil {
+		t.Error("Outer should not access inner tool")
+	}
+	_, err = svc.Resolve("webSearch", "outer")
+	if err == nil {
+		t.Error("Outer should not access dmz tool")
+	}
+	_, err = svc.Resolve("publicApi", "outer")
+	if err != nil {
+		t.Errorf("Outer should access outer tool, got %v", err)
+	}
+}
