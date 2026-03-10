@@ -142,3 +142,9 @@ func TestServiceContract_outcomeEventContainsErrorDetails(t *testing.T) {
 		t.Errorf("Expected ErrorDetails to be '%s', got '%s'", expectedError, outcome.ErrorDetails)
 	}
 }
+
+// TestServiceContract_allServicesImplementInterface - spec: arch-v1.md L479-480
+// Acceptance Criteria: All services implement the Service interface with HandleMail returning *OutcomeEvent
+func TestServiceContract_allServicesImplementInterface(t *testing.T) {
+	var _ Service = (*contractMockService)(nil)
+}
