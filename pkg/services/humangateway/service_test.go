@@ -238,3 +238,46 @@ func TestHumanGatewayService_ChatSession(t *testing.T) {
 		t.Error("Expected non-nil ContextMap")
 	}
 }
+
+// TestHumanGatewayService_SendMessage - arch-v1.md L732
+// Send messages to agent inbox with human_feedback type
+func TestHumanGatewayService_SendMessage(t *testing.T) {
+	svc := NewHumanGatewayService()
+
+	session, err := svc.CreateChatSession("agent-123")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	msg := "Hello agent"
+	err = svc.SendMessage(session, msg)
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	if len(session.Messages) != 1 {
+		t.Errorf("Expected 1 message, got %d", len(session.Messages))
+	}
+
+	m := session.Messages[0]
+	if m.Type != mail.MailTypeHumanFeedback {
+		t.Errorf("Expected MailTypeHumanFeedback, got %s", m.Type)
+	}
+
+	if m.Target != "agent:agent-123" {
+		t.Errorf("Expected target 'agent:agent-123', got '%s'", m.Target)
+	}
+
+	content, ok := m.Content.(map[string]any)
+	if !ok {
+		t.Error("Expected content to be map[string]any")
+	}
+	if content["message"] != msg {
+		t.Errorf("Expected message '%s', got '%v'", msg, content["message"])
+	}
+
+	err = svc.SendMessage(nil, "test")
+	if err == nil {
+		t.Error("Expected error for nil session")
+	}
+}

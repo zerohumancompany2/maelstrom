@@ -1,6 +1,9 @@
 package humangateway
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/maelstrom/v3/pkg/mail"
 	"strings"
 )
@@ -48,4 +51,27 @@ func SanitizeContextForBoundary(ctx ContextMapSnapshot, boundary mail.BoundaryTy
 		sanitized[k] = v
 	}
 	return sanitized
+}
+
+func (h *HumanGatewayService) SendMessage(session *ChatSession, message string) error {
+	if session == nil {
+		return fmt.Errorf("nil session")
+	}
+
+	mailMsg := mail.Mail{
+		ID:     fmt.Sprintf("human-%d", time.Now().UnixNano()),
+		Type:   mail.MailTypeHumanFeedback,
+		Source: "human:" + session.AgentID,
+		Target: "agent:" + session.AgentID,
+		Content: map[string]any{
+			"message": message,
+		},
+		Metadata: mail.MailMetadata{
+			Boundary: mail.InnerBoundary,
+			Taints:   []string{"USER_SUPPLIED"},
+		},
+	}
+
+	session.Messages = append(session.Messages, mailMsg)
+	return nil
 }
