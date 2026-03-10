@@ -430,3 +430,38 @@ func TestPrepareContextForBoundary_StripsForbidden(t *testing.T) {
 		t.Errorf("Expected TOOL_OUTPUT block to be preserved, but tool-block was removed")
 	}
 }
+
+func TestPrepareContextForBoundary_EnforcesPolicy(t *testing.T) {
+	contextBlockRegistry = make(map[string]BlockTaintInfo)
+
+	piiBlock := &ContextBlock{
+		Name:    "pii-block",
+		Content: "This contains PII data",
+		TaintPolicy: TaintPolicy{
+			RedactMode: "redact",
+			RedactRules: []RedactRule{
+				{Taint: "PII", Replacement: "[REDACTED]"},
+			},
+		},
+	}
+
+	contextBlockRegistry["pii-block"] = BlockTaintInfo{
+		Block:  piiBlock,
+		Taints: []string{"PII"},
+	}
+
+	err := PrepareContextForBoundary("runtime-1", OuterBoundary)
+
+	if err != nil {
+		t.Fatalf("PrepareContextForBoundary returned error: %v", err)
+	}
+
+	info, exists := contextBlockRegistry["pii-block"]
+	if !exists {
+		t.Errorf("Expected PII block to remain in context after redaction")
+	}
+
+	if info.Block.Content != "This contains [REDACTED] data" {
+		t.Errorf("Expected PII-tainted values to be redacted, got: %s", info.Block.Content)
+	}
+}

@@ -108,9 +108,23 @@ func PrepareContextForBoundary(runtimeId string, boundary BoundaryType) error {
 	}
 	contextBlockRegistry = make(map[string]BlockTaintInfo)
 	for _, block := range filtered {
-		contextBlockRegistry[block.Name] = BlockTaintInfo{Block: block, Taints: []string{"TOOL_OUTPUT"}}
+		processedBlock := applyTaintPolicy(block, boundary)
+		contextBlockRegistry[block.Name] = BlockTaintInfo{Block: processedBlock, Taints: []string{"TOOL_OUTPUT"}}
 	}
 	return nil
+}
+
+func applyTaintPolicy(block *ContextBlock, boundary BoundaryType) *ContextBlock {
+	if block.TaintPolicy.RedactMode == "redact" && len(block.TaintPolicy.RedactRules) > 0 {
+		result := *block
+		content := result.Content
+		for _, rule := range block.TaintPolicy.RedactRules {
+			content = replaceTaint(content, rule.Taint, rule.Replacement)
+		}
+		result.Content = content
+		return &result
+	}
+	return block
 }
 
 func FilterContextBlock(block ContextBlock, boundary BoundaryType) (ContextBlock, error) {
