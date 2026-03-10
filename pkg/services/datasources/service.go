@@ -34,7 +34,7 @@ func (s *datasourceService) ID() string {
 func (s *datasourceService) Get(name string) (datasource.DataSource, error) {
 	ds, ok := s.datasources[name]
 	if !ok {
-		return nil, nil
+		return nil, fmt.Errorf("datasource %q not found", name)
 	}
 	return ds, nil
 }

@@ -33,6 +33,32 @@ func TestDataSourceService_Register(t *testing.T) {
 	}
 }
 
+// TestDataSourceService_Get - arch-v1.md L490: get data source by name
+func TestDataSourceService_Get(t *testing.T) {
+	svc := NewDatasourceService()
+
+	// Register a datasource
+	err := svc.Register("localDisk", &LocalDiskDatasource{})
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	// Get existing datasource
+	ds, err := svc.Get("localDisk")
+	if err != nil {
+		t.Fatalf("Get existing datasource failed: %v", err)
+	}
+	if ds == nil {
+		t.Error("Expected non-nil datasource")
+	}
+
+	// Get unknown datasource should return error
+	_, err = svc.Get("unknown")
+	if err == nil {
+		t.Error("Expected error for unknown datasource, got nil")
+	}
+}
+
 func TestDatasources_Register(t *testing.T) {
 	svc := NewDatasourceService()
 
