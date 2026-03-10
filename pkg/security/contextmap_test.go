@@ -465,3 +465,41 @@ func TestPrepareContextForBoundary_EnforcesPolicy(t *testing.T) {
 		t.Errorf("Expected PII-tainted values to be redacted, got: %s", info.Block.Content)
 	}
 }
+
+func TestPrepareContextForBoundary_ReturnsEmpty(t *testing.T) {
+	contextBlockRegistry = make(map[string]BlockTaintInfo)
+
+	innerBlock := &ContextBlock{
+		Name:    "inner-block",
+		Content: "inner content",
+		TaintPolicy: TaintPolicy{
+			AllowedForBoundary: []BoundaryType{InnerBoundary},
+		},
+	}
+	secretBlock := &ContextBlock{
+		Name:    "secret-block",
+		Content: "secret content",
+		TaintPolicy: TaintPolicy{
+			AllowedForBoundary: []BoundaryType{InnerBoundary},
+		},
+	}
+
+	contextBlockRegistry["inner-block"] = BlockTaintInfo{
+		Block:  innerBlock,
+		Taints: []string{"INNER_ONLY"},
+	}
+	contextBlockRegistry["secret-block"] = BlockTaintInfo{
+		Block:  secretBlock,
+		Taints: []string{"SECRET"},
+	}
+
+	err := PrepareContextForBoundary("runtime-1", OuterBoundary)
+
+	if err != nil {
+		t.Fatalf("PrepareContextForBoundary returned error: %v", err)
+	}
+
+	if len(contextBlockRegistry) != 0 {
+		t.Errorf("Expected empty context when all blocks are blocked, got %d blocks", len(contextBlockRegistry))
+	}
+}
