@@ -134,3 +134,96 @@ func TestServicesIntegration_MailExchange(t *testing.T) {
 	_ = senderService.HandleMail(testMail)
 	_ = receiverService.HandleMail(testMail)
 }
+
+func TestServicesIntegration_MailRouting(t *testing.T) {
+	commSvc := communication.NewCommunicationService()
+
+	// Create test mail for routing
+	testMail := mail.Mail{
+		ID:     "mail-routing-test-1",
+		Type:   mail.MailTypeUser,
+		Source: "agent:test",
+		Target: "sys:memory",
+		Content: map[string]any{
+			"message": "routing test",
+		},
+		Metadata: mail.MailMetadata{
+			Boundary: mail.InnerBoundary,
+		},
+	}
+
+	// Test routing to correct service by sys:* ID
+	t.Run("Route to correct service", func(t *testing.T) {
+		// Subscribe to sys:memory
+		receiverChan, err := commSvc.Subscribe("sys:memory")
+		if err != nil {
+			t.Fatalf("Failed to subscribe: %v", err)
+		}
+
+		// Publish mail
+		ack, err := commSvc.Publish(testMail)
+		if err != nil {
+			t.Fatalf("Failed to publish: %v", err)
+		}
+
+		// Verify mail was delivered to correct service
+		if !ack.Success {
+			t.Error("Mail was not successfully routed")
+		}
+
+		// Read from channel
+		select {
+		case receivedMail := <-receiverChan:
+			if receivedMail.Target != "sys:memory" {
+				t.Error("Mail not routed to correct service")
+			}
+		default:
+			t.Error("Mail not received by target service")
+		}
+	})
+
+	// Test routing handles unknown targets gracefully
+	t.Run("Handle unknown target gracefully", func(t *testing.T) {
+		unknownMail := mail.Mail{
+			ID:     "unknown-target-test",
+			Type:   mail.MailTypeUser,
+			Source: "agent:test",
+			Target: "sys:unknown-service",
+			Content: map[string]any{
+				"message": "unknown target test",
+			},
+		}
+
+		// Should not panic
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("Routing to unknown target panicked: %v", r)
+			}
+		}()
+
+		_, err := commSvc.Publish(unknownMail)
+		if err != nil {
+			t.Logf("Expected error for unknown target: %v", err)
+		}
+	})
+
+	// Test cross-service routing
+	t.Run("Cross-service routing", func(t *testing.T) {
+		senderService := gateway.NewGatewayService()
+		receiverService := persistence.NewPersistenceService()
+
+		crossMail := mail.Mail{
+			ID:     "cross-service-test",
+			Type:   mail.MailTypeUser,
+			Source: "sys:gateway",
+			Target: "sys:persistence",
+			Content: map[string]any{
+				"message": "cross-service test",
+			},
+		}
+
+		// Both services should be able to HandleMail
+		_ = senderService.HandleMail(crossMail)
+		_ = receiverService.HandleMail(crossMail)
+	})
+}
