@@ -4,19 +4,13 @@ import (
 	"fmt"
 
 	"github.com/maelstrom/v3/pkg/security"
+	"github.com/maelstrom/v3/pkg/services/lifecycle"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
 
-type AgentInfo struct {
-	ID           string
-	State        string
-	ActiveStates []string
-	Boundary     string
-}
-
 type AdminService interface {
 	ID() string
-	ListAgents() ([]AgentInfo, error)
+	ListAgents() ([]lifecycle.RuntimeInfo, error)
 	ControlAgent(id string, cmd string) error
 	QueryTaints(agentId string) (security.TaintMap, error)
 	InjectEvent(agentId string, event statechart.Event) error
@@ -24,12 +18,14 @@ type AdminService interface {
 }
 
 type adminService struct {
-	agents map[string]AgentInfo
+	lifecycleService *lifecycle.LifecycleService
+	taintEngine      security.TaintEngine
 }
 
 func NewAdminService() AdminService {
 	return &adminService{
-		agents: make(map[string]AgentInfo),
+		lifecycleService: lifecycle.NewLifecycleServiceWithoutEngine(),
+		taintEngine:      security.NewTaintEngine(),
 	}
 }
 
@@ -37,8 +33,8 @@ func (s *adminService) ID() string {
 	return "sys:admin"
 }
 
-func (s *adminService) ListAgents() ([]AgentInfo, error) {
-	return []AgentInfo{}, nil
+func (s *adminService) ListAgents() ([]lifecycle.RuntimeInfo, error) {
+	return s.lifecycleService.List()
 }
 
 func (s *adminService) ControlAgent(id string, cmd string) error {

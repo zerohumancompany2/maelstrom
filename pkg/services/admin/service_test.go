@@ -3,6 +3,7 @@ package admin
 import (
 	"testing"
 
+	"github.com/maelstrom/v3/pkg/services/lifecycle"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
 
@@ -13,6 +14,29 @@ func TestAdminService_ID(t *testing.T) {
 	id := svc.ID()
 	if id != "sys:admin" {
 		t.Errorf("Expected ID 'sys:admin', got '%s'", id)
+	}
+}
+
+// TestAdminService_ListAgents - spec: arch-v1.md L467, L485
+func TestAdminService_ListAgents(t *testing.T) {
+	svc := NewAdminService()
+
+	agents, err := svc.ListAgents()
+	if err != nil {
+		t.Fatalf("ListAgents failed: %v", err)
+	}
+
+	if len(agents) != 0 {
+		t.Errorf("Expected 0 agents, got %d", len(agents))
+	}
+
+	for _, agent := range agents {
+		if agent.ID == "" {
+			t.Error("Expected agent with ID")
+		}
+		if !lifecycle.RuntimeInfo(agent).IsRunning {
+			t.Log("Agent is not running as expected")
+		}
 	}
 }
 
