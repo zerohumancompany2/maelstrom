@@ -26,16 +26,20 @@ type Service interface {
 
 // ServiceRegistry manages service registration and lookup.
 type ServiceRegistry struct {
-	services   map[string]Service
-	mu         sync.RWMutex
-	lifecycles map[string]string // service -> lifecycle state
+	services     map[string]Service
+	mu           sync.RWMutex
+	lifecycles   map[string]string   // service -> lifecycle state
+	capabilities map[string][]string // service -> capabilities
+	capIndex     map[string][]string // capability -> service IDs
 }
 
 // NewServiceRegistry creates a new ServiceRegistry.
 func NewServiceRegistry() *ServiceRegistry {
 	return &ServiceRegistry{
-		services:   make(map[string]Service),
-		lifecycles: make(map[string]string),
+		services:     make(map[string]Service),
+		lifecycles:   make(map[string]string),
+		capabilities: make(map[string][]string),
+		capIndex:     make(map[string][]string),
 	}
 }
 
@@ -63,6 +67,36 @@ func (sr *ServiceRegistry) RegisterWithState(svc Service, initialState string) e
 	sr.services[id] = svc
 	sr.lifecycles[id] = initialState
 	return nil
+}
+
+// RegisterWithCapabilities registers a service with the given capabilities.
+// Returns error if service is already registered.
+func (sr *ServiceRegistry) RegisterWithCapabilities(name string, svc Service, caps []string) error {
+	sr.mu.Lock()
+	defer sr.mu.Unlock()
+	if _, exists := sr.services[name]; exists {
+		return ErrAlreadyRegistered
+	}
+	sr.services[name] = svc
+	sr.capabilities[name] = caps
+	for _, cap := range caps {
+		sr.capIndex[cap] = append(sr.capIndex[cap], name)
+	}
+	return nil
+}
+
+// FindByCapability returns all services that have the given capability.
+func (sr *ServiceRegistry) FindByCapability(capability string) []Service {
+	sr.mu.RLock()
+	defer sr.mu.RUnlock()
+	serviceIDs := sr.capIndex[capability]
+	services := make([]Service, 0, len(serviceIDs))
+	for _, id := range serviceIDs {
+		if svc, ok := sr.services[id]; ok {
+			services = append(services, svc)
+		}
+	}
+	return services
 }
 
 // GetState retrieves the lifecycle state of a service.
