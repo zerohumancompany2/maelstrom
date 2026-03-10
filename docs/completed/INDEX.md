@@ -474,7 +474,7 @@ Layer 4 implements the security boundary enforcement system with taint tracking,
 
 ## Phase Plans (19 documents)
 
-All plans in `docs/layer-4/plans/`
+All plans in `layer-4/plans/`
 
 ### P1: Taint Engine Core (16 tests)
 
