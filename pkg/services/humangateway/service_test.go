@@ -399,3 +399,59 @@ func TestHumanGateway_HandleMail_ChatInterface(t *testing.T) {
 		t.Error("Expected session to be non-nil")
 	}
 }
+
+// TestHumanGateway_HandleMail_HumanInTheLoop - spec: arch-v1.md L471 (human-in-the-loop)
+func TestHumanGateway_HandleMail_HumanInTheLoop(t *testing.T) {
+	svc := NewHumanGatewayService()
+	agentID := "test-agent-001"
+
+	session, err := svc.CreateChatSession(agentID)
+	if err != nil {
+		t.Fatalf("Expected no error creating session, got %v", err)
+	}
+
+	feedbackMail := mail.Mail{
+		ID:      "feedback-001",
+		Type:    mail.MailTypeHumanFeedback,
+		Source:  "human",
+		Target:  "agent:" + agentID,
+		Content: "@pause - need to review",
+	}
+	err = svc.SendMessage(session, feedbackMail.Content.(string))
+	if err != nil {
+		t.Errorf("Expected no error sending message, got %v", err)
+	}
+
+	err = svc.HandleMail(feedbackMail)
+	if err != nil {
+		t.Errorf("Expected no error handling mail, got %v", err)
+	}
+
+	updatedSession, err := svc.CreateChatSession(agentID + "-check2")
+	if err != nil {
+		t.Fatalf("Expected no error getting session, got %v", err)
+	}
+	if updatedSession == nil {
+		t.Error("Expected session to be non-nil")
+	}
+
+	agentReply := mail.Mail{
+		ID:      "reply-001",
+		Type:    mail.MailTypeAssistant,
+		Source:  "agent:" + agentID,
+		Target:  "human",
+		Content: "Paused as requested",
+	}
+	err = svc.HandleMail(agentReply)
+	if err != nil {
+		t.Errorf("Expected no error handling agent reply, got %v", err)
+	}
+
+	finalSession, err := svc.CreateChatSession(agentID + "-check3")
+	if err != nil {
+		t.Fatalf("Expected no error getting session, got %v", err)
+	}
+	if finalSession == nil {
+		t.Error("Expected session to be non-nil")
+	}
+}
