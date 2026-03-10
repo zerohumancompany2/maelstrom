@@ -120,3 +120,20 @@ func (t *Topic) Unsubscribe(sub TopicSubscriber) error {
 
 	return errors.New("subscriber not found")
 }
+
+type SecurityService interface {
+	ValidateAndSanitize(mail any, src, tgt BoundaryType) (any, error)
+	MarkTaint(obj any, taints []string) (any, error)
+}
+
+func (r *MailRouter) RouteWithSecurity(mail Mail, securityService SecurityService) error {
+	_, err := securityService.ValidateAndSanitize(mail, mail.Metadata.Boundary, mail.Metadata.Boundary)
+	if err != nil {
+		return err
+	}
+	return r.Route(mail)
+}
+
+func (r *MailRouter) routeViolation(violation any) error {
+	return nil
+}

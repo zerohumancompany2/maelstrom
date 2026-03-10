@@ -217,3 +217,50 @@ func TestTopicSubscriber_Subscribe(t *testing.T) {
 		t.Errorf("Expected nil error, got %v", err)
 	}
 }
+
+type mockSecurityService struct {
+	validateCalled bool
+	validateMail   any
+	validateSrc    BoundaryType
+	validateTgt    BoundaryType
+}
+
+func (m *mockSecurityService) ValidateAndSanitize(mail any, src, tgt BoundaryType) (any, error) {
+	m.validateCalled = true
+	m.validateMail = mail
+	m.validateSrc = src
+	m.validateTgt = tgt
+	return mail, nil
+}
+
+func (m *mockSecurityService) MarkTaint(obj any, taints []string) (any, error) {
+	return obj, nil
+}
+
+func TestMailRouter_RouteWithSecurity_Validation(t *testing.T) {
+	router := NewMailRouter()
+
+	serviceInbox := &ServiceInbox{ID: "test-service"}
+	router.SubscribeService("test-service", serviceInbox)
+
+	mockService := &mockSecurityService{}
+
+	mail := Mail{
+		ID:     "msg-001",
+		Source: "agent:outer-agent",
+		Target: "sys:test-service",
+		Type:   MailTypeUser,
+		Metadata: MailMetadata{
+			Taints: []string{"EXTERNAL"},
+		},
+	}
+
+	err := router.RouteWithSecurity(mail, mockService)
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	if !mockService.validateCalled {
+		t.Error("Expected ValidateAndSanitize to be called")
+	}
+}
