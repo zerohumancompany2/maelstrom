@@ -64,3 +64,21 @@ func (o *Orchestrator) executeIsolated(ctx context.Context, toolCall *ToolCall) 
 		CanAccessParent: false,
 	}, nil
 }
+
+// SubAgent represents a sub-agent execution context.
+type SubAgent struct {
+	parentNs string
+	result   any
+}
+
+// NewSubAgent creates a new sub-agent.
+func NewSubAgent(parentNs string) *SubAgent {
+	return &SubAgent{
+		parentNs: parentNs,
+	}
+}
+
+// enforceAllowedOnExit enforces allowedOnExit policy on sub-agent return values.
+func (s *SubAgent) enforceAllowedOnExit(result any) (any, error) {
+	panic("not implemented")
+}

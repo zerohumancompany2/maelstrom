@@ -90,3 +90,38 @@ func TestSubAgentBoundary_ViolationOnElevation(t *testing.T) {
 		t.Errorf("Expected violation count > 0, got %d", count)
 	}
 }
+
+func TestAllowedOnExit_SubAgentReturn_CleanDataPasses(t *testing.T) {
+	// Given: A sub-agent returns a result containing only clean (untainted) data
+	cleanData := map[string]interface{}{
+		"result": "computation output",
+		"value":  42,
+	}
+
+	// Given: A policy that allows certain taints on exit
+	policy := &AllowedOnExitPolicy{
+		AllowedOnExit: []string{"TOOL_OUTPUT", "PUBLIC"},
+		Enforcement:   EnforcementStrict,
+	}
+
+	// When: allowedOnExit check is performed on the sub-agent return value
+	result, err := CheckSubAgentReturn(cleanData, policy)
+
+	// Then: Data is returned to parent agent without modification or blocking
+	if err != nil {
+		t.Fatalf("Expected no error for clean data, got %v", err)
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected result to be map[string]interface{}")
+	}
+
+	if resultMap["result"] != "computation output" {
+		t.Errorf("Expected result unchanged, got '%v'", resultMap["result"])
+	}
+
+	if resultMap["value"] != 42 {
+		t.Errorf("Expected value unchanged, got '%v'", resultMap["value"])
+	}
+}

@@ -124,3 +124,44 @@ func getPolicyForbiddenTaints(data any, allowedOnExit []string) []string {
 	}
 	return nil
 }
+
+type AllowedOnExitPolicy struct {
+	AllowedOnExit []string
+	Enforcement   EnforcementMode
+	RedactRules   []RedactRule
+}
+
+func CheckSubAgentReturn(result any, policy *AllowedOnExitPolicy) (any, error) {
+	if policy == nil {
+		return result, nil
+	}
+
+	switch v := result.(type) {
+	case map[string]interface{}:
+		_, hasTaints := v["_taints"].([]string)
+		if !hasTaints {
+			return result, nil
+		}
+
+		forbidden := getPolicyForbiddenTaints(result, policy.AllowedOnExit)
+		if len(forbidden) == 0 {
+			return result, nil
+		}
+
+		if policy.Enforcement == EnforcementStrict {
+			return nil, fmt.Errorf("forbidden taints in sub-agent return: %v", forbidden)
+		}
+
+		if policy.Enforcement == EnforcementRedact {
+			return applyRedaction(result, policy.RedactRules)
+		}
+
+		if policy.Enforcement == EnforcementAudit {
+			logAuditViolations(result, policy.AllowedOnExit, DMZBoundary)
+			return result, nil
+		}
+		return result, nil
+	default:
+		return result, nil
+	}
+}
