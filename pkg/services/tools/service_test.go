@@ -725,3 +725,15 @@ func TestToolDescriptor_HasTaintOutputField(t *testing.T) {
 		t.Errorf("Expected 2 taint outputs, got %d", len(innerTool.TaintOutput))
 	}
 }
+
+// arch-v1.md L568: Type field for sub-agent identification
+func TestToolDescriptor_TypeField(t *testing.T) {
+	tool := ToolDescriptor{
+		Name: "subAgentResearch",
+		Type: "attachedSubAgent",
+	}
+
+	if tool.Type != "attachedSubAgent" {
+		t.Errorf("Expected 'attachedSubAgent', got '%s'", tool.Type)
+	}
+}

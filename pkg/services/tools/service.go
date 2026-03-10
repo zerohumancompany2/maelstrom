@@ -33,6 +33,7 @@ type ToolDescriptor struct {
 	Schema      map[string]any
 	Isolation   string
 	TaintOutput []string
+	Type        string
 }
 
 type toolsService struct {
