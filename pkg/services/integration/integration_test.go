@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/maelstrom/v3/pkg/mail"
+	pkgsecurity "github.com/maelstrom/v3/pkg/security"
 	"github.com/maelstrom/v3/pkg/services/admin"
 	"github.com/maelstrom/v3/pkg/services/communication"
 	"github.com/maelstrom/v3/pkg/services/datasources"
@@ -12,6 +13,7 @@ import (
 	"github.com/maelstrom/v3/pkg/services/humangateway"
 	"github.com/maelstrom/v3/pkg/services/memory"
 	"github.com/maelstrom/v3/pkg/services/persistence"
+	svcsecurity "github.com/maelstrom/v3/pkg/services/security"
 	"github.com/maelstrom/v3/pkg/services/tools"
 )
 
@@ -225,5 +227,133 @@ func TestServicesIntegration_MailRouting(t *testing.T) {
 		// Both services should be able to HandleMail
 		_ = senderService.HandleMail(crossMail)
 		_ = receiverService.HandleMail(crossMail)
+	})
+}
+
+func TestServicesIntegration_MailBoundaryEnforcement(t *testing.T) {
+	securitySvc := svcsecurity.NewSecurityService()
+
+	// Test boundary enforcement on mail exchange
+	t.Run("Boundary enforcement", func(t *testing.T) {
+		// Create mail with boundary
+		boundaryMail := mail.Mail{
+			ID:     "boundary-test-1",
+			Type:   mail.MailTypeUser,
+			Source: "agent:inner",
+			Target: "agent:outer",
+			Content: map[string]any{
+				"message": "boundary test",
+			},
+			Metadata: mail.MailMetadata{
+				Boundary: mail.InnerBoundary,
+			},
+		}
+
+		// Security service should handle boundary enforcement
+		_ = securitySvc.HandleMail(&boundaryMail)
+	})
+
+	// Test taints tracked across mail boundaries
+	t.Run("Taints tracked across boundaries", func(t *testing.T) {
+		taintedMail := mail.Mail{
+			ID:     "taint-test-1",
+			Type:   mail.MailTypeUser,
+			Source: "agent:inner",
+			Target: "agent:dmz",
+			Content: map[string]any{
+				"message": "taint test",
+			},
+			Metadata: mail.MailMetadata{
+				Boundary: mail.InnerBoundary,
+				Taints:   []string{"SECRET", "INNER_ONLY"},
+			},
+		}
+
+		// Verify mail has taints
+		if len(taintedMail.Metadata.Taints) == 0 {
+			t.Error("Mail should have taints")
+		}
+
+		// Track taints
+		_ = securitySvc.TrackTaint("agent:inner", "taint-test-1", "SECRET")
+
+		// Verify taints are tracked
+		taintMap, err := securitySvc.ReportTaints("agent:inner")
+		if err != nil {
+			t.Fatalf("Failed to report taints: %v", err)
+		}
+
+		if len(taintMap) == 0 {
+			t.Error("Taints not tracked")
+		}
+	})
+
+	// Test cross-boundary mail blocked or flagged
+	t.Run("Cross-boundary mail blocked", func(t *testing.T) {
+		// Create mail that violates boundary policy
+		violationMail := mail.Mail{
+			ID:     "violation-test-1",
+			Type:   mail.MailTypeUser,
+			Source: "agent:inner",
+			Target: "agent:outer",
+			Content: map[string]any{
+				"message": "violation test",
+			},
+			Metadata: mail.MailMetadata{
+				Boundary: mail.InnerBoundary,
+				Taints:   []string{"INNER_ONLY"},
+			},
+		}
+
+		// Validate and sanitize - should fail for INNER_ONLY to outer
+		_, err := securitySvc.ValidateAndSanitize(violationMail, mail.InnerBoundary, mail.OuterBoundary)
+		if err == nil {
+			t.Error("Expected error for cross-boundary violation")
+		} else {
+			t.Logf("Expected error: %v", err)
+		}
+	})
+
+	// Test taint propagation
+	t.Run("Taint propagation", func(t *testing.T) {
+		data := map[string]interface{}{
+			"key": "value",
+		}
+
+		// Propagate taints
+		propagated, err := securitySvc.TaintPropagate(data, []string{"USER_SUPPLIED"})
+		if err != nil {
+			t.Fatalf("Failed to propagate taints: %v", err)
+		}
+
+		propagatedMap, ok := propagated.(map[string]interface{})
+		if !ok {
+			t.Error("Propagated data is not a map")
+		}
+
+		if _, hasTaints := propagatedMap["_taints"]; !hasTaints {
+			t.Error("Taints not propagated to data")
+		}
+	})
+
+	// Test taint policy check
+	t.Run("Taint policy enforcement", func(t *testing.T) {
+		policy := pkgsecurity.TaintPolicy{
+			AllowedForBoundary: []pkgsecurity.BoundaryType{pkgsecurity.InnerBoundary},
+		}
+
+		taintedData := map[string]interface{}{
+			"key":     "value",
+			"_taints": []string{"INNER_ONLY"},
+		}
+
+		allowed, err := securitySvc.CheckTaintPolicy(taintedData, mail.OuterBoundary, policy)
+		if err != nil {
+			t.Fatalf("Failed to check taint policy: %v", err)
+		}
+
+		if allowed {
+			t.Error("INNER_ONLY taint should not be allowed on outer boundary")
+		}
 	})
 }
