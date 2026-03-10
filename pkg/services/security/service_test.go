@@ -884,3 +884,82 @@ func TestSecurityService_TaintPropagate_sliceObjects(t *testing.T) {
 		t.Error("Expected _taints key to be added to second item")
 	}
 }
+
+func TestRuntimeTaintQuery_ReturnsActiveTaints(t *testing.T) {
+	svc := NewSecurityService()
+
+	_ = svc.TrackTaint("agent-789", "user-profile", "PII")
+	_ = svc.TrackTaint("agent-789", "user-profile", "SECRET")
+	_ = svc.TrackTaint("agent-789", "internal-config", "INNER_ONLY")
+	_ = svc.TrackTaint("agent-789", "api-key", "SECRET")
+
+	taintMap, err := svc.ReportTaints("agent-789")
+
+	if err != nil {
+		t.Errorf("Expected ReportTaints to return nil error, got %v", err)
+	}
+
+	if taintMap == nil {
+		t.Error("Expected ReportTaints to return non-nil TaintMap")
+	}
+
+	userProfileTaints, ok := taintMap["user-profile"]
+	if !ok {
+		t.Error("Expected user-profile to be in TaintMap")
+	}
+
+	hasPII := false
+	hasSecret := false
+	for _, t := range userProfileTaints {
+		if t == "PII" {
+			hasPII = true
+		}
+		if t == "SECRET" {
+			hasSecret = true
+		}
+	}
+
+	if !hasPII {
+		t.Error("Expected user-profile to have PII taint")
+	}
+
+	if !hasSecret {
+		t.Error("Expected user-profile to have SECRET taint")
+	}
+
+	internalConfigTaints, ok := taintMap["internal-config"]
+	if !ok {
+		t.Error("Expected internal-config to be in TaintMap")
+	}
+
+	hasInnerOnly := false
+	for _, t := range internalConfigTaints {
+		if t == "INNER_ONLY" {
+			hasInnerOnly = true
+		}
+	}
+
+	if !hasInnerOnly {
+		t.Error("Expected internal-config to have INNER_ONLY taint")
+	}
+
+	apiKeyTaints, ok := taintMap["api-key"]
+	if !ok {
+		t.Error("Expected api-key to be in TaintMap")
+	}
+
+	hasApiKeySecret := false
+	for _, t := range apiKeyTaints {
+		if t == "SECRET" {
+			hasApiKeySecret = true
+		}
+	}
+
+	if !hasApiKeySecret {
+		t.Error("Expected api-key to have SECRET taint")
+	}
+
+	if len(taintMap) != 3 {
+		t.Errorf("Expected 3 objects in TaintMap, got %d", len(taintMap))
+	}
+}

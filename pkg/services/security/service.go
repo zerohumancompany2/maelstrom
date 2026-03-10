@@ -1,7 +1,9 @@
 package security
 
 import (
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/security"
@@ -10,6 +12,14 @@ import (
 type SecurityService struct {
 	mu          sync.Mutex
 	taintTracks map[string]security.TaintMap
+	publisher   mail.Publisher
+}
+
+type TaintViolationEvent struct {
+	RuntimeID string
+	ObjectID  string
+	Taints    []string
+	Reason    string
 }
 
 type NotImplementedError struct{}
@@ -22,6 +32,36 @@ func NewSecurityService() *SecurityService {
 	return &SecurityService{
 		taintTracks: make(map[string]security.TaintMap),
 	}
+}
+
+func (s *SecurityService) SetPublisher(publisher mail.Publisher) {
+	s.publisher = publisher
+}
+
+func (s *SecurityService) EmitTaintViolation(runtimeId, objectID string, taints []string, reason string) error {
+	if s.publisher == nil {
+		return nil
+	}
+
+	event := TaintViolationEvent{
+		RuntimeID: runtimeId,
+		ObjectID:  objectID,
+		Taints:    taints,
+		Reason:    reason,
+	}
+
+	mail := mail.Mail{
+		ID:        fmt.Sprintf("taint-violation-%s-%s", runtimeId, objectID),
+		Type:      mail.MailTypeTaintViolation,
+		Source:    "sys:security",
+		Target:    "sys:observability",
+		Content:   event,
+		Metadata:  mail.MailMetadata{},
+		CreatedAt: time.Now(),
+	}
+
+	_, err := s.publisher.Publish(mail)
+	return err
 }
 
 func (s *SecurityService) ID() string {
