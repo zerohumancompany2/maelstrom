@@ -163,3 +163,41 @@ func TestGatewayService_NormalizeInbound_UnregisteredAdapterReturnsError(t *test
 		t.Error("Expected nil mail for unregistered adapter, got non-nil")
 	}
 }
+
+// TestGatewayService_NormalizeInbound_ContentNormalization - Spec: arch-v1.md L670-671
+func TestGatewayService_NormalizeInbound_ContentNormalization(t *testing.T) {
+	svc := NewGatewayService()
+
+	// Register adapter first
+	if err := svc.RegisterAdapter("webhook", &WebhookAdapter{}); err != nil {
+		t.Fatalf("Failed to register adapter: %v", err)
+	}
+
+	rawMessage := map[string]any{
+		"from":    "user@example.com",
+		"subject": "Test Message",
+		"body":    "Hello, World!",
+	}
+
+	m, err := svc.NormalizeInbound("webhook", rawMessage)
+	if err != nil {
+		t.Fatalf("NormalizeInbound failed: %v", err)
+	}
+
+	if m.Type != mail.MailReceived {
+		t.Errorf("Expected mail type 'mail_received', got '%s'", m.Type)
+	}
+
+	if m.Metadata.Adapter != "webhook" {
+		t.Errorf("Expected adapter 'webhook', got '%s'", m.Metadata.Adapter)
+	}
+
+	content, ok := m.Content.(string)
+	if !ok {
+		t.Errorf("Expected content to be string, got %T", m.Content)
+	}
+
+	if content == "" {
+		t.Error("Expected non-empty normalized content")
+	}
+}

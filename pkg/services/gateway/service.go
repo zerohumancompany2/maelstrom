@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/json"
 	"errors"
 
 	"github.com/maelstrom/v3/pkg/mail"
@@ -115,13 +116,31 @@ func (g *gatewayService) NormalizeInbound(adapterName string, rawMessage any) (*
 		return nil, errors.New("adapter not registered")
 	}
 
+	normalizedContent, err := normalizeContent(rawMessage)
+	if err != nil {
+		return nil, err
+	}
+
 	return &mail.Mail{
 		Type:    mail.MailReceived,
-		Content: rawMessage,
+		Content: normalizedContent,
 		Metadata: mail.MailMetadata{
 			Adapter: adapterName,
 		},
 	}, nil
+}
+
+func normalizeContent(rawMessage any) (string, error) {
+	switch v := rawMessage.(type) {
+	case string:
+		return v, nil
+	default:
+		jsonBytes, err := json.Marshal(rawMessage)
+		if err != nil {
+			return "", err
+		}
+		return string(jsonBytes), nil
+	}
 }
 
 // NormalizeOutbound normalizes outbound mail to channel-specific format
