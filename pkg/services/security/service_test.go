@@ -323,6 +323,73 @@ func TestSecurityService_NamespaceIsolate_FilteredView(t *testing.T) {
 	}
 }
 
+func TestSecurityService_CheckTaintPolicy_EnforcementModes(t *testing.T) {
+	svc := NewSecurityService()
+
+	dataWithTaints := map[string]interface{}{
+		"name":    "test",
+		"_taints": []string{"PII", "INNER_ONLY"},
+	}
+
+	strictPolicy := security.TaintPolicy{
+		RedactMode: "strict",
+		AllowedForBoundary: []security.BoundaryType{
+			security.InnerBoundary,
+		},
+	}
+
+	allowed, err := svc.CheckTaintPolicy(dataWithTaints, mail.OuterBoundary, strictPolicy)
+
+	if err != nil {
+		t.Errorf("Expected CheckTaintPolicy to return nil error, got %v", err)
+	}
+
+	if allowed {
+		t.Error("Expected CheckTaintPolicy to return false for forbidden taints in strict mode")
+	}
+
+	auditPolicy := security.TaintPolicy{
+		RedactMode: "audit",
+		AllowedForBoundary: []security.BoundaryType{
+			security.InnerBoundary,
+			security.OuterBoundary,
+		},
+	}
+
+	allowed2, err := svc.CheckTaintPolicy(dataWithTaints, mail.OuterBoundary, auditPolicy)
+
+	if err != nil {
+		t.Errorf("Expected CheckTaintPolicy to return nil error, got %v", err)
+	}
+
+	if !allowed2 {
+		t.Error("Expected CheckTaintPolicy to return true for allowed taints in audit mode")
+	}
+
+	allowedData := map[string]interface{}{
+		"name":    "test",
+		"_taints": []string{"INTERNAL"},
+	}
+
+	outerAllowedPolicy := security.TaintPolicy{
+		RedactMode: "strict",
+		AllowedForBoundary: []security.BoundaryType{
+			security.InnerBoundary,
+			security.OuterBoundary,
+		},
+	}
+
+	allowed3, err := svc.CheckTaintPolicy(allowedData, mail.OuterBoundary, outerAllowedPolicy)
+
+	if err != nil {
+		t.Errorf("Expected CheckTaintPolicy to return nil error, got %v", err)
+	}
+
+	if !allowed3 {
+		t.Error("Expected CheckTaintPolicy to return true for allowed taints")
+	}
+}
+
 func TestSecurityService_TaintPropagate_addTaints(t *testing.T) {
 	svc := NewSecurityService()
 

@@ -138,7 +138,51 @@ func (s *SecurityService) PrepareContextForBoundary(runtimeId string, boundary m
 }
 
 func (s *SecurityService) CheckTaintPolicy(data any, targetBoundary mail.BoundaryType, policy security.TaintPolicy) (bool, error) {
-	return false, NotImplementedError{}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	taints := s.extractTaints(data)
+
+	if policy.RedactMode == "strict" {
+		for _, taint := range taints {
+			if taint == "INNER_ONLY" || taint == "SECRET" {
+				if targetBoundary != mail.InnerBoundary {
+					return false, nil
+				}
+			}
+			if taint == "PII" {
+				if targetBoundary == mail.OuterBoundary {
+					return false, nil
+				}
+			}
+		}
+	}
+
+	allowedSet := make(map[security.BoundaryType]bool)
+	for _, b := range policy.AllowedForBoundary {
+		allowedSet[b] = true
+	}
+
+	secTargetBoundary := security.BoundaryType(targetBoundary)
+	if !allowedSet[secTargetBoundary] {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func (s *SecurityService) extractTaints(data any) []string {
+	dataMap, ok := data.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	taints, ok := dataMap["_taints"].([]string)
+	if !ok {
+		return nil
+	}
+
+	return taints
 }
 
 func (s *SecurityService) NamespaceIsolate(runtimeId string, operation string) (security.IsolatedView, error) {
