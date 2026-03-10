@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/maelstrom/v3/pkg/datasource"
+	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/security"
 )
 
@@ -15,6 +16,7 @@ type DatasourceService interface {
 	GetTaints(path string) ([]string, error)
 	ValidateAccess(path string, boundary security.BoundaryType) error
 	Register(name string, ds datasource.DataSource) error
+	AttachTaintsOnRead(m *mail.Mail, path string) *mail.Mail
 }
 
 type datasourceService struct {
@@ -90,6 +92,21 @@ func (s *datasourceService) Register(name string, ds datasource.DataSource) erro
 	}
 	s.datasources[name] = ds
 	return nil
+}
+
+func (s *datasourceService) AttachTaintsOnRead(m *mail.Mail, path string) *mail.Mail {
+	taints, _ := s.GetTaints(path)
+	existing := make(map[string]bool)
+	for _, t := range m.Metadata.Taints {
+		existing[t] = true
+	}
+	for _, t := range taints {
+		if !existing[t] {
+			m.Metadata.Taints = append(m.Metadata.Taints, t)
+			existing[t] = true
+		}
+	}
+	return m
 }
 
 type LocalDiskDatasource struct{}

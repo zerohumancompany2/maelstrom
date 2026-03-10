@@ -3,6 +3,7 @@ package datasources
 import (
 	"testing"
 
+	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/security"
 )
 
@@ -299,5 +300,39 @@ func TestDataSourceService_ValidateAccess(t *testing.T) {
 	err = svc.ValidateAccess("/path/inner.txt", security.InnerBoundary)
 	if err != nil {
 		t.Errorf("Inner boundary should access inner taints: %v", err)
+	}
+}
+
+// TestDataSourceService_TaintAttachment - arch-v1.md L1312: attach taints at file read
+func TestDataSourceService_TaintAttachment(t *testing.T) {
+	svc := NewDatasourceService()
+
+	err := svc.TagOnWrite("/path/to/file.txt", []string{"confidential", "internal"})
+	if err != nil {
+		t.Fatalf("TagOnWrite failed: %v", err)
+	}
+
+	mail := &mail.Mail{
+		Type:     mail.MailTypeUser,
+		Source:   "user",
+		Target:   "agent",
+		Content:  "read /path/to/file.txt",
+		Metadata: mail.MailMetadata{},
+	}
+
+	result := svc.AttachTaintsOnRead(mail, "/path/to/file.txt")
+	if result == nil {
+		t.Fatal("AttachTaintsOnRead returned nil")
+	}
+
+	if len(result.Metadata.Taints) != 2 {
+		t.Errorf("Expected 2 taints in mail metadata, got %d", len(result.Metadata.Taints))
+	}
+
+	expected := map[string]bool{"confidential": true, "internal": true}
+	for _, taint := range result.Metadata.Taints {
+		if !expected[taint] {
+			t.Errorf("Unexpected taint in mail: %s", taint)
+		}
 	}
 }
