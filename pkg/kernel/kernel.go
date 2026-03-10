@@ -10,6 +10,7 @@ import (
 
 	"github.com/maelstrom/v3/pkg/bootstrap"
 	"github.com/maelstrom/v3/pkg/runtime"
+	"github.com/maelstrom/v3/pkg/security"
 	"github.com/maelstrom/v3/pkg/services/communication"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
@@ -64,8 +65,9 @@ func (k *kernelApplicationContext) Get(key string, callerBoundary string) (inter
 		return nil, nil, nil
 	}
 	storedTaints := k.taints[key]
-	returnedTaints := make([]string, len(storedTaints))
-	copy(returnedTaints, storedTaints)
+	filteredTaints, _ := security.EnforceTransition(security.InnerBoundary, security.BoundaryType(callerBoundary), storedTaints)
+	returnedTaints := make([]string, len(filteredTaints))
+	copy(returnedTaints, filteredTaints)
 	return val, returnedTaints, nil
 }
 

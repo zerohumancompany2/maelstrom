@@ -784,6 +784,40 @@ func TestApplicationContext_SetTaints_StoresWithKey(t *testing.T) {
 	}
 }
 
+func TestApplicationContext_BoundaryFilter_HidesForbidden(t *testing.T) {
+	appCtx := &kernelApplicationContext{
+		kernel: &Kernel{},
+		data:   make(map[string]interface{}),
+		taints: make(map[string][]string),
+	}
+
+	testKey := "inner-secret"
+	testValue := "secret-value"
+	testTaints := []string{"INNER_ONLY", "SECRET"}
+
+	err := appCtx.Set(testKey, testValue, testTaints, "inner")
+	if err != nil {
+		t.Fatalf("Set() returned error: %v", err)
+	}
+
+	_, retrievedTaints, err := appCtx.Get(testKey, "outer")
+	if err != nil {
+		t.Fatalf("Get() returned error: %v", err)
+	}
+
+	hasForbidden := false
+	for _, taint := range retrievedTaints {
+		if taint == "INNER_ONLY" || taint == "SECRET" {
+			hasForbidden = true
+			break
+		}
+	}
+
+	if hasForbidden {
+		t.Error("Get() should filter out INNER_ONLY and SECRET taints for outer boundary")
+	}
+}
+
 func TestKernel_BootstrapServices(t *testing.T) {
 	kernel := &Kernel{
 		engine:       statechart.NewEngine(),
