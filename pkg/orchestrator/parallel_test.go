@@ -26,7 +26,7 @@ func TestParallel_Continue_ExecutesConcurrently(t *testing.T) {
 	}
 
 	// Collect all results
-	results := make([]ExecutionResult, 0, 3)
+	results := make([]ExecutionResultWithTool, 0, 3)
 	for result := range resultChan {
 		results = append(results, result)
 	}
@@ -54,7 +54,7 @@ func TestParallel_Continue_CollectsAllResults(t *testing.T) {
 	}
 
 	// Collect all results
-	results := make([]ExecutionResult, 0, 3)
+	results := make([]ExecutionResultWithTool, 0, 3)
 	for result := range resultChan {
 		results = append(results, result)
 	}
@@ -89,7 +89,7 @@ func TestParallel_Continue_FailureDoesNotStopOthers(t *testing.T) {
 	}
 
 	// Collect all results
-	results := make([]ExecutionResult, 0, 3)
+	results := make([]ExecutionResultWithTool, 0, 3)
 	for result := range resultChan {
 		results = append(results, result)
 	}
@@ -97,5 +97,37 @@ func TestParallel_Continue_FailureDoesNotStopOthers(t *testing.T) {
 	// All tools should execute even if one fails
 	if len(results) != 3 {
 		t.Errorf("Expected 3 results (all tools executed), got %d", len(results))
+	}
+}
+
+func TestParallel_Continue_ResultsOrderedByToolName(t *testing.T) {
+	// Given
+	executor := NewParallelExecutor(PolicyParContinue)
+	toolCalls := []ToolCall{
+		{Name: "zebra-tool", Arguments: map[string]any{"value": "result1"}},
+		{Name: "alpha-tool", Arguments: map[string]any{"value": "result2"}},
+		{Name: "middle-tool", Arguments: map[string]any{"value": "result3"}},
+	}
+
+	// When
+	resultChan, err := executor.Execute(toolCalls)
+
+	// Then
+	if err != nil {
+		t.Errorf("Expected Execute() to return nil error, got %v", err)
+	}
+
+	// Collect all results with tool names
+	results := make([]ExecutionResultWithTool, 0, 3)
+	for result := range resultChan {
+		results = append(results, result)
+	}
+
+	// Verify results are ordered by tool name
+	expectedOrder := []string{"alpha-tool", "middle-tool", "zebra-tool"}
+	for i, expected := range expectedOrder {
+		if results[i].ToolName != expected {
+			t.Errorf("Expected result %d to be for tool '%s', got '%s'", i, expected, results[i].ToolName)
+		}
 	}
 }

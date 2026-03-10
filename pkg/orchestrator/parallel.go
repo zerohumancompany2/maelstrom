@@ -1,6 +1,7 @@
 package orchestrator
 
 import (
+	"sort"
 	"sync"
 )
 
@@ -21,26 +22,39 @@ func NewParallelExecutor(policy ExecutionPolicy) *ParallelExecutor {
 }
 
 // Execute executes tool calls concurrently according to the par_continue policy.
-func (e *ParallelExecutor) Execute(tools []ToolCall) (<-chan ExecutionResult, error) {
-	resultChan := make(chan ExecutionResult, len(tools))
+func (e *ParallelExecutor) Execute(tools []ToolCall) (<-chan ExecutionResultWithTool, error) {
+	resultChan := make(chan ExecutionResultWithTool, len(tools))
 	var wg sync.WaitGroup
+	results := make([]ExecutionResultWithTool, 0, len(tools))
+	var mu sync.Mutex
 
 	for _, toolCall := range tools {
 		wg.Add(1)
 		go func(tc ToolCall) {
 			defer wg.Done()
-			result := ExecutionResult{
-				Output: map[string]any{
-					"tool": tc.Name,
-					"args": tc.Arguments,
+			result := ExecutionResultWithTool{
+				ToolName: tc.Name,
+				ExecutionResult: ExecutionResult{
+					Output: map[string]any{
+						"tool": tc.Name,
+						"args": tc.Arguments,
+					},
 				},
 			}
-			resultChan <- result
+			mu.Lock()
+			results = append(results, result)
+			mu.Unlock()
 		}(toolCall)
 	}
 
 	go func() {
 		wg.Wait()
+		sort.Slice(results, func(i, j int) bool {
+			return results[i].ToolName < results[j].ToolName
+		})
+		for _, result := range results {
+			resultChan <- result
+		}
 		close(resultChan)
 	}()
 
