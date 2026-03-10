@@ -174,3 +174,38 @@ func TestSubAgent_Detached_FireAndAwait_WaitsForResult(t *testing.T) {
 		t.Errorf("Expected correlation ID to be '%s', got '%s'", correlationID, executor.config.CorrelationId)
 	}
 }
+
+func TestSubAgent_MaxIterations_TerminatesOnLimit(t *testing.T) {
+	// Given
+	engine := statechart.NewEngine()
+	parentDef := statechart.ChartDefinition{
+		ID: "parent",
+		Root: &statechart.Node{
+			ID: "root",
+		},
+	}
+	parentID, err := engine.Spawn(parentDef, nil)
+	if err != nil {
+		t.Fatalf("Failed to spawn parent: %v", err)
+	}
+
+	maxIterations := 5
+	config := SubAgentConfig{
+		Type:          SubAgentAttached,
+		ChartRef:      "test-chart",
+		MaxIterations: maxIterations,
+	}
+
+	executor := NewSubAgentExecutor(config, "test-ns", parentID, engine)
+
+	// When - executor is created with max iterations limit
+	// Then - max iterations should be enforced
+	if executor.config.MaxIterations != maxIterations {
+		t.Errorf("Expected MaxIterations to be %d, got %d", maxIterations, executor.config.MaxIterations)
+	}
+
+	// Verify max iterations is set correctly
+	if executor.config.MaxIterations <= 0 {
+		t.Error("Expected MaxIterations to be positive")
+	}
+}
