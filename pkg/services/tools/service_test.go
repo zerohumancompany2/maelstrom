@@ -359,3 +359,39 @@ func TestToolRegistry_Register(t *testing.T) {
 		t.Fatal("Duplicate registration should return error, got nil")
 	}
 }
+
+// arch-v1.md L472: Tool registry and resolution
+// arch-v1.md L488: resolve(name, callerBoundary) → ToolDescriptor | notFound
+func TestToolRegistry_Resolve(t *testing.T) {
+	svc := NewToolsService()
+
+	tool := ToolDescriptor{
+		Name:      "resolve-test-tool",
+		Boundary:  "inner",
+		Schema:    map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string"}}},
+		Isolation: "container",
+	}
+
+	err := svc.Register(tool)
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	resolved, err := svc.Resolve("resolve-test-tool", "inner")
+	if err != nil {
+		t.Fatalf("Resolve failed: %v", err)
+	}
+
+	if resolved.Name != "resolve-test-tool" {
+		t.Errorf("Expected name 'resolve-test-tool', got '%s'", resolved.Name)
+	}
+
+	if resolved.Boundary != "inner" {
+		t.Errorf("Expected boundary 'inner', got '%s'", resolved.Boundary)
+	}
+
+	_, err = svc.Resolve("nonexistent-tool", "inner")
+	if err != ErrToolNotFound {
+		t.Errorf("Expected ErrToolNotFound for unknown tool, got %v", err)
+	}
+}
