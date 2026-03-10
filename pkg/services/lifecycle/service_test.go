@@ -849,3 +849,39 @@ func TestHardcodedServices_LifecycleSpawnTracking(t *testing.T) {
 		t.Errorf("Expected Boundary InnerBoundary, got %s", info.Boundary)
 	}
 }
+
+func TestLifecycleService_stopGracefullyTerminatesAgent(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-agent",
+		Version:      "1.0.0",
+		InitialState: "idle",
+	}
+
+	runtimeID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	runtimesBefore, err := svc.List()
+	if err != nil {
+		t.Fatalf("List failed before Stop: %v", err)
+	}
+	if len(runtimesBefore) != 1 {
+		t.Fatalf("Expected 1 runtime before Stop, got %d", len(runtimesBefore))
+	}
+
+	err = svc.Stop(runtimeID)
+	if err != nil {
+		t.Errorf("Expected Stop to return nil, got %v", err)
+	}
+
+	runtimesAfter, err := svc.List()
+	if err != nil {
+		t.Fatalf("List failed after Stop: %v", err)
+	}
+	if len(runtimesAfter) != 0 {
+		t.Errorf("Expected 0 runtimes after Stop, got %d", len(runtimesAfter))
+	}
+}

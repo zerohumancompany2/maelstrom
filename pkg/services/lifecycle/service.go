@@ -99,9 +99,24 @@ func (l *LifecycleService) Spawn(def statechart.ChartDefinition) (statechart.Run
 
 func (l *LifecycleService) Stop(id statechart.RuntimeID) error {
 	if l.engine == nil {
+		l.mu.Lock()
+		delete(l.runtimes, id)
+		runtimeID := string(id)
+		delete(l.stateHistory, runtimeID)
+		delete(l.savedStates, runtimeID)
+		l.mu.Unlock()
 		return nil
 	}
-	return l.engine.Control(id, statechart.CmdStop)
+	err := l.engine.Control(id, statechart.CmdStop)
+	if err == nil {
+		l.mu.Lock()
+		delete(l.runtimes, id)
+		runtimeID := string(id)
+		delete(l.stateHistory, runtimeID)
+		delete(l.savedStates, runtimeID)
+		l.mu.Unlock()
+	}
+	return err
 }
 
 func (l *LifecycleService) Control(id statechart.RuntimeID, cmd statechart.ControlCmd) error {
