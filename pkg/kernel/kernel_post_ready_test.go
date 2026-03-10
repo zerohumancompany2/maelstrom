@@ -184,3 +184,79 @@ metadata:
 		t.Errorf("Expected service 'sys:gateway', got '%s'", services[0].Metadata.Name)
 	}
 }
+
+// TestChartRegistry_coreNonCoreSeparation verifies core/non-core service separation
+func TestChartRegistry_coreNonCoreSeparation(t *testing.T) {
+	// Create services directory with YAML files
+	servicesDir := "var/maelstrom/services/"
+	os.MkdirAll(servicesDir, 0755)
+	defer os.RemoveAll(servicesDir)
+
+	// Create core service YAML
+	coreYAML := `apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:security
+  core: true
+spec:
+  chartRef: charts/sys-security
+  requiredForKernelReady: true
+`
+	corePath := filepath.Join(servicesDir, "sys-security.yaml")
+	err := os.WriteFile(corePath, []byte(coreYAML), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create core service YAML: %v", err)
+	}
+
+	// Create non-core service YAML
+	nonCoreYAML := `apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:gateway
+spec:
+  chartRef: charts/sys-gateway
+`
+	nonCorePath := filepath.Join(servicesDir, "sys-gateway.yaml")
+	err = os.WriteFile(nonCorePath, []byte(nonCoreYAML), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create non-core service YAML: %v", err)
+	}
+
+	// Load all services
+	registry := platform.NewChartRegistry(servicesDir)
+	services, err := registry.LoadPlatformServices()
+	if err != nil {
+		t.Fatalf("Failed to load platform services: %v", err)
+	}
+
+	// Verify total services
+	if len(services) != 2 {
+		t.Errorf("Expected 2 services loaded, got %d", len(services))
+	}
+
+	// Get core services
+	coreServices := registry.GetCoreServices(services)
+	if len(coreServices) != 1 {
+		t.Errorf("Expected 1 core service, got %d", len(coreServices))
+	}
+
+	if coreServices[0].Metadata.Name != "sys:security" {
+		t.Errorf("Expected core service 'sys:security', got '%s'", coreServices[0].Metadata.Name)
+	}
+
+	// Get non-core services
+	nonCoreServices := registry.GetNonCoreServices(services)
+	if len(nonCoreServices) != 1 {
+		t.Errorf("Expected 1 non-core service, got %d", len(nonCoreServices))
+	}
+
+	if nonCoreServices[0].Metadata.Name != "sys:gateway" {
+		t.Errorf("Expected non-core service 'sys:gateway', got '%s'", nonCoreServices[0].Metadata.Name)
+	}
+
+	// Validate core services
+	err = registry.ValidateCoreServices(services)
+	if err != nil {
+		t.Errorf("Core services validation failed: %v", err)
+	}
+}
