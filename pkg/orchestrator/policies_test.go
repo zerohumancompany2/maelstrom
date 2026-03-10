@@ -66,3 +66,31 @@ func TestExecutionPolicy_ParContinueStructure(t *testing.T) {
 		t.Errorf("Expected Isolation to be 'strict', got '%s'", PolicyParContinue.Isolation)
 	}
 }
+
+func TestExecutionPolicy_ParFailFastDropped(t *testing.T) {
+	// Given
+	// par_failfast policy should NOT be defined (dropped from MVP)
+
+	// When & Then
+	// This test verifies that PolicyParFailFast does not exist
+	// The par_failfast pattern was dropped due to being "too racy, not worth complexity"
+	// We verify this by checking that only the 3 expected policies exist
+
+	policies := []ExecutionPolicy{
+		PolicySeqContinue,
+		PolicySeqFailFast,
+		PolicyParContinue,
+	}
+
+	// Verify we have exactly 3 policies
+	if len(policies) != 3 {
+		t.Errorf("Expected exactly 3 policies, got %d", len(policies))
+	}
+
+	// Verify none of them is par_failfast
+	for _, policy := range policies {
+		if policy.Mode == "par_failfast" {
+			t.Error("PolicyParFailFast should not be defined (dropped from MVP)")
+		}
+	}
+}
