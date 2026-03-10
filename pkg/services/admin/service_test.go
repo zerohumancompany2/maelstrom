@@ -132,3 +132,39 @@ func TestAdminService_TokenCreation(t *testing.T) {
 		t.Error("Expected expired token to fail verification")
 	}
 }
+
+// TestHotreloadableServices_Admin2FAEnforcement - spec: arch-v1.md L467 (2FA-gated), L485 (authToken parameter)
+func TestHotreloadableServices_Admin2FAEnforcement(t *testing.T) {
+	svc := NewAdminService()
+
+	err := svc.ExecuteCommand("list", "")
+	if err == nil {
+		t.Error("Expected error for empty 2FA token")
+	}
+
+	err = svc.ExecuteCommand("list", "invalid-token")
+	if err == nil {
+		t.Error("Expected error for invalid 2FA token")
+	}
+
+	adminSvc := svc.(*adminService)
+	validToken, err := adminSvc.authManager.CreateToken("admin", time.Hour)
+	if err != nil {
+		t.Fatalf("Failed to create token: %v", err)
+	}
+
+	err = svc.ExecuteCommand("list", validToken)
+	if err != nil {
+		t.Errorf("Expected no error for valid 2FA token, got %v", err)
+	}
+
+	err = adminSvc.ExecuteCommandOnBoundary("list", validToken, mail.InnerBoundary)
+	if err == nil {
+		t.Error("Expected error for inner boundary access")
+	}
+
+	err = adminSvc.ExecuteCommandOnBoundary("list", validToken, mail.OuterBoundary)
+	if err != nil {
+		t.Errorf("Expected no error for outer boundary access, got %v", err)
+	}
+}
