@@ -206,3 +206,38 @@ func TestDataSourceService_TagOnWrite(t *testing.T) {
 		t.Errorf("Expected empty taints after clearing, got %d", len(taints))
 	}
 }
+
+// TestDataSourceService_GetTaints - arch-v1.md L490: retrieve taints from data
+func TestDataSourceService_GetTaints(t *testing.T) {
+	svc := NewDatasourceService()
+
+	err := svc.TagOnWrite("/path/to/file.txt", []string{"confidential", "internal", "pii"})
+	if err != nil {
+		t.Fatalf("TagOnWrite failed: %v", err)
+	}
+
+	taints, err := svc.GetTaints("/path/to/file.txt")
+	if err != nil {
+		t.Fatalf("GetTaints failed: %v", err)
+	}
+
+	if len(taints) != 3 {
+		t.Errorf("Expected 3 taints, got %d", len(taints))
+	}
+
+	expected := map[string]bool{"confidential": true, "internal": true, "pii": true}
+	for _, taint := range taints {
+		if !expected[taint] {
+			t.Errorf("Unexpected taint: %s", taint)
+		}
+	}
+
+	emptyTaints, err := svc.GetTaints("/nonexistent/path.txt")
+	if err != nil {
+		t.Fatalf("GetTaints for nonexistent path failed: %v", err)
+	}
+
+	if len(emptyTaints) != 0 {
+		t.Errorf("Expected empty taints for nonexistent path, got %d", len(emptyTaints))
+	}
+}
