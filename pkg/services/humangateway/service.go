@@ -21,6 +21,9 @@ type HumanGatewayService interface {
 	HandleMail(mail mail.Mail) error
 	Start() error
 	Stop() error
+	SendMessage(session *ChatSession, message string) error
+	ParseActionItem(message string) ([]ActionItem, error)
+	AddAgentReply(session *ChatSession, reply mail.Mail) error
 }
 
 type humanGatewayService struct {
