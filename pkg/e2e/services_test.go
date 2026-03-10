@@ -3,6 +3,8 @@ package e2e
 import (
 	"testing"
 
+	"github.com/maelstrom/v3/pkg/mail"
+	"github.com/maelstrom/v3/pkg/services"
 	"github.com/maelstrom/v3/pkg/services/admin"
 	"github.com/maelstrom/v3/pkg/services/gateway"
 	"github.com/maelstrom/v3/pkg/services/heartbeat"
@@ -72,4 +74,126 @@ func TestServicesE2E_AllServicesLoaded(t *testing.T) {
 	}
 
 	_ = engine
+}
+
+// TestServicesE2E_ServicesAddressable verifies services are addressable by sys:* IDs via ServiceRegistry
+// Spec: Services addressable by sys:* IDs, sys:gateway/admin/persistence reachable, all 8 IDs resolvable
+func TestServicesE2E_ServicesAddressable(t *testing.T) {
+	// Create service registry
+	registry := services.NewServiceRegistry()
+
+	// Create all 8 services
+	svcGateway := gateway.NewGatewayService()
+	svcAdmin := admin.NewAdminService()
+	svcPersistence := persistence.NewPersistenceService()
+	svcHeartbeat := heartbeat.NewHeartbeatService()
+	svcMemory := memory.NewMemoryService()
+	svcObservability := observability.NewObservabilityService()
+	svcLifecycle := lifecycle.NewLifecycleServiceWithoutEngine()
+	svcSecurity := security.NewSecurityService()
+
+	// Helper to wrap services that don't implement services.Service interface
+	wrapService := func(svc interface{}) services.Service {
+		if wrapped, ok := svc.(services.Service); ok {
+			return wrapped
+		}
+		// Create a wrapper for services with ID() method
+		return &serviceWrapper{svc: svc}
+	}
+
+	// Register all services with registry
+	err := registry.Register("sys:gateway", wrapService(svcGateway))
+	require.NoError(t, err, "Should register sys:gateway")
+
+	err = registry.Register("sys:admin", wrapService(svcAdmin))
+	require.NoError(t, err, "Should register sys:admin")
+
+	err = registry.Register("sys:persistence", wrapService(svcPersistence))
+	require.NoError(t, err, "Should register sys:persistence")
+
+	err = registry.Register("sys:heartbeat", wrapService(svcHeartbeat))
+	require.NoError(t, err, "Should register sys:heartbeat")
+
+	err = registry.Register("sys:memory", wrapService(svcMemory))
+	require.NoError(t, err, "Should register sys:memory")
+
+	err = registry.Register("sys:observability", wrapService(svcObservability))
+	require.NoError(t, err, "Should register sys:observability")
+
+	err = registry.Register("sys:lifecycle", wrapService(svcLifecycle))
+	require.NoError(t, err, "Should register sys:lifecycle")
+
+	err = registry.Register("sys:security", wrapService(svcSecurity))
+	require.NoError(t, err, "Should register sys:security")
+
+	// Verify sys:gateway is reachable
+	gatewaySvc, ok := registry.Get("sys:gateway")
+	require.True(t, ok, "sys:gateway should be reachable")
+	require.NotNil(t, gatewaySvc)
+	assert.Equal(t, "sys:gateway", gatewaySvc.ID())
+
+	// Verify sys:admin is reachable
+	adminSvc, ok := registry.Get("sys:admin")
+	require.True(t, ok, "sys:admin should be reachable")
+	require.NotNil(t, adminSvc)
+	assert.Equal(t, "sys:admin", adminSvc.ID())
+
+	// Verify sys:persistence is reachable
+	persistenceSvc, ok := registry.Get("sys:persistence")
+	require.True(t, ok, "sys:persistence should be reachable")
+	require.NotNil(t, persistenceSvc)
+	assert.Equal(t, "sys:persistence", persistenceSvc.ID())
+
+	// Verify all 8 sys:* IDs are resolvable
+	expectedIDs := []string{
+		"sys:gateway",
+		"sys:admin",
+		"sys:persistence",
+		"sys:heartbeat",
+		"sys:memory",
+		"sys:observability",
+		"sys:lifecycle",
+		"sys:security",
+	}
+
+	for _, id := range expectedIDs {
+		svc, ok := registry.Get(id)
+		require.True(t, ok, "Service %s should be resolvable", id)
+		require.NotNil(t, svc)
+		assert.Equal(t, id, svc.ID(), "Service ID should match")
+	}
+
+	// Verify List returns all 8 services
+	listed := registry.List()
+	assert.Len(t, listed, 8, "Should list all 8 services")
+}
+
+// serviceWrapper wraps a service that has an ID() method but doesn't fully implement services.Service
+type serviceWrapper struct {
+	svc interface{}
+}
+
+func (w *serviceWrapper) ID() string {
+	if ider, ok := w.svc.(interface{ ID() string }); ok {
+		return ider.ID()
+	}
+	return ""
+}
+
+func (w *serviceWrapper) HandleMail(mail mail.Mail) error {
+	return nil
+}
+
+func (w *serviceWrapper) Start() error {
+	if starter, ok := w.svc.(interface{ Start() error }); ok {
+		return starter.Start()
+	}
+	return nil
+}
+
+func (w *serviceWrapper) Stop() error {
+	if stopper, ok := w.svc.(interface{ Stop() error }); ok {
+		return stopper.Stop()
+	}
+	return nil
 }
