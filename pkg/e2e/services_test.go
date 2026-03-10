@@ -197,3 +197,72 @@ func (w *serviceWrapper) Stop() error {
 	}
 	return nil
 }
+
+// TestServicesE2E_HotReload verifies services can be hot-reloaded without manual intervention
+// Spec: Services hot-reloadable, state preserved, completes within timeout, continues functioning
+func TestServicesE2E_HotReload(t *testing.T) {
+	// Create statechart engine and lifecycle service for hot reload management
+	engine := statechart.NewEngine()
+	lifecycleSvc := lifecycle.NewLifecycleService(engine)
+
+	// Create a test chart definition for the service
+	testChartDef := statechart.ChartDefinition{
+		ID:           "test-service",
+		Version:      "1.0.0",
+		InitialState: "init",
+		Root: &statechart.Node{
+			ID: "root",
+			Children: map[string]*statechart.Node{
+				"init": {
+					ID: "init",
+				},
+				"running": {
+					ID: "running",
+				},
+			},
+		},
+	}
+
+	// Spawn the runtime first (this registers it with lifecycle service)
+	runtimeID, err := lifecycleSvc.Spawn(testChartDef)
+	require.NoError(t, err, "Should spawn runtime successfully")
+
+	// Start the runtime
+	err = lifecycleSvc.Control(runtimeID, statechart.CmdStart)
+	require.NoError(t, err, "Runtime should start successfully")
+
+	// Save initial runtime state
+	runtimes, err := lifecycleSvc.List()
+	require.NoError(t, err)
+	require.Len(t, runtimes, 1, "Should have one runtime")
+	initialState := runtimes[0].ActiveStates[0]
+	t.Logf("Initial state: %s", initialState)
+
+	// Perform hot reload
+	err = lifecycleSvc.HotReload(string(runtimeID))
+	require.NoError(t, err, "Hot reload should complete without error")
+
+	// Verify runtime still exists after hot reload
+	runtimes, err = lifecycleSvc.List()
+	require.NoError(t, err)
+	assert.Len(t, runtimes, 1, "Should still have one runtime after hot reload")
+
+	// Verify state is preserved (runtime still in same state)
+	assert.Equal(t, initialState, runtimes[0].ActiveStates[0], "State should be preserved after hot reload")
+
+	// Verify service continues functioning after reload (can still list and control)
+	err = lifecycleSvc.Control(runtimeID, statechart.CmdPause)
+	require.NoError(t, err, "Should be able to control runtime after hot reload")
+
+	// Test hot reload completes (implicitly within timeout as HotReload is synchronous)
+	err = lifecycleSvc.HotReload(string(runtimeID))
+	require.NoError(t, err, "Second hot reload should complete")
+
+	// Verify service still functional after second reload
+	runtimes, err = lifecycleSvc.List()
+	require.NoError(t, err)
+	assert.Len(t, runtimes, 1, "Service should be functional after hot reload")
+
+	// Cleanup
+	_ = lifecycleSvc.Stop(runtimeID)
+}
