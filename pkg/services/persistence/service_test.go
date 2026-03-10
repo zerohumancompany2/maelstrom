@@ -9,11 +9,14 @@ import (
 )
 
 func TestPersistence_SnapshotCreate(t *testing.T) {
-	svc := NewPersistenceService()
+	ps := NewPersistenceService().(*persistenceService)
 
 	runtimeID := statechart.RuntimeID("test-runtime-1")
+	ps.state[string(runtimeID)] = map[string]any{"key": "value"}
+	ps.taints[string(runtimeID)] = []string{}
+
 	policy := security.EnforcementPolicy{AllowedOnExit: []string{}, Enforcement: "strict"}
-	snap, err := svc.Snapshot(string(runtimeID), policy)
+	snap, err := ps.Snapshot(string(runtimeID), policy)
 
 	if err != nil {
 		t.Fatalf("Snapshot failed: %v", err)
@@ -37,12 +40,14 @@ func TestPersistence_SnapshotCreate(t *testing.T) {
 }
 
 func TestPersistence_SnapshotRestore(t *testing.T) {
-	svc := NewPersistenceService()
+	ps := NewPersistenceService().(*persistenceService)
 
 	originalID := statechart.RuntimeID("restore-test-1")
+	ps.state[string(originalID)] = map[string]any{"key": "value"}
+	ps.taints[string(originalID)] = []string{}
 
 	policy := security.EnforcementPolicy{AllowedOnExit: []string{}, Enforcement: "strict"}
-	snap, err := svc.Snapshot(string(originalID), policy)
+	snap, err := ps.Snapshot(string(originalID), policy)
 	if err != nil {
 		t.Fatalf("Snapshot failed: %v", err)
 	}
@@ -52,7 +57,7 @@ func TestPersistence_SnapshotRestore(t *testing.T) {
 		Version: "1.0.0",
 	}
 
-	restoredID, err := svc.Restore(string(snap.ID), def)
+	restoredID, err := ps.Restore(string(snap.ID), def)
 	if err != nil {
 		t.Fatalf("Restore failed: %v", err)
 	}
