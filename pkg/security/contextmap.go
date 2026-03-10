@@ -1,7 +1,84 @@
 package security
 
 type ContextMap struct {
-	Blocks []*ContextBlock
+	Blocks     []*ContextBlock
+	TokenCount int
+	Budget     int
+}
+
+func NewContextMap(blocks []*ContextBlock, budget int) *ContextMap {
+	return &ContextMap{
+		Blocks: blocks,
+		Budget: budget,
+	}
+}
+
+func (cm *ContextMap) AssembleWithBudget() ([]*ContextBlock, error) {
+	result := make([]*ContextBlock, 0, len(cm.Blocks))
+	totalTokens := 0
+
+	for _, block := range cm.Blocks {
+		totalTokens += block.MaxTokens
+	}
+
+	for totalTokens > cm.Budget && len(result) < len(cm.Blocks) {
+		evicted, err := cm.EvictLowestPriority()
+		if err != nil {
+			return nil, err
+		}
+		if evicted != nil {
+			totalTokens -= evicted.MaxTokens
+		} else {
+			break
+		}
+	}
+
+	for _, block := range cm.Blocks {
+		if !isEvicted(block, cm.Blocks) {
+			result = append(result, block)
+		}
+	}
+
+	return result, nil
+}
+
+func isEvicted(block *ContextBlock, allBlocks []*ContextBlock) bool {
+	for _, b := range allBlocks {
+		if b.Name == block.Name && b.MaxTokens == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func (cm *ContextMap) EvictLowestPriority() (*ContextBlock, error) {
+	if len(cm.Blocks) == 0 {
+		return nil, nil
+	}
+
+	lowestIdx := 0
+	n := len(cm.Blocks)
+	for i := 1; i < n; i++ {
+		if cm.Blocks[i].Priority > cm.Blocks[lowestIdx].Priority {
+			lowestIdx = i
+		}
+	}
+
+	if cm.Blocks[lowestIdx].Priority == 0 {
+		return nil, nil
+	}
+
+	evicted := cm.Blocks[lowestIdx]
+	cm.Blocks = append(cm.Blocks[:lowestIdx], cm.Blocks[lowestIdx+1:]...)
+	return evicted, nil
+}
+
+func (cm *ContextMap) CompressBlock(block *ContextBlock) error {
+	panic("not implemented")
+}
+
+func (cm *ContextMap) IsSystemBlock(block *ContextBlock) bool {
+	panic("not implemented")
 }
 
 type BlockTaintInfo struct {

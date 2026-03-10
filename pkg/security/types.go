@@ -26,6 +26,7 @@ type ContextBlock struct {
 	Priority       int
 	TaintPolicy    TaintPolicy
 	BoundaryFilter BoundaryType
+	Taints         TaintSet
 }
 
 type TaintPolicy struct {

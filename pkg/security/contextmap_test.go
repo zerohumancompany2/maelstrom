@@ -182,3 +182,205 @@ func TestFilterContextBlock_Audit(t *testing.T) {
 		t.Errorf("Expected audit log to contain VIOLATION, got: %s", lastLog)
 	}
 }
+
+func TestContextMap_TokenBudgetEnforcement(t *testing.T) {
+	block1 := &ContextBlock{
+		Name:      "block1",
+		Content:   strings.Repeat("a", 2000),
+		MaxTokens: 2000,
+		Priority:  1,
+		Eviction:  "summarize",
+	}
+	block2 := &ContextBlock{
+		Name:      "block2",
+		Content:   strings.Repeat("b", 1500),
+		MaxTokens: 1500,
+		Priority:  5,
+		Eviction:  "summarize",
+	}
+	block3 := &ContextBlock{
+		Name:      "block3",
+		Content:   strings.Repeat("c", 1500),
+		MaxTokens: 1500,
+		Priority:  10,
+		Eviction:  "summarize",
+	}
+
+	blocks := []*ContextBlock{block1, block2, block3}
+	totalTokens := 5000
+	budget := 4000
+
+	cm := NewContextMap(blocks, budget)
+	result, err := cm.AssembleWithBudget()
+
+	if err != nil {
+		t.Fatalf("AssembleWithBudget returned error: %v", err)
+	}
+
+	if len(result) == 0 {
+		t.Fatal("Expected some blocks to be returned")
+	}
+
+	total := 0
+	for _, block := range result {
+		total += block.MaxTokens
+	}
+
+	if total > budget {
+		t.Errorf("Expected total tokens <= %d, got %d (total was %d before assembly)", budget, total, totalTokens)
+	}
+}
+
+func TestContextMap_EvictionPriorityOrder(t *testing.T) {
+	block1 := &ContextBlock{
+		Name:      "block1",
+		Content:   strings.Repeat("a", 1000),
+		MaxTokens: 1000,
+		Priority:  1,
+	}
+	block5 := &ContextBlock{
+		Name:      "block5",
+		Content:   strings.Repeat("b", 1000),
+		MaxTokens: 1000,
+		Priority:  5,
+	}
+	block10 := &ContextBlock{
+		Name:      "block10",
+		Content:   strings.Repeat("c", 1000),
+		MaxTokens: 1000,
+		Priority:  10,
+	}
+	block15 := &ContextBlock{
+		Name:      "block15",
+		Content:   strings.Repeat("d", 1000),
+		MaxTokens: 1000,
+		Priority:  15,
+	}
+
+	blocks := []*ContextBlock{block1, block5, block10, block15}
+	budget := 2000
+
+	cm := NewContextMap(blocks, budget)
+	result, err := cm.AssembleWithBudget()
+
+	if err != nil {
+		t.Fatalf("AssembleWithBudget returned error: %v", err)
+	}
+
+	resultNames := make(map[string]bool)
+	for _, block := range result {
+		resultNames[block.Name] = true
+	}
+
+	if !resultNames["block1"] {
+		t.Error("Expected block1 (priority 1) to be preserved")
+	}
+	if !resultNames["block5"] {
+		t.Error("Expected block5 (priority 5) to be preserved")
+	}
+	if resultNames["block10"] {
+		t.Error("Expected block10 (priority 10) to be evicted")
+	}
+	if resultNames["block15"] {
+		t.Error("Expected block15 (priority 15, lowest) to be evicted first")
+	}
+}
+
+func TestContextMap_SystemBlockPreservation(t *testing.T) {
+	systemBlock := &ContextBlock{
+		Name:      "system",
+		Content:   strings.Repeat("s", 500),
+		MaxTokens: 500,
+		Priority:  0,
+	}
+	userBlock5 := &ContextBlock{
+		Name:      "user5",
+		Content:   strings.Repeat("a", 1000),
+		MaxTokens: 1000,
+		Priority:  5,
+	}
+	userBlock10 := &ContextBlock{
+		Name:      "user10",
+		Content:   strings.Repeat("b", 1000),
+		MaxTokens: 1000,
+		Priority:  10,
+	}
+
+	blocks := []*ContextBlock{systemBlock, userBlock5, userBlock10}
+	budget := 600
+
+	cm := NewContextMap(blocks, budget)
+	result, err := cm.AssembleWithBudget()
+
+	if err != nil {
+		t.Fatalf("AssembleWithBudget returned error: %v", err)
+	}
+
+	resultNames := make(map[string]bool)
+	for _, block := range result {
+		resultNames[block.Name] = true
+	}
+
+	if !resultNames["system"] {
+		t.Error("Expected system block (priority 0) to always be preserved")
+	}
+	if resultNames["user5"] {
+		t.Error("Expected user block at priority 5 to be evicted")
+	}
+	if resultNames["user10"] {
+		t.Error("Expected user block at priority 10 to be evicted")
+	}
+
+	total := 0
+	for _, block := range result {
+		total += block.MaxTokens
+	}
+	if total > budget {
+		t.Errorf("Expected total tokens <= %d, got %d", budget, total)
+	}
+}
+
+func TestContextMap_EvictionSummarize(t *testing.T) {
+	block1 := &ContextBlock{
+		Name:      "system",
+		Content:   strings.Repeat("s", 500),
+		MaxTokens: 500,
+		Priority:  0,
+		Eviction:  "summarize",
+	}
+	block5 := &ContextBlock{
+		Name:      "user",
+		Content:   strings.Repeat("u", 2000),
+		MaxTokens: 2000,
+		Priority:  5,
+		Eviction:  "summarize",
+	}
+
+	blocks := []*ContextBlock{block1, block5}
+	budget := 800
+
+	cm := NewContextMap(blocks, budget)
+	result, err := cm.AssembleWithBudget()
+
+	if err != nil {
+		t.Fatalf("AssembleWithBudget returned error: %v", err)
+	}
+
+	resultNames := make(map[string]bool)
+	for _, block := range result {
+		resultNames[block.Name] = true
+	}
+
+	if !resultNames["system"] {
+		t.Error("Expected system block to be preserved")
+	}
+
+	total := 0
+	for _, block := range result {
+		total += block.MaxTokens
+	}
+
+	if total > budget {
+		t.Errorf("Expected total tokens <= %d after compression/eviction, got %d", budget, total)
+	}
+}
