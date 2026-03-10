@@ -2,6 +2,8 @@ package orchestrator
 
 import (
 	"testing"
+
+	"github.com/maelstrom/v3/pkg/services/tools"
 )
 
 func TestOrchestratorService_NewCreatesService(t *testing.T) {
@@ -53,5 +55,33 @@ func TestOrchestratorService_RegisterPolicy(t *testing.T) {
 		t.Error("Expected retrieved policy to be non-nil")
 	} else if retrieved.Mode != policy.Mode {
 		t.Errorf("Expected policy Mode to be '%s', got '%s'", policy.Mode, retrieved.Mode)
+	}
+}
+
+func TestOrchestratorService_ResolveTool(t *testing.T) {
+	// Given
+	expectedTool := tools.ToolDescriptor{
+		Name:     "test-tool",
+		Boundary: "outer",
+		Schema:   map[string]any{"type": "object"},
+	}
+
+	// Create tools service and register a tool
+	toolsService := tools.NewToolsService()
+	_ = toolsService.Register(expectedTool)
+
+	// Create orchestrator with tools service
+	service := NewOrchestratorServiceWithTools(toolsService)
+
+	// When
+	result, err := service.ResolveTool("test-tool", "outer")
+
+	// Then
+	if err != nil {
+		t.Errorf("Expected ResolveTool() to return nil error, got %v", err)
+	}
+
+	if result.Name != expectedTool.Name {
+		t.Errorf("Expected tool Name to be '%s', got '%s'", expectedTool.Name, result.Name)
 	}
 }

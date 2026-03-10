@@ -9,18 +9,29 @@ import (
 )
 
 type OrchestratorService struct {
-	id       string
-	registry *security.ToolRegistry
-	library  statechart.Library
-	policies map[string]*ExecutionPolicy
-	mu       sync.RWMutex
+	id           string
+	registry     *security.ToolRegistry
+	library      statechart.Library
+	policies     map[string]*ExecutionPolicy
+	toolsService tools.ToolsService
+	mu           sync.RWMutex
 }
 
 func NewOrchestratorService() *OrchestratorService {
 	return &OrchestratorService{
-		id:       "sys:orchestrator",
-		registry: security.NewToolRegistry(),
-		policies: make(map[string]*ExecutionPolicy),
+		id:           "sys:orchestrator",
+		registry:     security.NewToolRegistry(),
+		policies:     make(map[string]*ExecutionPolicy),
+		toolsService: tools.NewToolsService(),
+	}
+}
+
+func NewOrchestratorServiceWithTools(toolsService tools.ToolsService) *OrchestratorService {
+	return &OrchestratorService{
+		id:           "sys:orchestrator",
+		registry:     security.NewToolRegistry(),
+		policies:     make(map[string]*ExecutionPolicy),
+		toolsService: toolsService,
 	}
 }
 
@@ -36,8 +47,7 @@ func (s *OrchestratorService) RegisterPolicy(name string, policy ExecutionPolicy
 }
 
 func (s *OrchestratorService) ResolveTool(name string, callerBoundary string) (tools.ToolDescriptor, error) {
-	// TODO: Implement tool resolution
-	return tools.ToolDescriptor{}, nil
+	return s.toolsService.Resolve(name, callerBoundary)
 }
 
 func (s *OrchestratorService) Execute(toolCalls []ToolCall, policy ExecutionPolicy) (statechart.RuntimeID, error) {
