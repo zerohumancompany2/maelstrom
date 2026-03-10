@@ -2,7 +2,15 @@
 // Spec Reference: Section 13.7
 package platform
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+
+	"github.com/maelstrom/v3/pkg/statechart"
+	"gopkg.in/yaml.v3"
+)
 
 // PlatformService represents a PlatformService YAML definition.
 type PlatformService struct {
@@ -74,4 +82,76 @@ func (ps PlatformService) Validate() error {
 		return fmt.Errorf("spec.chartRef is required")
 	}
 	return nil
+}
+
+// ToChartDefinition converts a PlatformService to a ChartDefinition.
+func (ps PlatformService) ToChartDefinition(hydrator statechart.HydratorFunc) (statechart.ChartDefinition, error) {
+	chartYAML := fmt.Sprintf(`
+id: %s
+version: 1.0.0
+root:
+  id: root
+  children:
+    init:
+      id: init
+      type: atomic
+      transitions:
+        - event: START
+          target: running
+    running:
+      id: running
+      type: atomic
+    stopped:
+      id: stopped
+      type: final
+initialState: init
+`, ps.Metadata.Name)
+
+	return hydrator([]byte(chartYAML))
+}
+
+// ChartRegistry loads PlatformService YAMLs from a directory.
+type ChartRegistry struct {
+	dir string
+}
+
+// NewChartRegistry creates a new ChartRegistry for the given directory.
+func NewChartRegistry(dir string) *ChartRegistry {
+	return &ChartRegistry{dir: dir}
+}
+
+// LoadPlatformServices loads all PlatformService YAMLs from the registry directory.
+func (cr *ChartRegistry) LoadPlatformServices() ([]PlatformService, error) {
+	files, err := filepath.Glob(filepath.Join(cr.dir, "*.yaml"))
+	if err != nil {
+		return nil, fmt.Errorf("glob: %w", err)
+	}
+
+	if len(files) == 0 {
+		return []PlatformService{}, nil
+	}
+
+	// Sort for deterministic order
+	sort.Strings(files)
+
+	services := make([]PlatformService, 0, len(files))
+	for _, file := range files {
+		content, err := os.ReadFile(file)
+		if err != nil {
+			return nil, fmt.Errorf("read file %s: %w", file, err)
+		}
+
+		var ps PlatformService
+		if err := yaml.Unmarshal(content, &ps); err != nil {
+			return nil, fmt.Errorf("parse yaml %s: %w", file, err)
+		}
+
+		if err := ps.Validate(); err != nil {
+			return nil, fmt.Errorf("validate %s: %w", file, err)
+		}
+
+		services = append(services, ps)
+	}
+
+	return services, nil
 }

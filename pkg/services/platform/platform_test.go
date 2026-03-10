@@ -1,8 +1,11 @@
 package platform
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/maelstrom/v3/pkg/statechart"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -115,5 +118,118 @@ spec:
 		assert.True(t, ps.Spec.Expose.HTTP.TLS)
 		assert.Equal(t, int32(8080), ps.Spec.Expose.HTTP.Port)
 		assert.Equal(t, int32(9090), ps.Spec.Expose.TCP.Port)
+	})
+}
+
+// TestPlatformServiceYAML_ChartRegistryLoad tests ChartRegistry loading PlatformService YAMLs
+// ChartRegistry loads PlatformService YAMLs from charts/platform-services/
+// YAML files parsed correctly
+// ChartDefinitions created from YAML
+func TestPlatformServiceYAML_ChartRegistryLoad(t *testing.T) {
+	t.Run("loads platform service yaml from directory", func(t *testing.T) {
+		// Create temp directory with test YAML files
+		tmpDir := t.TempDir()
+
+		yamlContent := `
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:gateway
+  core: true
+spec:
+  chartRef: gateway-v1
+  requiredForKernelReady: true
+  replicas: 2
+`
+		err := os.WriteFile(filepath.Join(tmpDir, "gateway.yaml"), []byte(yamlContent), 0644)
+		require.NoError(t, err)
+
+		registry := NewChartRegistry(tmpDir)
+		services, err := registry.LoadPlatformServices()
+		require.NoError(t, err)
+		assert.Len(t, services, 1)
+		assert.Equal(t, "sys:gateway", services[0].Metadata.Name)
+		assert.True(t, services[0].Metadata.Core)
+	})
+
+	t.Run("parses multiple yaml files", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		files := map[string]string{
+			"gateway.yaml": `
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:gateway
+spec:
+  chartRef: gateway-v1
+`,
+			"admin.yaml": `
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:admin
+spec:
+  chartRef: admin-v1
+`,
+		}
+
+		for name, content := range files {
+			err := os.WriteFile(filepath.Join(tmpDir, name), []byte(content), 0644)
+			require.NoError(t, err)
+		}
+
+		registry := NewChartRegistry(tmpDir)
+		services, err := registry.LoadPlatformServices()
+		require.NoError(t, err)
+		assert.Len(t, services, 2)
+	})
+
+	t.Run("creates chart definitions from yaml", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		yamlContent := `
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:gateway
+  core: true
+spec:
+  chartRef: gateway-v1
+  requiredForKernelReady: true
+`
+		err := os.WriteFile(filepath.Join(tmpDir, "gateway.yaml"), []byte(yamlContent), 0644)
+		require.NoError(t, err)
+
+		registry := NewChartRegistry(tmpDir)
+		services, err := registry.LoadPlatformServices()
+		require.NoError(t, err)
+
+		// Convert to ChartDefinition
+		hydrator := statechart.DefaultHydrator()
+		def, err := services[0].ToChartDefinition(hydrator)
+		require.NoError(t, err)
+		assert.NotEmpty(t, def.ID)
+		assert.NotNil(t, def.Root)
+	})
+
+	t.Run("returns error for invalid yaml", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		yamlContent := `
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:gateway
+spec:
+  chartRef: gateway-v1
+invalid yaml content: [
+`
+		err := os.WriteFile(filepath.Join(tmpDir, "invalid.yaml"), []byte(yamlContent), 0644)
+		require.NoError(t, err)
+
+		registry := NewChartRegistry(tmpDir)
+		_, err = registry.LoadPlatformServices()
+		assert.Error(t, err)
 	})
 }
