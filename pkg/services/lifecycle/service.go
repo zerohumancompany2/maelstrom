@@ -379,3 +379,12 @@ func (l *LifecycleService) applyContextTransform(oldContext any, newVersion stri
 
 	return result, nil
 }
+
+func (l *LifecycleService) applyContextTransformWithFallback(oldContext any, newVersion string, templateStr string, cleanStart func() (any, error)) (any, error) {
+	result, err := l.applyContextTransform(oldContext, newVersion, templateStr)
+	if err != nil {
+		fmt.Printf("Warning: transform failed, falling back to cleanStart: %v\n", err)
+		return cleanStart()
+	}
+	return result, nil
+}
