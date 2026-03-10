@@ -37,8 +37,37 @@ func (s *adminService) ListAgents() ([]lifecycle.RuntimeInfo, error) {
 	return s.lifecycleService.List()
 }
 
-func (s *adminService) ControlAgent(id string, cmd string) error {
-	return nil
+func (s *adminService) ControlAgent(id string, action string) error {
+	var cmd statechart.ControlCmd
+	switch action {
+	case "pause":
+		cmd = statechart.CmdPause
+	case "resume":
+		cmd = statechart.CmdResume
+	case "stop":
+		cmd = statechart.CmdStop
+	default:
+		return fmt.Errorf("unknown action: %s", action)
+	}
+
+	agents, err := s.lifecycleService.List()
+	if err != nil {
+		return err
+	}
+
+	found := false
+	for _, agent := range agents {
+		if agent.ID == id {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return statechart.ErrRuntimeNotFound
+	}
+
+	return s.lifecycleService.Control(statechart.RuntimeID(id), cmd)
 }
 
 func (s *adminService) QueryTaints(agentId string) (security.TaintMap, error) {

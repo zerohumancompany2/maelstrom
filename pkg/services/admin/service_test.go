@@ -40,6 +40,16 @@ func TestAdminService_ListAgents(t *testing.T) {
 	}
 }
 
+// TestAdminService_ControlAgent - spec: arch-v1.md L467, L485
+func TestAdminService_ControlAgent(t *testing.T) {
+	svc := NewAdminService()
+
+	err := svc.ControlAgent("nonexistent-agent", "pause")
+	if err == nil {
+		t.Error("Expected error for nonexistent agent")
+	}
+}
+
 func TestAdmin_2FARequired(t *testing.T) {
 	svc := NewAdminService()
 
