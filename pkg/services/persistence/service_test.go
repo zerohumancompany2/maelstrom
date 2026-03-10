@@ -91,6 +91,50 @@ func TestPersistenceService_Restore(t *testing.T) {
 	}
 }
 
+// TestPersistenceService_AppendEvent verifies AppendEvent adds events with timestamps
+// Spec Reference: arch-v1.md L468 (event sourcing)
+func TestPersistenceService_AppendEvent(t *testing.T) {
+	ps := NewPersistenceService().(*persistenceService)
+
+	runtimeID := statechart.RuntimeID("event-test-append")
+	event := statechart.Event{
+		Type:          "test:event",
+		Payload:       map[string]any{"key": "value"},
+		CorrelationID: "corr-123",
+		Source:        "test-source",
+	}
+
+	err := ps.AppendEvent(string(runtimeID), event)
+	if err != nil {
+		t.Fatalf("AppendEvent failed: %v", err)
+	}
+
+	events, err := ps.GetEvents(string(runtimeID), "")
+	if err != nil {
+		t.Fatalf("GetEvents failed: %v", err)
+	}
+
+	if len(events) != 1 {
+		t.Errorf("Expected 1 event, got %d", len(events))
+	}
+
+	if events[0].Type != "test:event" {
+		t.Errorf("Expected event type 'test:event', got '%s'", events[0].Type)
+	}
+
+	if events[0].CorrelationID != "corr-123" {
+		t.Errorf("Expected correlation ID 'corr-123', got '%s'", events[0].CorrelationID)
+	}
+
+	if events[0].Source != "test-source" {
+		t.Errorf("Expected source 'test-source', got '%s'", events[0].Source)
+	}
+
+	if events[0].Timestamp.IsZero() {
+		t.Error("Expected event timestamp to be non-zero")
+	}
+}
+
 func TestPersistence_SnapshotCreate(t *testing.T) {
 	ps := NewPersistenceService().(*persistenceService)
 
