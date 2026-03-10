@@ -8,6 +8,18 @@ import (
 	"github.com/maelstrom/v3/pkg/statechart"
 )
 
+// TestPersistenceService_ID verifies ID() returns "sys:persistence"
+// Spec Reference: arch-v1.md L468 (sys:persistence service), L477-480 (Platform Service Contract)
+func TestPersistenceService_ID(t *testing.T) {
+	ps := NewPersistenceService().(*persistenceService)
+
+	id := ps.ID()
+
+	if id != "sys:persistence" {
+		t.Errorf("Expected ID 'sys:persistence', got '%s'", id)
+	}
+}
+
 func TestPersistence_SnapshotCreate(t *testing.T) {
 	ps := NewPersistenceService().(*persistenceService)
 

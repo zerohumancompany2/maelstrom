@@ -60,6 +60,10 @@ func NewPersistenceService() PersistenceService {
 	}
 }
 
+func (s *persistenceService) ID() string {
+	return "sys:persistence"
+}
+
 func (s *persistenceService) Snapshot(runtimeId string, policy security.EnforcementPolicy) (SnapshotRecord, error) {
 	id := runtimeId + "-snap-" + time.Now().Format("20060102150405")
 
