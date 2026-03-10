@@ -94,8 +94,8 @@ func TestAdmin_ControlAgent(t *testing.T) {
 	svc := NewAdminService()
 
 	err := svc.ControlAgent("nonexistent-agent", "pause")
-	if err != nil {
-		t.Fatalf("ControlAgent failed: %v", err)
+	if err == nil {
+		t.Error("Expected error for nonexistent agent")
 	}
 }
 
@@ -155,6 +155,21 @@ func TestAdminService_2FAGate(t *testing.T) {
 	svc := NewAdminService()
 
 	err := svc.ExecuteCommand("test-command", "")
+	if err == nil {
+		t.Error("Expected error for empty token")
+	}
+}
+
+// TestAdminService_2FARequired - spec: arch-v1.md L467 (2FA-gated), L485 (authToken parameter)
+func TestAdminService_2FARequired(t *testing.T) {
+	svc := NewAdminService()
+
+	err := svc.ExecuteCommand("test-command", "invalid-token")
+	if err == nil {
+		t.Error("Expected error for invalid token")
+	}
+
+	err = svc.ExecuteCommand("test-command", "")
 	if err == nil {
 		t.Error("Expected error for empty token")
 	}

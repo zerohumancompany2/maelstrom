@@ -20,12 +20,14 @@ type AdminService interface {
 type adminService struct {
 	lifecycleService *lifecycle.LifecycleService
 	taintEngine      security.TaintEngine
+	authManager      AuthManager
 }
 
 func NewAdminService() AdminService {
 	return &adminService{
 		lifecycleService: lifecycle.NewLifecycleServiceWithoutEngine(),
 		taintEngine:      security.NewTaintEngine(),
+		authManager:      NewAuthManager(),
 	}
 }
 
@@ -82,5 +84,10 @@ func (s *adminService) ExecuteCommand(cmd string, token string) error {
 	if token == "" {
 		return fmt.Errorf("2FA token required")
 	}
+
+	if err := s.authManager.Verify2FA(token); err != nil {
+		return err
+	}
+
 	return nil
 }
