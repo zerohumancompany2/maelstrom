@@ -255,11 +255,13 @@ func (r *E2ERuntime) StartStreamingSession(agentID string, clientBoundary mail.B
 }
 
 func (r *E2ERuntime) SendStreamChunk(session *StreamSession, data string, taints []string) (time.Duration, error) {
+	allowedTaints := r.filterAllowedTaints(taints, session.clientBoundary)
+
 	chunk := mail.StreamChunk{
 		Data:     data,
 		Sequence: len(session.chunks),
 		IsFinal:  false,
-		Taints:   taints,
+		Taints:   allowedTaints,
 	}
 
 	start := time.Now()
@@ -267,6 +269,26 @@ func (r *E2ERuntime) SendStreamChunk(session *StreamSession, data string, taints
 	latency := time.Since(start)
 
 	return latency, nil
+}
+
+func (r *E2ERuntime) filterAllowedTaints(taints []string, targetBoundary mail.BoundaryType) []string {
+	allowed := make([]string, 0)
+
+	for _, taint := range taints {
+		allowed = append(allowed, taint)
+	}
+
+	if targetBoundary == mail.OuterBoundary {
+		filtered := make([]string, 0)
+		for _, taint := range allowed {
+			if taint != "PII" && taint != "INNER_ONLY" && taint != "SECRET" {
+				filtered = append(filtered, taint)
+			}
+		}
+		allowed = filtered
+	}
+
+	return allowed
 }
 
 func (r *E2ERuntime) EndStreamSession(session *StreamSession) (*StreamTestResult, error) {
@@ -407,4 +429,109 @@ func (r *E2ERuntime) QueryViolations(filters map[string]interface{}) []*Violatio
 	}
 
 	return results
+}
+
+func (r *E2ERuntime) GetDataSource(name string) datasource.DataSource {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.dataSources[name]
+}
+
+func (r *E2ERuntime) RegisterDataSource(name string, ds datasource.DataSource) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.dataSources[name] = ds
+}
+
+func (r *E2ERuntime) WriteFileViaDataSource(agentID, path string, content []byte, taints []string) error {
+	r.mu.RLock()
+	ds, ok := r.dataSources["inmemory"]
+	r.mu.RUnlock()
+
+	if !ok {
+		return nil
+	}
+
+	return ds.TagOnWrite(path, taints)
+}
+
+func (r *E2ERuntime) WriteFileViaDataSourceWithDS(ds datasource.DataSource, path string, taints []string) error {
+	return ds.TagOnWrite(path, taints)
+}
+
+func (r *E2ERuntime) ReadFileViaDataSource(agentID, path string) (*mail.Mail, error) {
+	r.mu.RLock()
+	ds, ok := r.dataSources["inmemory"]
+	r.mu.RUnlock()
+
+	if !ok {
+		return nil, nil
+	}
+
+	taints, err := ds.GetTaints(path)
+	if err != nil {
+		return nil, err
+	}
+
+	toolResult := &mail.Mail{
+		ID:        "tool-result-" + agentID + "-" + path,
+		Type:      mail.MailTypeToolResult,
+		Source:    "sys:datasources",
+		Target:    agentID,
+		Content:   map[string]interface{}{"path": path, "content": "file-content"},
+		CreatedAt: time.Now(),
+		Metadata: mail.MailMetadata{
+			Taints: []string{"TOOL_OUTPUT"},
+		},
+	}
+
+	if r.securityService != nil {
+		r.attachTaintsToMessage(toolResult, taints)
+	}
+
+	return toolResult, nil
+}
+
+func (r *E2ERuntime) attachTaintsToMessage(msg *mail.Mail, fileTaints []string) {
+	existing := make(map[string]bool)
+	for _, t := range msg.Metadata.Taints {
+		existing[t] = true
+	}
+
+	for _, t := range fileTaints {
+		existing[t] = true
+	}
+
+	merged := make([]string, 0, len(existing))
+	for t := range existing {
+		merged = append(merged, t)
+	}
+
+	msg.Metadata.Taints = merged
+}
+
+func (r *E2ERuntime) PrepareContextForBoundary(agentID string, boundary mail.BoundaryType) error {
+	r.mu.RLock()
+	_, ok := r.agents[agentID]
+	r.mu.RUnlock()
+
+	if !ok {
+		return nil
+	}
+
+	return r.securityService.PrepareContextForBoundary(agentID, boundary)
+}
+
+func (r *E2ERuntime) GetContextMap(agentID string) (*security.ContextMap, error) {
+	r.mu.RLock()
+	_, ok := r.agents[agentID]
+	r.mu.RUnlock()
+
+	if !ok {
+		return nil, nil
+	}
+
+	return &security.ContextMap{
+		Blocks: make([]*security.ContextBlock, 0),
+	}, nil
 }
