@@ -1077,3 +1077,56 @@ func containsTaint(taints []string, target string) bool {
 	}
 	return false
 }
+
+func TestHardcodedServices_SecurityTaintPropagation(t *testing.T) {
+	svc := NewSecurityService()
+
+	nestedMap := map[string]any{
+		"level1": map[string]any{
+			"level2": map[string]any{
+				"value": "test",
+			},
+		},
+		"direct": "value",
+	}
+
+	propagated, err := svc.TaintPropagate(nestedMap, []string{"USER_SUPPLIED"})
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	propagatedMap, ok := propagated.(map[string]any)
+	if !ok {
+		t.Fatal("Expected propagated to be map[string]any")
+	}
+
+	if propagatedMap["_taints"] == nil {
+		t.Error("Expected _taints field at top level")
+	}
+
+	level1 := propagatedMap["level1"].(map[string]any)
+	if level1["_taints"] == nil {
+		t.Error("Expected _taints field at level1")
+	}
+
+	level2 := level1["level2"].(map[string]any)
+	if level2["_taints"] == nil {
+		t.Error("Expected _taints field at level2")
+	}
+
+	existingTainted := map[string]any{
+		"_taints": []string{"EXISTING"},
+		"data":    "value",
+	}
+	merged, err := svc.TaintPropagate(existingTainted, []string{"NEW"})
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	mergedMap, ok := merged.(map[string]any)
+	if !ok {
+		t.Fatal("Expected merged to be map[string]any")
+	}
+	taints := mergedMap["_taints"].([]string)
+	if !containsTaint(taints, "EXISTING") || !containsTaint(taints, "NEW") {
+		t.Error("Expected both EXISTING and NEW taints in merged result")
+	}
+}
