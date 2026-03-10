@@ -84,7 +84,7 @@ func TestGatewayService_NormalizeOutbound(t *testing.T) {
 	}
 }
 
-func TestGateway_RegisterAdapter(t *testing.T) {
+func TestGatewayService_RegisterAdapter_Success(t *testing.T) {
 	// Test: Register webhook, websocket, sse, smtp adapters
 	svc := NewGatewayService()
 
