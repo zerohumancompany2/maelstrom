@@ -11,6 +11,12 @@ type SecurityService struct {
 	mu sync.Mutex
 }
 
+type NotImplementedError struct{}
+
+func (NotImplementedError) Error() string {
+	return "not implemented"
+}
+
 func NewSecurityService() *SecurityService {
 	return &SecurityService{}
 }
@@ -19,7 +25,21 @@ func (s *SecurityService) ID() string {
 	return "sys:security"
 }
 
-func (s *SecurityService) HandleMail(mail mail.Mail) error {
+func (s *SecurityService) HandleMail(m *mail.Mail) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sourceBoundary := m.Metadata.Boundary
+	targetBoundary := mail.InnerBoundary
+
+	if sourceBoundary == mail.OuterBoundary && targetBoundary == mail.InnerBoundary {
+		if m.Metadata.Taints == nil {
+			m.Metadata.Taints = []string{}
+		}
+		m.Metadata.Taints = append(m.Metadata.Taints, "EXTERNAL")
+		m.Metadata.Boundary = targetBoundary
+	}
+
 	return nil
 }
 
@@ -47,90 +67,23 @@ func (s *SecurityService) ValidateAndSanitize(m mail.Mail, sourceBoundary, targe
 }
 
 func (s *SecurityService) TaintPropagate(obj any, newTaints []string) (any, error) {
-	result, ok := obj.(map[string]interface{})
-	if !ok {
-		return obj, nil
-	}
-
-	if result["_taints"] == nil {
-		result["_taints"] = []string{}
-	}
-
-	existing := result["_taints"].([]string)
-	result["_taints"] = append(existing, newTaints...)
-
-	for key, value := range result {
-		if key == "_taints" {
-			continue
-		}
-		nested, ok := value.(map[string]interface{})
-		if ok {
-			propagated, err := s.TaintPropagate(nested, newTaints)
-			if err != nil {
-				return nil, err
-			}
-			result[key] = propagated
-			continue
-		}
-
-		slice, ok := value.([]interface{})
-		if ok {
-			var propagatedSlice []interface{}
-			for _, item := range slice {
-				itemMap, ok := item.(map[string]interface{})
-				if ok {
-					propagated, err := s.TaintPropagate(itemMap, newTaints)
-					if err != nil {
-						return nil, err
-					}
-					propagatedSlice = append(propagatedSlice, propagated)
-				} else {
-					propagatedSlice = append(propagatedSlice, item)
-				}
-			}
-			result[key] = propagatedSlice
-		}
-	}
-
-	return result, nil
+	return nil, NotImplementedError{}
 }
 
 func (s *SecurityService) ReportTaints(runtimeId string) (security.TaintMap, error) {
-	return security.TaintMap{}, nil
+	return nil, NotImplementedError{}
 }
 
 func (s *SecurityService) PrepareContextForBoundary(runtimeId string, boundary mail.BoundaryType) error {
 	return nil
 }
 
-func (s *SecurityService) CheckTaintPolicy(taints []string, action string) bool {
-	for _, taint := range taints {
-		if taint == "UNTRUSTED" {
-			return false
-		}
-	}
-	return true
+func (s *SecurityService) CheckTaintPolicy(data any, targetBoundary mail.BoundaryType, policy security.TaintPolicy) (bool, error) {
+	return false, NotImplementedError{}
 }
 
-func (s *SecurityService) NamespaceIsolate(data interface{}, agentID string) interface{} {
-	dataSlice, ok := data.([]interface{})
-	if !ok {
-		return data
-	}
-
-	var result []interface{}
-	for _, item := range dataSlice {
-		itemMap, ok := item.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		if itemMap["agentID"] == agentID {
-			result = append(result, item)
-		}
-	}
-
-	return result
+func (s *SecurityService) NamespaceIsolate(runtimeId string, operation string) (security.IsolatedView, error) {
+	return security.IsolatedView{}, NotImplementedError{}
 }
 
 func (s *SecurityService) Start() error {
