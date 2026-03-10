@@ -30,6 +30,16 @@ func (r *ToolRegistry) GetTool(name string) (*ToolConfig, bool) {
 	return tool, ok
 }
 
+func (r *ToolRegistry) GetToolsByBoundary(boundary mail.BoundaryType) []*ToolConfig {
+	var filtered []*ToolConfig
+	for _, tool := range r.tools {
+		if tool.Boundary == boundary {
+			filtered = append(filtered, tool)
+		}
+	}
+	return filtered
+}
+
 func AttachToolTaints(toolName string, result any, toolRegistry *ToolRegistry) (any, error) {
 	tool, ok := toolRegistry.GetTool(toolName)
 	if !ok {
