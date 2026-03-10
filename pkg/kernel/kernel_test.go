@@ -748,6 +748,42 @@ func TestApplicationContext_GetTaints_ReturnsStoredTaints(t *testing.T) {
 	}
 }
 
+func TestApplicationContext_SetTaints_StoresWithKey(t *testing.T) {
+	appCtx := &kernelApplicationContext{
+		kernel: &Kernel{},
+		data:   make(map[string]interface{}),
+		taints: make(map[string][]string),
+	}
+
+	testKey := "secret-data"
+	testValue := "secret-value"
+	testTaints := []string{"SECRET", "INNER_ONLY"}
+
+	err := appCtx.Set(testKey, testValue, testTaints, "inner")
+	if err != nil {
+		t.Fatalf("Set() returned error: %v", err)
+	}
+
+	retrievedValue, retrievedTaints, err := appCtx.Get(testKey, "inner")
+	if err != nil {
+		t.Fatalf("Get() returned error: %v", err)
+	}
+
+	if retrievedValue != testValue {
+		t.Errorf("Get() value: expected %v, got %v", testValue, retrievedValue)
+	}
+
+	if len(retrievedTaints) != len(testTaints) {
+		t.Fatalf("Get() taints length: expected %d, got %d", len(testTaints), len(retrievedTaints))
+	}
+
+	for i, expectedTaint := range testTaints {
+		if retrievedTaints[i] != expectedTaint {
+			t.Errorf("Get() taints[%d]: expected %q, got %q", i, expectedTaint, retrievedTaints[i])
+		}
+	}
+}
+
 func TestKernel_BootstrapServices(t *testing.T) {
 	kernel := &Kernel{
 		engine:       statechart.NewEngine(),
