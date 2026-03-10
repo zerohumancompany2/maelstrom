@@ -94,3 +94,96 @@ func makeChunkData(size int) string {
 	}
 	return string(data)
 }
+
+func TestE2E_StreamSanitization_PII_Redaction(t *testing.T) {
+	runtime := NewE2ERuntime()
+	if err := runtime.Start(); err != nil {
+		t.Fatalf("Failed to start runtime: %v", err)
+	}
+	defer runtime.Stop()
+
+	taintPolicy := security.TaintPolicy{
+		RedactMode: "redact",
+		RedactRules: []security.RedactRule{
+			{Taint: "PII", Replacement: "[PII REDACTED]"},
+			{Taint: "INNER_ONLY", Replacement: "[INNER_ONLY REDACTED]"},
+		},
+		AllowedForBoundary: []security.BoundaryType{security.DMZBoundary, security.OuterBoundary},
+	}
+
+	dmzAgent := runtime.CreateAgent("dmz-agent", mail.DMZBoundary, taintPolicy)
+	if dmzAgent == nil {
+		t.Fatal("Failed to create DMZ agent")
+	}
+
+	session, err := runtime.StartStreamingSession("dmz-agent", mail.OuterBoundary)
+	if err != nil {
+		t.Fatalf("Failed to start streaming session: %v", err)
+	}
+
+	chunkWithPII := "User email is john.doe@example.com and SSN is 123-45-6789"
+	chunkWithInnerOnly := "Internal secret key: sk-12345-abcde"
+	chunkWithToolOutput := "Tool executed successfully"
+
+	latency, err := runtime.SendStreamChunk(session, chunkWithPII, []string{"TOOL_OUTPUT", "PII", "INNER_ONLY"})
+	if err != nil {
+		t.Fatalf("Failed to send chunk with PII: %v", err)
+	}
+	if latency >= 50*time.Millisecond {
+		t.Errorf("Chunk with PII sanitization latency %v exceeds 50ms limit", latency)
+	}
+
+	latency, err = runtime.SendStreamChunk(session, chunkWithInnerOnly, []string{"TOOL_OUTPUT", "INNER_ONLY"})
+	if err != nil {
+		t.Fatalf("Failed to send chunk with INNER_ONLY: %v", err)
+	}
+	if latency >= 50*time.Millisecond {
+		t.Errorf("Chunk with INNER_ONLY sanitization latency %v exceeds 50ms limit", latency)
+	}
+
+	latency, err = runtime.SendStreamChunk(session, chunkWithToolOutput, []string{"TOOL_OUTPUT"})
+	if err != nil {
+		t.Fatalf("Failed to send chunk with TOOL_OUTPUT only: %v", err)
+	}
+	if latency >= 50*time.Millisecond {
+		t.Errorf("Chunk with TOOL_OUTPUT sanitization latency %v exceeds 50ms limit", latency)
+	}
+
+	session.chunks[len(session.chunks)-1].IsFinal = true
+
+	result, err := runtime.EndStreamSession(session)
+	if err != nil {
+		t.Fatalf("Failed to end streaming session: %v", err)
+	}
+
+	if len(result.Chunks) != 3 {
+		t.Errorf("Expected 3 chunks, got %d", len(result.Chunks))
+	}
+
+	forbiddenTaintsFound := false
+	for _, chunk := range result.Chunks {
+		for _, taint := range chunk.Taints {
+			if taint == "PII" || taint == "INNER_ONLY" {
+				forbiddenTaintsFound = true
+				t.Errorf("Chunk contains forbidden taint: %s", taint)
+			}
+		}
+	}
+
+	if forbiddenTaintsFound {
+		t.Error("Forbidden taints (PII, INNER_ONLY) should be removed/redacted from delivered chunks")
+	}
+
+	allowedTaintsFound := false
+	for _, chunk := range result.Chunks {
+		for _, taint := range chunk.Taints {
+			if taint == "TOOL_OUTPUT" {
+				allowedTaintsFound = true
+			}
+		}
+	}
+
+	if !allowedTaintsFound {
+		t.Error("Allowed taint TOOL_OUTPUT should be present in chunk metadata")
+	}
+}
