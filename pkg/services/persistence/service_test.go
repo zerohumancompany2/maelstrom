@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/maelstrom/v3/pkg/security"
@@ -269,5 +270,35 @@ func TestSnapshot_AllowedOnExit_EnforcesPolicy(t *testing.T) {
 		if !found {
 			t.Errorf("Expected taint %s to be stored", taint)
 		}
+	}
+}
+
+func TestSnapshot_AllowedOnExit_BlocksForbiddenTaints(t *testing.T) {
+	ps := NewPersistenceService().(*persistenceService)
+
+	runtimeID := statechart.RuntimeID("test-runtime-forbidden")
+	taints := []string{"TOOL_OUTPUT", "INNER_ONLY"}
+
+	ps.taints[string(runtimeID)] = taints
+	ps.state[string(runtimeID)] = map[string]any{"data": "test state"}
+
+	policy := security.EnforcementPolicy{
+		AllowedOnExit: []string{"TOOL_OUTPUT", "USER_SUPPLIED"},
+		Enforcement:   "strict",
+	}
+
+	snap, err := ps.Snapshot(string(runtimeID), policy)
+
+	if err == nil {
+		t.Fatalf("Expected error for forbidden taint INNER_ONLY, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "INNER_ONLY") {
+		t.Errorf("Expected error message to contain 'INNER_ONLY', got: %v", err)
+	}
+
+	_, exists := ps.snapshots[snap.ID]
+	if exists && snap.ID != "" {
+		t.Error("Expected no snapshot to be created for forbidden taints")
 	}
 }
