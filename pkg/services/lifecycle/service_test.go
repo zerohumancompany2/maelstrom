@@ -526,3 +526,36 @@ func TestHotReload_PrepareForReload(t *testing.T) {
 		t.Fatalf("prepareForReload should return nil error for quiescent runtime, got: %v", err)
 	}
 }
+
+func TestHotReload_ShallowHistory(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	snapshot := statechart.Snapshot{
+		RuntimeID:      statechart.RuntimeID("original-runtime"),
+		DefinitionID:   "test-chart",
+		ActiveStates:   []string{"idle"},
+		RuntimeContext: statechart.RuntimeContext{ChartID: "test-chart", RuntimeID: "original-runtime"},
+	}
+
+	rtID, err := svc.restoreWithShallowHistory(snapshot)
+	if err != nil {
+		t.Fatalf("restoreWithShallowHistory should return nil error, got: %v", err)
+	}
+
+	if rtID == "" {
+		t.Error("Expected non-empty RuntimeID")
+	}
+
+	list, err := svc.List()
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+
+	if len(list) != 1 {
+		t.Errorf("Expected 1 runtime, got %d", len(list))
+	}
+
+	if list[0].ActiveStates[0] != "idle" {
+		t.Errorf("Expected state 'idle', got %s", list[0].ActiveStates[0])
+	}
+}

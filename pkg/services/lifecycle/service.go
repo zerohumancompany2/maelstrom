@@ -239,3 +239,25 @@ func (l *LifecycleService) prepareForReload(runtimeID string, timeoutMs int) err
 		return statechart.ErrQuiescenceTimeout
 	}
 }
+
+func (l *LifecycleService) restoreWithShallowHistory(snapshot statechart.Snapshot) (statechart.RuntimeID, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	id := statechart.RuntimeID(fmt.Sprintf("restored-%s-%d", snapshot.RuntimeID, len(l.runtimes)))
+	runtimeID := string(id)
+
+	l.runtimes[id] = RuntimeInfo{
+		ID:           runtimeID,
+		DefinitionID: snapshot.DefinitionID,
+		Boundary:     mail.InnerBoundary,
+		ActiveStates: snapshot.ActiveStates,
+		IsRunning:    false,
+	}
+
+	l.stateHistory[runtimeID] = []StateTransition{
+		{From: "", To: snapshot.ActiveStates[0], Timestamp: time.Now()},
+	}
+
+	return id, nil
+}
