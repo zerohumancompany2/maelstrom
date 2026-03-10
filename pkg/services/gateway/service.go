@@ -53,6 +53,9 @@ func NewGatewayService() GatewayService {
 
 // RegisterAdapter registers a channel adapter
 func (g *gatewayService) RegisterAdapter(name string, adapter ChannelAdapter) error {
+	if _, exists := g.adapters[name]; exists {
+		return errors.New("adapter already registered")
+	}
 	g.adapters[name] = adapter
 	return nil
 }

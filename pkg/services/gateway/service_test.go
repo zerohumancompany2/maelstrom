@@ -13,6 +13,22 @@ func TestGatewayService_ID(t *testing.T) {
 	}
 }
 
+// TestGatewayService_RegisterAdapter_DuplicateReturnsError - Spec: arch-v1.md L659-666
+func TestGatewayService_RegisterAdapter_DuplicateReturnsError(t *testing.T) {
+	svc := NewGatewayService()
+	adapter := &WebhookAdapter{}
+
+	// First registration should succeed
+	if err := svc.RegisterAdapter("webhook", adapter); err != nil {
+		t.Fatalf("First registration should succeed: %v", err)
+	}
+
+	// Duplicate registration should return error
+	if err := svc.RegisterAdapter("webhook", adapter); err == nil {
+		t.Error("Expected error on duplicate registration, got nil")
+	}
+}
+
 func TestGateway_RegisterAdapter(t *testing.T) {
 	// Test: Register webhook, websocket, sse, smtp adapters
 	svc := NewGatewayService()
