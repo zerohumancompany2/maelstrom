@@ -2,6 +2,7 @@ package lifecycle
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -262,17 +263,26 @@ func (l *LifecycleService) restoreWithShallowHistory(snapshot statechart.Snapsho
 	return id, nil
 }
 
-func (l *LifecycleService) restoreWithDeepHistory(snapshot statechart.Snapshot, targetState string) (statechart.RuntimeID, error) {
+func (l *LifecycleService) restoreWithDeepHistory(snapshot statechart.Snapshot, targetState string, def statechart.ChartDefinition) (statechart.RuntimeID, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-
-	id := statechart.RuntimeID(fmt.Sprintf("restored-%s-%d", snapshot.RuntimeID, len(l.runtimes)))
-	runtimeID := string(id)
 
 	activeState := targetState
 	if regionState, ok := snapshot.RegionStates[snapshot.ActiveStates[0]]; ok {
 		activeState = regionState
 	}
+
+	fallbackToShallow := false
+	if def.Root != nil {
+		fullStatePath := snapshot.ActiveStates[0] + "/" + activeState
+		if !l.stateExistsInDefinition(def, fullStatePath) {
+			activeState = snapshot.ActiveStates[0]
+			fallbackToShallow = true
+		}
+	}
+
+	id := statechart.RuntimeID(fmt.Sprintf("restored-%s-%d", snapshot.RuntimeID, len(l.runtimes)))
+	runtimeID := string(id)
 
 	l.runtimes[id] = RuntimeInfo{
 		ID:           runtimeID,
@@ -286,5 +296,43 @@ func (l *LifecycleService) restoreWithDeepHistory(snapshot statechart.Snapshot, 
 		{From: "", To: activeState, Timestamp: time.Now()},
 	}
 
+	if fallbackToShallow {
+		fmt.Printf("Warning: state %s not found, falling back to shallow history\n", targetState)
+	}
+
 	return id, nil
+}
+
+func (l *LifecycleService) stateExistsInDefinition(def statechart.ChartDefinition, statePath string) bool {
+	root := def.Root
+	if root == nil {
+		return false
+	}
+
+	parts := strings.Split(statePath, "/")
+	if len(parts) == 0 {
+		return false
+	}
+
+	current := root
+	if parts[0] == root.ID {
+		current = root
+	} else {
+		if child, ok := root.Children[parts[0]]; ok {
+			current = child
+		} else {
+			return false
+		}
+	}
+
+	for i := 1; i < len(parts); i++ {
+		part := parts[i]
+		if child, ok := current.Children[part]; ok {
+			current = child
+		} else {
+			return false
+		}
+	}
+
+	return true
 }

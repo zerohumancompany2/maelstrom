@@ -563,6 +563,23 @@ func TestHotReload_ShallowHistory(t *testing.T) {
 func TestHotReload_DeepHistory(t *testing.T) {
 	svc := NewLifecycleServiceWithoutEngine()
 
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+		Root: &statechart.Node{
+			ID: "root",
+			Children: map[string]*statechart.Node{
+				"idle": {
+					ID: "idle",
+					Children: map[string]*statechart.Node{
+						"sub-idle": {ID: "sub-idle"},
+					},
+				},
+			},
+		},
+	}
+
 	targetState := "idle/sub-idle"
 
 	snapshot := statechart.Snapshot{
@@ -573,7 +590,7 @@ func TestHotReload_DeepHistory(t *testing.T) {
 		RegionStates:   map[string]string{"idle": "sub-idle"},
 	}
 
-	rtID, err := svc.restoreWithDeepHistory(snapshot, targetState)
+	rtID, err := svc.restoreWithDeepHistory(snapshot, targetState, def)
 	if err != nil {
 		t.Fatalf("restoreWithDeepHistory should return nil error, got: %v", err)
 	}
@@ -593,5 +610,53 @@ func TestHotReload_DeepHistory(t *testing.T) {
 
 	if list[0].ActiveStates[0] != "sub-idle" {
 		t.Errorf("Expected state 'sub-idle', got %s", list[0].ActiveStates[0])
+	}
+}
+
+func TestHotReload_DeletedStateFallback(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+		Root: &statechart.Node{
+			ID: "root",
+			Children: map[string]*statechart.Node{
+				"idle": {ID: "idle"},
+			},
+		},
+	}
+
+	targetState := "deleted-state/path"
+
+	snapshot := statechart.Snapshot{
+		RuntimeID:      statechart.RuntimeID("original-runtime"),
+		DefinitionID:   "test-chart",
+		ActiveStates:   []string{"idle"},
+		RuntimeContext: statechart.RuntimeContext{ChartID: "test-chart", RuntimeID: "original-runtime"},
+		RegionStates:   map[string]string{"idle": "deleted-state"},
+	}
+
+	rtID, err := svc.restoreWithDeepHistory(snapshot, targetState, def)
+	if err != nil {
+		t.Fatalf("restoreWithDeepHistory should return nil error, got: %v", err)
+	}
+
+	if rtID == "" {
+		t.Error("Expected non-empty RuntimeID")
+	}
+
+	list, err := svc.List()
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+
+	if len(list) != 1 {
+		t.Errorf("Expected 1 runtime, got %d", len(list))
+	}
+
+	if list[0].ActiveStates[0] != "idle" {
+		t.Errorf("Expected fallback to state 'idle', got %s", list[0].ActiveStates[0])
 	}
 }
