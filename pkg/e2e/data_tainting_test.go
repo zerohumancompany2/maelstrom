@@ -60,3 +60,53 @@ func TestE2E_DataTainting_MessageCreationToExit(t *testing.T) {
 		t.Error("Expected violation logged to dead-letter queue for INNER_ONLY taint")
 	}
 }
+
+func TestE2E_DataTainting_AllowedExitPropagation(t *testing.T) {
+	runtime := NewE2ERuntime()
+	if err := runtime.Start(); err != nil {
+		t.Fatalf("Failed to start runtime: %v", err)
+	}
+	defer runtime.Stop()
+
+	taintPolicy := security.TaintPolicy{
+		AllowedForBoundary: []security.BoundaryType{security.DMZBoundary, security.OuterBoundary},
+	}
+	dmzAgent := runtime.CreateAgent("dmz-agent", mail.DMZBoundary, taintPolicy)
+	if dmzAgent == nil {
+		t.Fatal("Failed to create DMZ agent")
+	}
+
+	outerAgent := runtime.CreateAgent("outer-agent", mail.OuterBoundary, security.TaintPolicy{})
+	if outerAgent == nil {
+		t.Fatal("Failed to create outer agent")
+	}
+
+	toolResult := map[string]interface{}{
+		"_taints": []string{"TOOL_OUTPUT"},
+		"data":    "search results",
+	}
+
+	mailWithToolOutput, err := runtime.SendMail("dmz-agent", "outer-agent", toolResult, []string{"TOOL_OUTPUT"})
+	if err != nil {
+		t.Fatalf("Expected TOOL_OUTPUT taint to be allowed on exit, got error: %v", err)
+	}
+	if mailWithToolOutput == nil {
+		t.Fatal("Mail with TOOL_OUTPUT taint should be delivered")
+	}
+
+	hasToolOutput := false
+	for _, taint := range mailWithToolOutput.Metadata.Taints {
+		if taint == "TOOL_OUTPUT" {
+			hasToolOutput = true
+			break
+		}
+	}
+	if !hasToolOutput {
+		t.Error("Expected TOOL_OUTPUT taint to be preserved in mail")
+	}
+
+	violations := runtime.GetViolations()
+	if len(violations) > 0 {
+		t.Errorf("Expected no violations for allowed taint TOOL_OUTPUT, got %d violations", len(violations))
+	}
+}
