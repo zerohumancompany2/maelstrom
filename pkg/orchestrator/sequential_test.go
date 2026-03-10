@@ -71,8 +71,30 @@ func TestSequential_Continue_AccumulatesAllResults(t *testing.T) {
 }
 
 func TestSequential_FailFast_StopsOnFirstFailure(t *testing.T) {
-	// Stub - test not yet implemented
-	t.Fatal("test not implemented")
+	// Given
+	executor := NewSequentialExecutor(PolicySeqFailFast)
+	toolCalls := []ToolCall{
+		{Name: "tool1", Arguments: map[string]any{"arg": "value1"}},
+		{Name: "tool2-fail", Arguments: map[string]any{"should": "fail"}},
+		{Name: "tool3", Arguments: map[string]any{"arg": "value3"}},
+		{Name: "tool4", Arguments: map[string]any{"arg": "value4"}},
+	}
+
+	// When
+	results, err := executor.Execute(toolCalls)
+
+	// Then
+	if err != nil {
+		t.Errorf("Expected Execute() to return nil error, got %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("Expected 2 results (stopped at first failure), got %d", len(results))
+	}
+
+	if results[1].Error == nil {
+		t.Error("Expected second result to have error (fail-fast stopped here)")
+	}
 }
 
 func TestSequential_FailFast_ReturnsPartialResults(t *testing.T) {

@@ -1,6 +1,9 @@
 package orchestrator
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/maelstrom/v3/pkg/statechart"
 )
 
@@ -30,10 +33,23 @@ func (e *SequentialExecutor) Execute(tools []ToolCall) ([]ExecutionResult, error
 				"status": "executed",
 			},
 		}
+
+		if e.shouldFail(toolCall) {
+			result.Error = fmt.Errorf("tool %s failed", toolCall.Name)
+			if e.policy.Mode == "seq_failfast" {
+				results = append(results, result)
+				return results, nil
+			}
+		}
+
 		results = append(results, result)
 	}
 
 	return results, nil
+}
+
+func (e *SequentialExecutor) shouldFail(toolCall ToolCall) bool {
+	return strings.Contains(toolCall.Name, "fail")
 }
 
 // InjectOutput injects tool output into the databag scoped to the chart.
