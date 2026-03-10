@@ -8,7 +8,8 @@ import (
 )
 
 type SecurityService struct {
-	mu sync.Mutex
+	mu          sync.Mutex
+	taintTracks map[string]security.TaintMap
 }
 
 type NotImplementedError struct{}
@@ -18,7 +19,9 @@ func (NotImplementedError) Error() string {
 }
 
 func NewSecurityService() *SecurityService {
-	return &SecurityService{}
+	return &SecurityService{
+		taintTracks: make(map[string]security.TaintMap),
+	}
 }
 
 func (s *SecurityService) ID() string {
@@ -130,7 +133,34 @@ func (s *SecurityService) TaintPropagate(obj any, newTaints []string) (any, erro
 }
 
 func (s *SecurityService) ReportTaints(runtimeId string) (security.TaintMap, error) {
-	return nil, NotImplementedError{}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	taintMap, ok := s.taintTracks[runtimeId]
+	if !ok {
+		return make(security.TaintMap), nil
+	}
+
+	result := make(security.TaintMap)
+	for k, v := range taintMap {
+		result[k] = make([]string, len(v))
+		copy(result[k], v)
+	}
+
+	return result, nil
+}
+
+func (s *SecurityService) TrackTaint(runtimeId, objectID, taint string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.taintTracks[runtimeId] == nil {
+		s.taintTracks[runtimeId] = make(security.TaintMap)
+	}
+
+	s.taintTracks[runtimeId][objectID] = append(s.taintTracks[runtimeId][objectID], taint)
+
+	return nil
 }
 
 func (s *SecurityService) PrepareContextForBoundary(runtimeId string, boundary mail.BoundaryType) error {

@@ -390,6 +390,64 @@ func TestSecurityService_CheckTaintPolicy_EnforcementModes(t *testing.T) {
 	}
 }
 
+func TestSecurityService_ReportTaints_CompleteMap(t *testing.T) {
+	svc := NewSecurityService()
+
+	_ = svc.TrackTaint("agent-456", "object-1", "PII")
+	_ = svc.TrackTaint("agent-456", "object-1", "SECRET")
+	_ = svc.TrackTaint("agent-456", "object-2", "EXTERNAL")
+	_ = svc.TrackTaint("agent-789", "object-3", "INTERNAL")
+
+	taintMap, err := svc.ReportTaints("agent-456")
+
+	if err != nil {
+		t.Errorf("Expected ReportTaints to return nil error, got %v", err)
+	}
+
+	if taintMap == nil {
+		t.Error("Expected ReportTaints to return non-nil TaintMap")
+	}
+
+	object1Taints, ok := taintMap["object-1"]
+	if !ok {
+		t.Error("Expected object-1 to be in TaintMap")
+	}
+
+	hasPII := false
+	hasSecret := false
+	for _, t := range object1Taints {
+		if t == "PII" {
+			hasPII = true
+		}
+		if t == "SECRET" {
+			hasSecret = true
+		}
+	}
+
+	if !hasPII || !hasSecret {
+		t.Error("Expected object-1 to have PII and SECRET taints")
+	}
+
+	object2Taints, ok := taintMap["object-2"]
+	if !ok {
+		t.Error("Expected object-2 to be in TaintMap")
+	}
+
+	if len(object2Taints) != 1 || object2Taints[0] != "EXTERNAL" {
+		t.Error("Expected object-2 to have EXTERNAL taint")
+	}
+
+	unknownTaintMap, err := svc.ReportTaints("unknown-agent")
+
+	if err != nil {
+		t.Errorf("Expected ReportTaints to return nil error for unknown agent, got %v", err)
+	}
+
+	if len(unknownTaintMap) != 0 {
+		t.Errorf("Expected empty TaintMap for unknown agent, got %d entries", len(unknownTaintMap))
+	}
+}
+
 func TestSecurityService_TaintPropagate_addTaints(t *testing.T) {
 	svc := NewSecurityService()
 
