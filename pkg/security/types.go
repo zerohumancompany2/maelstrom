@@ -411,9 +411,10 @@ type BoundaryService interface {
 }
 
 type IsolatedView struct {
-	RuntimeID string
-	Operation string
-	Boundary  BoundaryType
+	RuntimeID   string
+	Operation   string
+	Boundary    BoundaryType
+	ContextData map[string]any
 }
 
 type boundaryServiceImpl struct {

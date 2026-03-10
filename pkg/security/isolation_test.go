@@ -62,6 +62,32 @@ func TestNamespaceIsolate_FilterData(t *testing.T) {
 	}
 }
 
+func TestNamespaceIsolate_CreatesIsolatedContext(t *testing.T) {
+	runtimeId := "agent-123"
+	operation := "read"
+
+	view, err := NamespaceIsolate(runtimeId, operation)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if view.RuntimeID != runtimeId {
+		t.Errorf("Expected RuntimeID %s, got %s", runtimeId, view.RuntimeID)
+	}
+
+	if view.Operation != operation {
+		t.Errorf("Expected Operation %s, got %s", operation, view.Operation)
+	}
+
+	if view.Boundary != DMZBoundary {
+		t.Errorf("Expected Boundary DMZ, got %s", view.Boundary)
+	}
+
+	if view.ContextData == nil {
+		t.Error("Expected ContextData to be initialized")
+	}
+}
+
 func TestNamespaceIsolate_Operation(t *testing.T) {
 	t.Run("WriteOperation", func(t *testing.T) {
 		view, _ := NamespaceIsolate("agent-123", "write")

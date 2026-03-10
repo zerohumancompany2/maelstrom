@@ -2,9 +2,10 @@ package security
 
 func NamespaceIsolate(runtimeId string, operation string) (IsolatedView, error) {
 	return IsolatedView{
-		RuntimeID: runtimeId,
-		Operation: operation,
-		Boundary:  DMZBoundary,
+		RuntimeID:   runtimeId,
+		Operation:   operation,
+		Boundary:    DMZBoundary,
+		ContextData: make(map[string]any),
 	}, nil
 }
 
