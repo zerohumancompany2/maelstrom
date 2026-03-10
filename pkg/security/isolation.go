@@ -2,17 +2,16 @@ package security
 
 func NamespaceIsolate(runtimeId string, operation string) (IsolatedView, error) {
 	return IsolatedView{
-		ChartID:   runtimeId,
+		RuntimeID: runtimeId,
 		Operation: operation,
-		Namespace: runtimeId,
-		Isolated:  true,
+		Boundary:  DMZBoundary,
 	}, nil
 }
 
 func (iv *IsolatedView) FilterData(data any) any {
 	switch v := data.(type) {
 	case map[string]interface{}:
-		forbidden := getForbiddenTaintsForBoundary(DMZBoundary)
+		forbidden := getForbiddenTaintsForBoundary(iv.Boundary)
 		forbiddenSet := make(map[string]bool)
 		for _, f := range forbidden {
 			forbiddenSet[f] = true
