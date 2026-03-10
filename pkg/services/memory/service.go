@@ -24,6 +24,14 @@ func (s *memoryService) Embed(content string) ([]float32, error) {
 	return s.vectorStore.Embed(content)
 }
 
+func (s *memoryService) VectorSearch(query []float32, topK int) ([]MemoryItem, error) {
+	return s.vectorStore.Search(query, topK)
+}
+
+func (s *memoryService) StoreVectorItem(item MemoryItem) error {
+	return s.vectorStore.Store(item)
+}
+
 func (s *memoryService) StoreKey(key string, value interface{}) error {
 	s.store[key] = value
 	return nil
