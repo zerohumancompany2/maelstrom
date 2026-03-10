@@ -63,7 +63,13 @@ func (s *storageBackend) SaveSnapshot(snapshot Snapshot) error {
 }
 
 func (s *storageBackend) LoadSnapshot(id string) (Snapshot, error) {
-	return Snapshot{}, nil
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	snap, ok := s.snapshots[id]
+	if !ok {
+		return Snapshot{}, ErrSnapshotNotFound
+	}
+	return snap, nil
 }
 
 func (s *storageBackend) SaveEvent(event Event) error {
