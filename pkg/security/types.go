@@ -446,7 +446,24 @@ func (s *boundaryServiceImpl) NamespaceIsolate(chartID, operation string) (Isola
 }
 
 func (s *boundaryServiceImpl) ReportTaints(chartID string) (TaintMap, error) {
-	return make(TaintMap), nil
+	result := make(TaintMap)
+	engineImpl, ok := s.engine.(*taintEngineImpl)
+	if !ok {
+		return result, nil
+	}
+	for k, v := range engineImpl.taints {
+		result[k] = v
+	}
+	return s.collectTaintsFromRuntime(chartID, engineImpl, result)
+}
+
+func (s *boundaryServiceImpl) collectTaintsFromRuntime(chartID string, engineImpl *taintEngineImpl, result TaintMap) (TaintMap, error) {
+	if data, ok := engineImpl.taints[chartID]; ok {
+		for _, taint := range data {
+			result[chartID] = append(result[chartID], taint)
+		}
+	}
+	return result, nil
 }
 
 func (s *boundaryServiceImpl) PrepareContextForBoundary(chartID string, boundary BoundaryType) error {

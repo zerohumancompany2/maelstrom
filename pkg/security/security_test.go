@@ -1145,3 +1145,36 @@ func TestToolTaintOutput_NoAttach(t *testing.T) {
 		t.Errorf("Expected no automatic taints, got %v", resultMail.Metadata.Taints)
 	}
 }
+
+func TestReportTaints_GeneratesTaintMap(t *testing.T) {
+	engineImpl := &taintEngineImpl{
+		taints: TaintMap{
+			"user":   []string{"PII"},
+			"secret": []string{"SECRET"},
+		},
+	}
+
+	service := NewBoundaryService(engineImpl)
+	taintMap, err := service.ReportTaints("runtime-1")
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if len(taintMap) != 2 {
+		t.Errorf("Expected 2 entries in TaintMap, got %d", len(taintMap))
+	}
+
+	userTaints, ok := taintMap["user"]
+	if !ok {
+		t.Error("Expected 'user' key in TaintMap")
+	} else if len(userTaints) != 1 || userTaints[0] != "PII" {
+		t.Errorf("Expected user taints ['PII'], got %v", userTaints)
+	}
+
+	secretTaints, ok := taintMap["secret"]
+	if !ok {
+		t.Error("Expected 'secret' key in TaintMap")
+	} else if len(secretTaints) != 1 || secretTaints[0] != "SECRET" {
+		t.Errorf("Expected secret taints ['SECRET'], got %v", secretTaints)
+	}
+}
