@@ -222,7 +222,7 @@ func (s *SecurityService) ValidateAndSanitize(m mail.Mail, sourceBoundary, targe
 		if result.Metadata.Taints == nil {
 			result.Metadata.Taints = []string{}
 		}
-		result.Metadata.Taints = append(result.Metadata.Taints, "EXTERNAL")
+		result.Metadata.Taints = append(result.Metadata.Taints, "OUTER_BOUNDARY")
 		return result, nil
 	}
 

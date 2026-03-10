@@ -1032,3 +1032,48 @@ func TestRuntimeTaintQuery_EnablesViolationDetection(t *testing.T) {
 		t.Errorf("Expected Reason to be 'forbidden taint crossing boundary', got %s", event.Reason)
 	}
 }
+
+func TestHardcodedServices_SecurityBoundaryEnforcement(t *testing.T) {
+	svc := NewSecurityService()
+
+	outerMail := mail.Mail{
+		ID:       "test-001",
+		Source:   "agent:outer",
+		Target:   "agent:inner",
+		Content:  map[string]any{"data": "sensitive"},
+		Metadata: mail.MailMetadata{Boundary: mail.OuterBoundary},
+	}
+
+	taintedMail, err := svc.ValidateAndSanitize(outerMail, mail.OuterBoundary, mail.InnerBoundary)
+	if err != nil {
+		t.Errorf("Expected no error for outer→inner, got %v", err)
+	}
+	if !containsTaint(taintedMail.Metadata.Taints, "OUTER_BOUNDARY") {
+		t.Error("Expected OUTER_BOUNDARY taint added for outer→inner transition")
+	}
+
+	innerMail := mail.Mail{
+		ID:      "test-002",
+		Source:  "agent:inner",
+		Target:  "agent:outer",
+		Content: map[string]any{"secret": "password123"},
+		Metadata: mail.MailMetadata{
+			Boundary: mail.InnerBoundary,
+			Taints:   []string{"SECRET", "PII"},
+		},
+	}
+
+	_, err = svc.ValidateAndSanitize(innerMail, mail.InnerBoundary, mail.OuterBoundary)
+	if err == nil {
+		t.Error("Expected error for inner→outer with SECRET/PII taints")
+	}
+}
+
+func containsTaint(taints []string, target string) bool {
+	for _, t := range taints {
+		if t == target {
+			return true
+		}
+	}
+	return false
+}
