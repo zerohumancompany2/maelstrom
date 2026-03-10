@@ -328,3 +328,65 @@ func TestMemoryService_QueryPattern(t *testing.T) {
 		t.Errorf("Expected 1 node for From=alice, To=bob, got %d", len(nodes))
 	}
 }
+
+// TestMemoryService_TraverseRelationships - arch-v1.md L470: GraphStore must traverse relationships from a node
+func TestMemoryService_TraverseRelationships(t *testing.T) {
+	svc := NewMemoryService()
+
+	// Setup: Create a chain of relationships
+	// alice -> bob -> charlie -> david
+	svc.AddEdge("alice", "bob", "knows", nil)
+	svc.AddEdge("bob", "charlie", "knows", nil)
+	svc.AddEdge("charlie", "david", "knows", nil)
+
+	// Test 1: Traverse from alice with maxDepth=1 (should get alice->bob)
+	edges, err := svc.TraverseRelationships("alice", 1)
+	if err != nil {
+		t.Fatalf("TraverseRelationships failed: %v", err)
+	}
+	if len(edges) != 1 {
+		t.Errorf("Expected 1 edge for depth=1, got %d", len(edges))
+	}
+	if edges[0].From != "alice" || edges[0].To != "bob" {
+		t.Errorf("Expected edge alice->bob, got %s->%s", edges[0].From, edges[0].To)
+	}
+
+	// Test 2: Traverse from alice with maxDepth=2 (should get alice->bob, bob->charlie)
+	edges, err = svc.TraverseRelationships("alice", 2)
+	if err != nil {
+		t.Fatalf("TraverseRelationships failed: %v", err)
+	}
+	if len(edges) != 2 {
+		t.Errorf("Expected 2 edges for depth=2, got %d", len(edges))
+	}
+
+	// Test 3: Traverse from alice with maxDepth=3 (should get all 3 edges)
+	edges, err = svc.TraverseRelationships("alice", 3)
+	if err != nil {
+		t.Fatalf("TraverseRelationships failed: %v", err)
+	}
+	if len(edges) != 3 {
+		t.Errorf("Expected 3 edges for depth=3, got %d", len(edges))
+	}
+
+	// Test 4: Traverse from bob with maxDepth=1 (should get bob->charlie)
+	edges, err = svc.TraverseRelationships("bob", 1)
+	if err != nil {
+		t.Fatalf("TraverseRelationships failed: %v", err)
+	}
+	if len(edges) != 1 {
+		t.Errorf("Expected 1 edge for bob depth=1, got %d", len(edges))
+	}
+	if edges[0].From != "bob" || edges[0].To != "charlie" {
+		t.Errorf("Expected edge bob->charlie, got %s->%s", edges[0].From, edges[0].To)
+	}
+
+	// Test 5: Traverse from david (no outgoing edges)
+	edges, err = svc.TraverseRelationships("david", 1)
+	if err != nil {
+		t.Fatalf("TraverseRelationships failed: %v", err)
+	}
+	if len(edges) != 0 {
+		t.Errorf("Expected 0 edges for david, got %d", len(edges))
+	}
+}

@@ -185,5 +185,44 @@ func (gs *graphStore) Query(pattern GraphPattern) ([]GraphNode, error) {
 // Traverse traverses relationships from a start node
 // arch-v1.md L470: GraphStore must traverse relationships from a node
 func (gs *graphStore) Traverse(startNode string, maxDepth int) ([]GraphEdge, error) {
-	return nil, NotImplementedError
+	var results []GraphEdge
+	visited := make(map[string]bool)
+	queue := []struct {
+		node  string
+		depth int
+	}{
+		{node: startNode, depth: 0},
+	}
+
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		if current.depth >= maxDepth {
+			continue
+		}
+
+		node, exists := gs.nodes[current.node]
+		if !exists {
+			continue
+		}
+
+		for _, edge := range node.OutEdges {
+			edgeKey := fmt.Sprintf("%s:%s:%s", edge.From, edge.To, edge.Type)
+			if visited[edgeKey] {
+				continue
+			}
+			visited[edgeKey] = true
+			results = append(results, edge)
+
+			if current.depth+1 < maxDepth {
+				queue = append(queue, struct {
+					node  string
+					depth int
+				}{node: edge.To, depth: current.depth + 1})
+			}
+		}
+	}
+
+	return results, nil
 }
