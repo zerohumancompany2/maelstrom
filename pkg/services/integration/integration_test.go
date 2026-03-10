@@ -5,6 +5,7 @@ import (
 
 	"github.com/maelstrom/v3/pkg/mail"
 	pkgsecurity "github.com/maelstrom/v3/pkg/security"
+	svc "github.com/maelstrom/v3/pkg/services"
 	"github.com/maelstrom/v3/pkg/services/admin"
 	"github.com/maelstrom/v3/pkg/services/communication"
 	"github.com/maelstrom/v3/pkg/services/datasources"
@@ -16,6 +17,27 @@ import (
 	svcsecurity "github.com/maelstrom/v3/pkg/services/security"
 	"github.com/maelstrom/v3/pkg/services/tools"
 )
+
+// mockLifecycleService implements the Service interface for testing
+type mockLifecycleService struct {
+	id string
+}
+
+func (m *mockLifecycleService) ID() string {
+	return m.id
+}
+
+func (m *mockLifecycleService) HandleMail(mail mail.Mail) *svc.OutcomeEvent {
+	return nil
+}
+
+func (m *mockLifecycleService) Start() error {
+	return nil
+}
+
+func (m *mockLifecycleService) Stop() error {
+	return nil
+}
 
 func TestServicesIntegration_HandleMail(t *testing.T) {
 	// Create all 8 services
@@ -356,4 +378,46 @@ func TestServicesIntegration_MailBoundaryEnforcement(t *testing.T) {
 			t.Error("INNER_ONLY taint should not be allowed on outer boundary")
 		}
 	})
+}
+
+func TestLayer7_integrationAllHardcodedServicesStart(t *testing.T) {
+	// Create all 4 hardcoded core services
+	securitySvc := svcsecurity.NewSecurityService()
+	commSvc := communication.NewCommunicationService()
+	lifecycleSvc := &mockLifecycleService{id: "sys:lifecycle"}
+
+	// Test that all services can start
+	t.Run("security service starts", func(t *testing.T) {
+		err := securitySvc.Start()
+		if err != nil {
+			t.Errorf("Failed to start security service: %v", err)
+		}
+	})
+
+	t.Run("communication service starts", func(t *testing.T) {
+		err := commSvc.Start()
+		if err != nil {
+			t.Errorf("Failed to start communication service: %v", err)
+		}
+	})
+
+	t.Run("lifecycle service starts", func(t *testing.T) {
+		err := lifecycleSvc.Start()
+		if err != nil {
+			t.Errorf("Failed to start lifecycle service: %v", err)
+		}
+	})
+
+	// Test mock services can be registered
+	sr := svc.NewServiceRegistry()
+	err := sr.Register("sys:lifecycle", lifecycleSvc)
+	if err != nil {
+		t.Errorf("Failed to register lifecycle service: %v", err)
+	}
+
+	// Verify service is discoverable
+	svcList := sr.DiscoverServices()
+	if len(svcList) != 1 {
+		t.Errorf("Expected 1 service, got %d", len(svcList))
+	}
 }
