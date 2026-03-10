@@ -3,6 +3,7 @@ package tools
 import (
 	"errors"
 
+	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/security"
 )
 
@@ -127,4 +128,16 @@ func (s *toolsService) ResolveByName(name string) (ToolDescriptor, error) {
 		return zero, nil
 	}
 	return tool, nil
+}
+
+func (s *toolsService) HandleMail(m mail.Mail) error {
+	return nil
+}
+
+func (s *toolsService) Start() error {
+	return nil
+}
+
+func (s *toolsService) Stop() error {
+	return nil
 }

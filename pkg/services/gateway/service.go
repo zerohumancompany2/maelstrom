@@ -184,3 +184,15 @@ func allowLimitedMetadata(data map[string]any) map[string]any {
 	}
 	return result
 }
+
+func (g *gatewayService) HandleMail(m mail.Mail) error {
+	return nil
+}
+
+func (g *gatewayService) Start() error {
+	return nil
+}
+
+func (g *gatewayService) Stop() error {
+	return nil
+}

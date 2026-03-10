@@ -93,3 +93,15 @@ func (h *HumanGatewayService) CreateChatSession(agentID string) (*ChatSession, e
 	h.sessions[agentID] = session
 	return session, nil
 }
+
+func (h *HumanGatewayService) HandleMail(m mail.Mail) error {
+	return nil
+}
+
+func (h *HumanGatewayService) Start() error {
+	return nil
+}
+
+func (h *HumanGatewayService) Stop() error {
+	return nil
+}

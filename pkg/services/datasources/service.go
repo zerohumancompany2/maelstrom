@@ -109,6 +109,18 @@ func (s *datasourceService) AttachTaintsOnRead(m *mail.Mail, path string) *mail.
 	return m
 }
 
+func (s *datasourceService) HandleMail(m mail.Mail) error {
+	return nil
+}
+
+func (s *datasourceService) Start() error {
+	return nil
+}
+
+func (s *datasourceService) Stop() error {
+	return nil
+}
+
 type LocalDiskDatasource struct{}
 
 func (d *LocalDiskDatasource) TagOnWrite(path string, taints []string) error {

@@ -3,19 +3,21 @@ package memory
 import (
 	"errors"
 	"fmt"
+
+	"github.com/maelstrom/v3/pkg/mail"
 )
 
 var NotImplementedError = errors.New("not implemented")
 
 type memoryService struct {
-	store      map[string]interface{}
+	store       map[string]interface{}
 	vectorStore VectorStore
-	graphStore GraphStore
+	graphStore  GraphStore
 }
 
 func NewMemoryService() MemoryService {
 	return &memoryService{
-		store:      make(map[string]interface{}),
+		store:       make(map[string]interface{}),
 		vectorStore: newVectorStore(),
 		graphStore:  newGraphStore(),
 	}
@@ -56,10 +58,10 @@ func (s *memoryService) Store(runtimeId string, content string, metadata map[str
 	if err != nil {
 		return "", fmt.Errorf("failed to embed content: %w", err)
 	}
-	
+
 	// Generate unique ID
 	id := generateUniqueID(content, metadata)
-	
+
 	// Extract boundary safely
 	boundary := ""
 	if metadata != nil {
@@ -67,7 +69,7 @@ func (s *memoryService) Store(runtimeId string, content string, metadata map[str
 			boundary = b
 		}
 	}
-	
+
 	// Create and store memory item
 	item := MemoryItem{
 		ID:       id,
@@ -76,12 +78,12 @@ func (s *memoryService) Store(runtimeId string, content string, metadata map[str
 		Metadata: metadata,
 		Boundary: boundary,
 	}
-	
+
 	err = s.vectorStore.Store(item)
 	if err != nil {
 		return "", fmt.Errorf("failed to store item: %w", err)
 	}
-	
+
 	return id, nil
 }
 
@@ -111,4 +113,16 @@ func (s *memoryService) QueryPattern(pattern GraphPattern) ([]GraphNode, error) 
 
 func (s *memoryService) TraverseRelationships(startNode string, maxDepth int) ([]GraphEdge, error) {
 	return s.graphStore.Traverse(startNode, maxDepth)
+}
+
+func (s *memoryService) HandleMail(m mail.Mail) error {
+	return nil
+}
+
+func (s *memoryService) Start() error {
+	return nil
+}
+
+func (s *memoryService) Stop() error {
+	return nil
 }

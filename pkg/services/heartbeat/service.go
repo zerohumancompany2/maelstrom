@@ -12,10 +12,10 @@ import (
 var NotImplementedError = errors.New("not implemented")
 
 type heartbeatService struct {
-	schedules   map[string]Schedule
+	schedules    map[string]Schedule
 	agentInboxes map[string]*mail.AgentInbox
-	publisher   mail.Publisher
-	mu          sync.Mutex
+	publisher    mail.Publisher
+	mu           sync.Mutex
 }
 
 func NewHeartbeatService() HeartbeatService {
@@ -108,4 +108,16 @@ func (s *heartbeatService) GetInbox(agentID string) *mail.AgentInbox {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.agentInboxes[agentID]
+}
+
+func (s *heartbeatService) HandleMail(m mail.Mail) error {
+	return nil
+}
+
+func (s *heartbeatService) Start() error {
+	return nil
+}
+
+func (s *heartbeatService) Stop() error {
+	return nil
 }

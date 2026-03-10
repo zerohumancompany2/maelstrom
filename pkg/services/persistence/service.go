@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/security"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
@@ -146,5 +147,17 @@ func (s *persistenceService) Migrate(runtimeId string, newDef statechart.ChartDe
 	case CleanStart:
 		s.events[runtimeId] = []EventLogEntry{}
 	}
+	return nil
+}
+
+func (s *persistenceService) HandleMail(m mail.Mail) error {
+	return nil
+}
+
+func (s *persistenceService) Start() error {
+	return nil
+}
+
+func (s *persistenceService) Stop() error {
 	return nil
 }

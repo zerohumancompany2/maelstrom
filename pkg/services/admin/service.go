@@ -108,3 +108,15 @@ func (s *adminService) ExecuteCommandOnBoundary(cmd string, token string, bounda
 
 	return nil
 }
+
+func (s *adminService) HandleMail(m mail.Mail) error {
+	return nil
+}
+
+func (s *adminService) Start() error {
+	return nil
+}
+
+func (s *adminService) Stop() error {
+	return nil
+}
