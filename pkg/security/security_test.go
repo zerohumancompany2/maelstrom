@@ -1178,3 +1178,42 @@ func TestReportTaints_GeneratesTaintMap(t *testing.T) {
 		t.Errorf("Expected secret taints ['SECRET'], got %v", secretTaints)
 	}
 }
+
+func TestReportTaints_RecursiveCollection(t *testing.T) {
+	engineImpl := &taintEngineImpl{
+		taints: TaintMap{
+			"config.inner.key": []string{"SECRET", "INNER_ONLY"},
+		},
+	}
+
+	service := NewBoundaryService(engineImpl)
+	taintMap, err := service.ReportTaints("runtime-1")
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	expectedKey := "config.inner.key"
+	taints, ok := taintMap[expectedKey]
+	if !ok {
+		t.Errorf("Expected key '%s' in TaintMap", expectedKey)
+	} else if len(taints) != 2 {
+		t.Errorf("Expected 2 taints for '%s', got %d: %v", expectedKey, len(taints), taints)
+	} else {
+		hasSecret := false
+		hasInnerOnly := false
+		for _, t := range taints {
+			if t == "SECRET" {
+				hasSecret = true
+			}
+			if t == "INNER_ONLY" {
+				hasInnerOnly = true
+			}
+		}
+		if !hasSecret {
+			t.Error("Expected SECRET taint")
+		}
+		if !hasInnerOnly {
+			t.Error("Expected INNER_ONLY taint")
+		}
+	}
+}

@@ -452,16 +452,8 @@ func (s *boundaryServiceImpl) ReportTaints(chartID string) (TaintMap, error) {
 		return result, nil
 	}
 	for k, v := range engineImpl.taints {
-		result[k] = v
-	}
-	return s.collectTaintsFromRuntime(chartID, engineImpl, result)
-}
-
-func (s *boundaryServiceImpl) collectTaintsFromRuntime(chartID string, engineImpl *taintEngineImpl, result TaintMap) (TaintMap, error) {
-	if data, ok := engineImpl.taints[chartID]; ok {
-		for _, taint := range data {
-			result[chartID] = append(result[chartID], taint)
-		}
+		result[k] = make([]string, len(v))
+		copy(result[k], v)
 	}
 	return result, nil
 }
