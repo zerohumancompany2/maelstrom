@@ -483,3 +483,38 @@ func TestSnapshot_AllowedOnExit_BlocksForbiddenTaints(t *testing.T) {
 		t.Error("Expected no snapshot to be created for forbidden taints")
 	}
 }
+
+// TestHotreloadableServices_PersistenceSnapshotRestore - spec: arch-v1.md L486 (snapshot/restore with taints and session pointer)
+func TestHotreloadableServices_PersistenceSnapshotRestore(t *testing.T) {
+	svc := NewPersistenceService()
+	ps := svc.(*persistenceService)
+	runtimeId := "test-runtime-001"
+
+	ps.state[runtimeId] = map[string]any{"key": "value"}
+	ps.taints[runtimeId] = []string{"TOOL_OUTPUT"}
+
+	policy := security.EnforcementPolicy{AllowedOnExit: []string{"TOOL_OUTPUT"}, Enforcement: "strict"}
+	snap, err := svc.Snapshot(runtimeId, policy)
+	if err != nil {
+		t.Fatalf("Expected no error creating snapshot, got %v", err)
+	}
+	if snap.ID == "" {
+		t.Error("Expected non-empty snapshot ID")
+	}
+
+	if snap.RuntimeID != runtimeId {
+		t.Errorf("Expected RuntimeID '%s', got '%s'", runtimeId, snap.RuntimeID)
+	}
+	if snap.Taints == nil {
+		t.Error("Expected snapshot to include taints")
+	}
+
+	def := statechart.ChartDefinition{ID: "test-chart", Version: "1.0.0"}
+	restoredID, err := svc.Restore(snap.ID, def)
+	if err != nil {
+		t.Errorf("Expected no error restoring snapshot, got %v", err)
+	}
+	if restoredID == "" {
+		t.Error("Expected non-empty restored runtime ID")
+	}
+}
