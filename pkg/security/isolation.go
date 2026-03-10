@@ -1,5 +1,7 @@
 package security
 
+import "fmt"
+
 func NamespaceIsolate(runtimeId string, operation string) (IsolatedView, error) {
 	return IsolatedView{
 		RuntimeID:   runtimeId,
@@ -68,4 +70,11 @@ func (iv *IsolatedView) IsReadOperation() bool {
 
 func (iv *IsolatedView) IsWriteOperation() bool {
 	return iv.Operation == "write"
+}
+
+func (iv *IsolatedView) AccessData(otherRuntimeId string) error {
+	if otherRuntimeId != iv.RuntimeID {
+		return fmt.Errorf("namespace violation: cannot access data from runtime %s, isolated to %s", otherRuntimeId, iv.RuntimeID)
+	}
+	return nil
 }

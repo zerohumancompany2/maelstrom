@@ -1,6 +1,7 @@
 package security
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -85,6 +86,20 @@ func TestNamespaceIsolate_CreatesIsolatedContext(t *testing.T) {
 
 	if view.ContextData == nil {
 		t.Error("Expected ContextData to be initialized")
+	}
+}
+
+func TestNamespaceIsolate_BlocksCrossNamespaceAccess(t *testing.T) {
+	view, _ := NamespaceIsolate("agent-123", "read")
+	view.Boundary = DMZBoundary
+
+	err := view.AccessData("agent-456")
+	if err == nil {
+		t.Fatal("Expected error for cross-namespace access, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "namespace violation") {
+		t.Errorf("Expected namespace violation error, got: %v", err)
 	}
 }
 
