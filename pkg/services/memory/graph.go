@@ -14,7 +14,8 @@ type GraphStore interface {
 type GraphNode struct {
 	ID         string
 	Properties map[string]any
-	Edges      []GraphEdge
+	OutEdges   []GraphEdge // Outgoing edges (this node is From)
+	InEdges    []GraphEdge // Incoming edges (this node is To)
 }
 
 // GraphEdge represents an edge between nodes
@@ -50,23 +51,25 @@ func newGraphStore() GraphStore {
 // arch-v1.md L470: GraphStore must add edges between nodes with properties
 func (gs *graphStore) AddEdge(from, to, relationship string, properties map[string]any) error {
 	edgeKey := fmt.Sprintf("%s:%s:%s", from, to, relationship)
-	
+
 	// Ensure nodes exist
 	if _, exists := gs.nodes[from]; !exists {
 		gs.nodes[from] = GraphNode{
 			ID:         from,
 			Properties: make(map[string]any),
-			Edges:      []GraphEdge{},
+			OutEdges:   []GraphEdge{},
+			InEdges:    []GraphEdge{},
 		}
 	}
 	if _, exists := gs.nodes[to]; !exists {
 		gs.nodes[to] = GraphNode{
 			ID:         to,
 			Properties: make(map[string]any),
-			Edges:      []GraphEdge{},
+			OutEdges:   []GraphEdge{},
+			InEdges:    []GraphEdge{},
 		}
 	}
-	
+
 	// Create or update edge
 	edge := GraphEdge{
 		From:       from,
@@ -75,12 +78,17 @@ func (gs *graphStore) AddEdge(from, to, relationship string, properties map[stri
 		Properties: properties,
 	}
 	gs.edges[edgeKey] = edge
-	
-	// Update node edges (need to get node first, modify, then set back)
-	node := gs.nodes[from]
-	node.Edges = append(node.Edges, edge)
-	gs.nodes[from] = node
-	
+
+	// Update from node outgoing edges
+	fromNode := gs.nodes[from]
+	fromNode.OutEdges = append(fromNode.OutEdges, edge)
+	gs.nodes[from] = fromNode
+
+	// Update to node incoming edges
+	toNode := gs.nodes[to]
+	toNode.InEdges = append(toNode.InEdges, edge)
+	gs.nodes[to] = toNode
+
 	return nil
 }
 
@@ -88,61 +96,89 @@ func (gs *graphStore) AddEdge(from, to, relationship string, properties map[stri
 // arch-v1.md L470: GraphStore must query patterns and return matching nodes
 func (gs *graphStore) Query(pattern GraphPattern) ([]GraphNode, error) {
 	var results []GraphNode
-	
+
 	for id, node := range gs.nodes {
-		// If From specified without To, only return the From node
-		if pattern.From != "" && pattern.To == "" && id != pattern.From {
-			continue
-		}
-		// If To specified without From, only return the To node
-		if pattern.To != "" && pattern.From == "" && id != pattern.To {
-			continue
-		}
-		
-		// Check edges match pattern
-		for _, edge := range node.Edges {
-			// Check relationship type
-			if pattern.Relationship != "" && edge.Type != pattern.Relationship {
+		matched := false
+
+		// If From specified, only check outgoing edges and return From node
+		if pattern.From != "" {
+			if id != pattern.From {
 				continue
 			}
-			// Check if edge connects From to To
-			if pattern.From != "" && pattern.To != "" {
-				if edge.From != pattern.From || edge.To != pattern.To {
+			for _, edge := range node.OutEdges {
+				if pattern.Relationship != "" && edge.Type != pattern.Relationship {
 					continue
 				}
-			}
-			// Check if edge matches From (outgoing)
-			if pattern.From != "" && pattern.To == "" {
-				if edge.From != pattern.From {
+				if pattern.To != "" && edge.To != pattern.To {
 					continue
 				}
+				if pattern.Properties != nil {
+					match := true
+					for key, val := range pattern.Properties {
+						if edge.Properties == nil || edge.Properties[key] != val {
+							match = false
+							break
+						}
+					}
+					if !match {
+						continue
+					}
+				}
+				matched = true
+				break
 			}
-			// Check if edge matches To (incoming)
-			if pattern.To != "" && pattern.From == "" {
+		} else if pattern.To != "" {
+			// If To specified (without From), return nodes that have edges TO the To node
+			for _, edge := range node.OutEdges {
 				if edge.To != pattern.To {
 					continue
 				}
-			}
-			
-			// Check property filtering (only if Properties specified)
-			if pattern.Properties != nil {
-				match := true
-				for key, val := range pattern.Properties {
-					if edge.Properties == nil || edge.Properties[key] != val {
-						match = false
-						break
-					}
-				}
-				if !match {
+				if pattern.Relationship != "" && edge.Type != pattern.Relationship {
 					continue
 				}
+				if pattern.Properties != nil {
+					match := true
+					for key, val := range pattern.Properties {
+						if edge.Properties == nil || edge.Properties[key] != val {
+							match = false
+							break
+						}
+					}
+					if !match {
+						continue
+					}
+				}
+				matched = true
+				break
 			}
-			
+		} else {
+			// Only relationship or properties specified - return From nodes
+			for _, edge := range node.OutEdges {
+				if pattern.Relationship != "" && edge.Type != pattern.Relationship {
+					continue
+				}
+				if pattern.Properties != nil {
+					match := true
+					for key, val := range pattern.Properties {
+						if edge.Properties == nil || edge.Properties[key] != val {
+							match = false
+							break
+						}
+					}
+					if !match {
+						continue
+					}
+				}
+				matched = true
+				break
+			}
+		}
+
+		if matched {
 			results = append(results, node)
-			break
 		}
 	}
-	
+
 	return results, nil
 }
 

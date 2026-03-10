@@ -264,3 +264,67 @@ func TestMemoryService_AddEdge(t *testing.T) {
 		t.Error("Expected at least one node in query results")
 	}
 }
+
+// TestMemoryService_QueryPattern - arch-v1.md L470: GraphStore must query patterns and return matching nodes
+func TestMemoryService_QueryPattern(t *testing.T) {
+	svc := NewMemoryService()
+
+	// Setup: Create graph with multiple nodes and edges
+	svc.AddEdge("alice", "bob", "knows", map[string]any{"since": "2020"})
+	svc.AddEdge("alice", "charlie", "knows", map[string]any{"since": "2019"})
+	svc.AddEdge("bob", "david", "works-with", map[string]any{"level": "close"})
+	svc.AddEdge("charlie", "david", "works-with", map[string]any{"level": "casual"})
+
+	// Test 1: Query by From node (outgoing edges)
+	pattern := GraphPattern{From: "alice"}
+	nodes, err := svc.QueryPattern(pattern)
+	if err != nil {
+		t.Fatalf("QueryPattern failed: %v", err)
+	}
+	if len(nodes) != 1 {
+		t.Errorf("Expected 1 node for From=alice, got %d", len(nodes))
+	}
+
+	// Test 2: Query by To node (incoming edges)
+	pattern = GraphPattern{To: "david"}
+	nodes, err = svc.QueryPattern(pattern)
+	if err != nil {
+		t.Fatalf("QueryPattern failed: %v", err)
+	}
+	if len(nodes) != 2 {
+		t.Errorf("Expected 2 nodes for To=david, got %d", len(nodes))
+	}
+
+	// Test 3: Query by relationship type (returns From nodes)
+	pattern = GraphPattern{Relationship: "knows"}
+	nodes, err = svc.QueryPattern(pattern)
+	if err != nil {
+		t.Fatalf("QueryPattern failed: %v", err)
+	}
+	if len(nodes) != 1 {
+		t.Errorf("Expected 1 node for Relationship=knows, got %d", len(nodes))
+	}
+
+	// Test 4: Query with property filtering
+	pattern = GraphPattern{
+		Relationship: "works-with",
+		Properties:   map[string]any{"level": "close"},
+	}
+	nodes, err = svc.QueryPattern(pattern)
+	if err != nil {
+		t.Fatalf("QueryPattern with property filter failed: %v", err)
+	}
+	if len(nodes) != 1 {
+		t.Errorf("Expected 1 node for works-with with level=close, got %d", len(nodes))
+	}
+
+	// Test 5: Query by From and To
+	pattern = GraphPattern{From: "alice", To: "bob"}
+	nodes, err = svc.QueryPattern(pattern)
+	if err != nil {
+		t.Fatalf("QueryPattern failed: %v", err)
+	}
+	if len(nodes) != 1 {
+		t.Errorf("Expected 1 node for From=alice, To=bob, got %d", len(nodes))
+	}
+}
