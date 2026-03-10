@@ -1,14 +1,23 @@
 package lifecycle
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
+
+type transformData struct {
+	OldContext     any
+	NewVersion     string
+	ContextVersion string
+}
 
 type LifecycleService struct {
 	mu           sync.Mutex
@@ -335,4 +344,38 @@ func (l *LifecycleService) stateExistsInDefinition(def statechart.ChartDefinitio
 	}
 
 	return true
+}
+
+func (l *LifecycleService) applyContextTransform(oldContext any, newVersion string, templateStr string) (any, error) {
+	data := transformData{
+		OldContext:     oldContext,
+		NewVersion:     newVersion,
+		ContextVersion: newVersion,
+	}
+
+	funcMap := template.FuncMap{
+		"GetMapValue": func(m map[string]any, key string) any {
+			if val, ok := m[key]; ok {
+				return val
+			}
+			return ""
+		},
+	}
+
+	tmpl, err := template.New("contextTransform").Funcs(funcMap).Parse(templateStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return nil, fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal result: %w", err)
+	}
+
+	return result, nil
 }

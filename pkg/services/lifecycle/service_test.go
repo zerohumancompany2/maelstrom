@@ -723,3 +723,48 @@ func TestHotReload_HistoryPreservation(t *testing.T) {
 		t.Errorf("Expected 2 runtimes, got %d", len(list))
 	}
 }
+
+func TestHotReload_ContextTransform(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	oldContext := map[string]any{
+		"userId":   "user-123",
+		"state":    "idle",
+		"version":  "1.0.0",
+		"settings": map[string]any{"theme": "dark"},
+	}
+
+	newVersion := "2.0.0"
+
+	template := `{"userId":"{{GetMapValue .OldContext "userId"}}","state":"{{GetMapValue .OldContext "state"}}","newVersion":"{{.NewVersion}}","contextVersion":"{{.ContextVersion}}"}`
+
+	newContext, err := svc.applyContextTransform(oldContext, newVersion, template)
+	if err != nil {
+		t.Fatalf("applyContextTransform should return nil error, got: %v", err)
+	}
+
+	if newContext == nil {
+		t.Error("Expected non-nil new context")
+	}
+
+	newContextMap, ok := newContext.(map[string]any)
+	if !ok {
+		t.Error("Expected new context to be map[string]any")
+	}
+
+	if newContextMap["userId"] != "user-123" {
+		t.Errorf("Expected userId 'user-123', got %v", newContextMap["userId"])
+	}
+
+	if newContextMap["state"] != "idle" {
+		t.Errorf("Expected state 'idle', got %v", newContextMap["state"])
+	}
+
+	if newContextMap["newVersion"] != "2.0.0" {
+		t.Errorf("Expected newVersion '2.0.0', got %v", newContextMap["newVersion"])
+	}
+
+	if newContextMap["contextVersion"] != "2.0.0" {
+		t.Errorf("Expected contextVersion '2.0.0', got %v", newContextMap["contextVersion"])
+	}
+}
