@@ -484,8 +484,10 @@ func (r *E2ERuntime) GetMetrics() map[string]interface{} {
 	byType := make(map[string]int)
 	for _, v := range r.violations {
 		if content, ok := v.Content.(map[string]interface{}); ok {
-			if vtype, ok := content["type"].(string); ok {
-				byType[vtype]++
+			if forbiddenTaints, ok := content["forbidden_taints"].([]string); ok {
+				for _, taint := range forbiddenTaints {
+					byType[taint]++
+				}
 			}
 		}
 	}
@@ -511,7 +513,9 @@ func (r *E2ERuntime) QueryViolations(filters map[string]interface{}) []*Violatio
 			if vtype, ok := content["type"].(string); ok {
 				violation.Type = vtype
 			}
-			if ftaints, ok := content["taints"].([]string); ok {
+			if forbiddenTaints, ok := content["forbidden_taints"].([]string); ok {
+				violation.ForbiddenTaints = forbiddenTaints
+			} else if ftaints, ok := content["taints"].([]string); ok {
 				violation.ForbiddenTaints = ftaints
 			}
 		}
