@@ -559,3 +559,39 @@ func TestHotReload_ShallowHistory(t *testing.T) {
 		t.Errorf("Expected state 'idle', got %s", list[0].ActiveStates[0])
 	}
 }
+
+func TestHotReload_DeepHistory(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	targetState := "idle/sub-idle"
+
+	snapshot := statechart.Snapshot{
+		RuntimeID:      statechart.RuntimeID("original-runtime"),
+		DefinitionID:   "test-chart",
+		ActiveStates:   []string{"idle"},
+		RuntimeContext: statechart.RuntimeContext{ChartID: "test-chart", RuntimeID: "original-runtime"},
+		RegionStates:   map[string]string{"idle": "sub-idle"},
+	}
+
+	rtID, err := svc.restoreWithDeepHistory(snapshot, targetState)
+	if err != nil {
+		t.Fatalf("restoreWithDeepHistory should return nil error, got: %v", err)
+	}
+
+	if rtID == "" {
+		t.Error("Expected non-empty RuntimeID")
+	}
+
+	list, err := svc.List()
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+
+	if len(list) != 1 {
+		t.Errorf("Expected 1 runtime, got %d", len(list))
+	}
+
+	if list[0].ActiveStates[0] != "sub-idle" {
+		t.Errorf("Expected state 'sub-idle', got %s", list[0].ActiveStates[0])
+	}
+}

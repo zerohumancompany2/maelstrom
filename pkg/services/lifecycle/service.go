@@ -261,3 +261,30 @@ func (l *LifecycleService) restoreWithShallowHistory(snapshot statechart.Snapsho
 
 	return id, nil
 }
+
+func (l *LifecycleService) restoreWithDeepHistory(snapshot statechart.Snapshot, targetState string) (statechart.RuntimeID, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	id := statechart.RuntimeID(fmt.Sprintf("restored-%s-%d", snapshot.RuntimeID, len(l.runtimes)))
+	runtimeID := string(id)
+
+	activeState := targetState
+	if regionState, ok := snapshot.RegionStates[snapshot.ActiveStates[0]]; ok {
+		activeState = regionState
+	}
+
+	l.runtimes[id] = RuntimeInfo{
+		ID:           runtimeID,
+		DefinitionID: snapshot.DefinitionID,
+		Boundary:     mail.InnerBoundary,
+		ActiveStates: []string{activeState},
+		IsRunning:    false,
+	}
+
+	l.stateHistory[runtimeID] = []StateTransition{
+		{From: "", To: activeState, Timestamp: time.Now()},
+	}
+
+	return id, nil
+}
