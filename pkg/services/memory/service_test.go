@@ -99,3 +99,33 @@ func TestMemoryService_ID(t *testing.T) {
 		t.Errorf("Expected ID 'sys:memory', got '%s'", id)
 	}
 }
+
+// TestMemoryService_Embed - arch-v1.md L489: Content embedded to vector representation
+func TestMemoryService_Embed(t *testing.T) {
+	svc := NewMemoryService()
+
+	content := "test content for embedding"
+	
+	// Embed content to vector
+	vector, err := svc.Embed(content)
+	if err != nil {
+		t.Fatalf("Embed failed: %v", err)
+	}
+	
+	// Check vector dimension is consistent (384)
+	if len(vector) != 384 {
+		t.Errorf("Expected vector dimension 384, got %d", len(vector))
+	}
+	
+	// Check deterministic: same content produces same vector
+	vector2, err := svc.Embed(content)
+	if err != nil {
+		t.Fatalf("Embed failed on second call: %v", err)
+	}
+	
+	for i := range vector {
+		if vector[i] != vector2[i] {
+			t.Errorf("Embedding not deterministic at index %d: %f != %f", i, vector[i], vector2[i])
+		}
+	}
+}

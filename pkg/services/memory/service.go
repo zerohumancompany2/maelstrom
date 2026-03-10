@@ -20,6 +20,10 @@ func (s *memoryService) ID() string {
 	return "sys:memory"
 }
 
+func (s *memoryService) Embed(content string) ([]float32, error) {
+	return s.vectorStore.Embed(content)
+}
+
 func (s *memoryService) StoreKey(key string, value interface{}) error {
 	s.store[key] = value
 	return nil

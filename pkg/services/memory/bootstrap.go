@@ -5,6 +5,7 @@ import "github.com/maelstrom/v3/pkg/statechart"
 // MemoryService interface for memory operations
 type MemoryService interface {
 	ID() string
+	Embed(content string) ([]float32, error)
 	Store(runtimeId string, content string, metadata map[string]any) (string, error)
 	Query(vector []float32, topK int, boundaryFilter string) ([]MemoryResult, error)
 	QueryByQuery(query string, topK int, boundaryFilter string) ([]MemoryResult, error)
