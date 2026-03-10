@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -19,6 +20,8 @@ type E2ERuntime struct {
 	dataSources     map[string]datasource.DataSource
 	violations      []*mail.Mail
 	streamResults   map[string]*StreamTestResult
+	contextBlocks   map[string][]*security.ContextBlock
+	blockedBlocks   map[string][]*security.ContextBlock
 }
 
 type TestAgent struct {
@@ -88,6 +91,8 @@ func NewE2ERuntime() *E2ERuntime {
 		dataSources:     make(map[string]datasource.DataSource),
 		violations:      make([]*mail.Mail, 0),
 		streamResults:   make(map[string]*StreamTestResult),
+		contextBlocks:   make(map[string][]*security.ContextBlock),
+		blockedBlocks:   make(map[string][]*security.ContextBlock),
 	}
 
 	publisher := &testPublisher{runtime: rt}
@@ -511,27 +516,153 @@ func (r *E2ERuntime) attachTaintsToMessage(msg *mail.Mail, fileTaints []string) 
 }
 
 func (r *E2ERuntime) PrepareContextForBoundary(agentID string, boundary mail.BoundaryType) error {
-	r.mu.RLock()
-	_, ok := r.agents[agentID]
-	r.mu.RUnlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
+	_, ok := r.agents[agentID]
 	if !ok {
 		return nil
 	}
 
-	return r.securityService.PrepareContextForBoundary(agentID, boundary)
+	blocks, ok := r.contextBlocks[agentID]
+	if !ok || len(blocks) == 0 {
+		return nil
+	}
+
+	forbiddenTaints := r.getForbiddenTaintsForBoundary(boundary)
+	blocked := make([]*security.ContextBlock, 0)
+
+	for _, block := range blocks {
+		for taint := range block.Taints {
+			if r.isTaintForbidden(taint, forbiddenTaints) {
+				if block.TaintPolicy.RedactMode == "dropBlock" {
+					blocked = append(blocked, block)
+					r.logViolation(agentID, "taint_violation", []string{taint})
+				}
+				break
+			}
+		}
+	}
+
+	r.blockedBlocks[agentID] = blocked
+
+	filteredBlocks := make([]*security.ContextBlock, 0)
+	for _, block := range blocks {
+		isBlocked := false
+		for _, b := range blocked {
+			if b.Name == block.Name {
+				isBlocked = true
+				break
+			}
+		}
+		if !isBlocked {
+			filteredBlocks = append(filteredBlocks, block)
+		}
+	}
+
+	r.contextBlocks[agentID] = filteredBlocks
+
+	if len(blocked) > 0 {
+		return fmt.Errorf("dropped %d context blocks due to forbidden taints", len(blocked))
+	}
+
+	return nil
+}
+
+func (r *E2ERuntime) getForbiddenTaintsForBoundary(boundary mail.BoundaryType) []string {
+	switch boundary {
+	case mail.OuterBoundary:
+		return []string{"INNER_ONLY", "SECRET", "PII"}
+	case mail.DMZBoundary:
+		return []string{"INNER_ONLY", "SECRET"}
+	default:
+		return []string{}
+	}
+}
+
+func (r *E2ERuntime) isTaintForbidden(taint string, forbidden []string) bool {
+	for _, f := range forbidden {
+		if taint == f {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *E2ERuntime) logViolation(agentID, violationType string, taints []string) {
+	violationMail := mail.Mail{
+		ID:        "violation-" + agentID + "-" + violationType,
+		Type:      mail.MailTypeTaintViolation,
+		Source:    agentID,
+		Target:    "sys:observability",
+		Content:   map[string]interface{}{"type": violationType, "taints": taints},
+		CreatedAt: time.Now(),
+		Metadata: mail.MailMetadata{
+			Taints: taints,
+		},
+	}
+
+	r.violations = append(r.violations, &violationMail)
+	r.deadLetterQueue = append(r.deadLetterQueue, &violationMail)
 }
 
 func (r *E2ERuntime) GetContextMap(agentID string) (*security.ContextMap, error) {
 	r.mu.RLock()
+	defer r.mu.RUnlock()
 	_, ok := r.agents[agentID]
-	r.mu.RUnlock()
 
 	if !ok {
 		return nil, nil
 	}
 
+	blocks, ok := r.contextBlocks[agentID]
+	if !ok {
+		return &security.ContextMap{
+			Blocks: make([]*security.ContextBlock, 0),
+		}, nil
+	}
+
 	return &security.ContextMap{
-		Blocks: make([]*security.ContextBlock, 0),
+		Blocks: blocks,
 	}, nil
+}
+
+func (r *E2ERuntime) RegisterContextBlock(agentID string, block *security.ContextBlock) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.contextBlocks == nil {
+		r.contextBlocks = make(map[string][]*security.ContextBlock)
+	}
+
+	r.contextBlocks[agentID] = append(r.contextBlocks[agentID], block)
+}
+
+func (r *E2ERuntime) GetBlockedContextBlocks(agentID string) []*security.ContextBlock {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	return r.blockedBlocks[agentID]
+}
+
+func (r *E2ERuntime) AssemblePromptForLLM(agentID string) string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	blocks, ok := r.contextBlocks[agentID]
+	if !ok || len(blocks) == 0 {
+		return ""
+	}
+
+	prompt := ""
+	for _, block := range blocks {
+		if block.Name != "" {
+			if prompt != "" {
+				prompt += "\n"
+			}
+			prompt += block.Content
+		}
+	}
+
+	return prompt
 }
