@@ -8,7 +8,8 @@ import (
 )
 
 type contractMockService struct {
-	id string
+	id          string
+	returnError bool
 }
 
 func (m *contractMockService) ID() string {
@@ -16,6 +17,15 @@ func (m *contractMockService) ID() string {
 }
 
 func (m *contractMockService) HandleMail(mail mail.Mail) *OutcomeEvent {
+	if m.returnError {
+		return &OutcomeEvent{
+			ServiceID:    m.id,
+			MailID:       mail.ID,
+			Status:       "error",
+			Timestamp:    time.Now(),
+			ErrorDetails: "test error",
+		}
+	}
 	return &OutcomeEvent{
 		ServiceID:    m.id,
 		MailID:       mail.ID,
@@ -107,5 +117,28 @@ func TestServiceContract_outcomeEventContainsServiceID(t *testing.T) {
 
 	if outcome.ServiceID != expectedServiceID {
 		t.Errorf("Expected ServiceID to be '%s', got '%s'", expectedServiceID, outcome.ServiceID)
+	}
+}
+
+// TestServiceContract_outcomeEventContainsErrorDetails - spec: arch-v1.md L479-480
+// Acceptance Criteria: OutcomeEvent contains ErrorDetails field
+func TestServiceContract_outcomeEventContainsErrorDetails(t *testing.T) {
+	expectedError := "test error"
+	svc := &contractMockService{id: "sys:test", returnError: true}
+	m := mail.Mail{
+		ID:      "test-mail-5",
+		Source:  "agent:test",
+		Target:  "sys:test",
+		Type:    mail.MailTypeUser,
+		Content: "test",
+	}
+
+	outcome := svc.HandleMail(m)
+
+	if outcome.Status != "error" {
+		t.Errorf("Expected Status to be 'error', got '%s'", outcome.Status)
+	}
+	if outcome.ErrorDetails != expectedError {
+		t.Errorf("Expected ErrorDetails to be '%s', got '%s'", expectedError, outcome.ErrorDetails)
 	}
 }
