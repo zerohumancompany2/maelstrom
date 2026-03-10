@@ -80,3 +80,37 @@ func createViolationMail(violation TaintViolation) mail.Mail {
 		},
 	}
 }
+
+func ReportContextBlockViolation(blockID string, taints []string, boundary BoundaryType, policy string) error {
+	countsMu.Lock()
+	violationCounts[blockID]++
+	countsMu.Unlock()
+
+	taintsInterface := make([]interface{}, len(taints))
+	for i, taint := range taints {
+		taintsInterface[i] = taint
+	}
+
+	mail := mail.Mail{
+		Type:   mail.MailTypeTaintViolation,
+		Source: "sys:security",
+		Target: "sys:observability",
+		Content: map[string]interface{}{
+			"blockID":   blockID,
+			"taints":    taintsInterface,
+			"boundary":  string(boundary),
+			"policy":    policy,
+			"timestamp": time.Now(),
+		},
+	}
+
+	routerMu.RLock()
+	router := violationRouter
+	routerMu.RUnlock()
+
+	if router == nil {
+		return nil
+	}
+
+	return router.Route(mail)
+}

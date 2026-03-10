@@ -1,9 +1,6 @@
 package security
 
-import (
-	"fmt"
-	"time"
-)
+import "fmt"
 
 type ContextMap struct {
 	Blocks     []*ContextBlock
@@ -201,14 +198,7 @@ func filterWithStrictEnforcement(block ContextBlock, boundary BoundaryType, glob
 	forbiddenTaint := forbiddenTaints[0]
 	err := fmt.Errorf("strict enforcement blocked block with forbidden taint: %s", forbiddenTaint)
 
-	violation := TaintViolation{
-		RuntimeID:       block.Name,
-		SourceBoundary:  boundary,
-		TargetBoundary:  boundary,
-		ForbiddenTaints: forbiddenTaints,
-		Timestamp:       time.Now(),
-	}
-	ReportViolation(block.Name, violation)
+	ReportContextBlockViolation(block.Name, forbiddenTaints, boundary, "strict")
 
 	return ContextBlock{}, err
 }
