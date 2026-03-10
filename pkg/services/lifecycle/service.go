@@ -388,3 +388,24 @@ func (l *LifecycleService) applyContextTransformWithFallback(oldContext any, new
 	}
 	return result, nil
 }
+
+func validateTransformTemplate(templateStr string) error {
+	funcMap := template.FuncMap{
+		"GetMapValue": func(m map[string]any, key string) any {
+			if val, ok := m[key]; ok {
+				return val
+			}
+			return ""
+		},
+	}
+
+	_, err := template.New("contextTransform").Funcs(funcMap).Parse(templateStr)
+	if err != nil {
+		return fmt.Errorf("invalid template syntax: %w", err)
+	}
+	return nil
+}
+
+func (l *LifecycleService) validateTransformTemplate(templateStr string) error {
+	return validateTransformTemplate(templateStr)
+}

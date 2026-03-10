@@ -768,3 +768,50 @@ func TestHotReload_ContextTransform(t *testing.T) {
 		t.Errorf("Expected contextVersion '2.0.0', got %v", newContextMap["contextVersion"])
 	}
 }
+
+func TestHotReload_TransformFailureFallback(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	oldContext := map[string]any{
+		"userId": "user-123",
+		"state":  "idle",
+	}
+
+	newVersion := "2.0.0"
+
+	invalidTemplate := `{{invalid syntax that will fail`
+
+	cleanStartCalled := false
+	cleanContext := map[string]any{"version": newVersion}
+
+	_, err := svc.applyContextTransformWithFallback(oldContext, newVersion, invalidTemplate, func() (any, error) {
+		cleanStartCalled = true
+		return cleanContext, nil
+	})
+
+	if err != nil {
+		t.Fatalf("applyContextTransformWithFallback should return nil error after fallback, got: %v", err)
+	}
+
+	if !cleanStartCalled {
+		t.Error("Expected cleanStart to be called on transform failure")
+	}
+}
+
+func TestHotReload_TemplateValidation(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	invalidTemplate := `{{invalid syntax that will fail`
+
+	err := svc.validateTransformTemplate(invalidTemplate)
+	if err == nil {
+		t.Error("Expected validateTransformTemplate to return error for invalid syntax")
+	}
+
+	validTemplate := `{"key":"{{GetMapValue .OldContext "key"}}","version":"{{.NewVersion}}"}`
+
+	err = svc.validateTransformTemplate(validTemplate)
+	if err != nil {
+		t.Errorf("Expected validateTransformTemplate to return nil for valid template, got: %v", err)
+	}
+}
