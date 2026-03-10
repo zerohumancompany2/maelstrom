@@ -125,3 +125,62 @@ spec:
   chartRef: charts/` + strings.ReplaceAll(name, ":", "-") + `
 `
 }
+
+// TestChartRegistry_yamlValidationOnLoad verifies YAML validation on load
+func TestChartRegistry_yamlValidationOnLoad(t *testing.T) {
+	// Create services directory with YAML files
+	servicesDir := "var/maelstrom/services/"
+	os.MkdirAll(servicesDir, 0755)
+	defer os.RemoveAll(servicesDir)
+
+	// Create valid service YAML
+	validYAML := `apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:gateway
+spec:
+  chartRef: charts/sys-gateway
+`
+	validPath := filepath.Join(servicesDir, "sys-gateway.yaml")
+	err := os.WriteFile(validPath, []byte(validYAML), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create valid service YAML: %v", err)
+	}
+
+	// Create invalid service YAML (missing required field)
+	invalidYAML := `apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:admin
+`
+	invalidPath := filepath.Join(servicesDir, "sys-admin.yaml")
+	err = os.WriteFile(invalidPath, []byte(invalidYAML), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create invalid service YAML: %v", err)
+	}
+
+	// Try to load services - should fail due to invalid YAML
+	registry := platform.NewChartRegistry(servicesDir)
+	_, err = registry.LoadPlatformServices()
+	if err == nil {
+		t.Error("Expected error when loading invalid YAML")
+	}
+
+	// Remove invalid YAML
+	os.Remove(invalidPath)
+
+	// Load services again - should succeed
+	services, err := registry.LoadPlatformServices()
+	if err != nil {
+		t.Fatalf("Failed to load valid platform services: %v", err)
+	}
+
+	// Verify only valid service was loaded
+	if len(services) != 1 {
+		t.Errorf("Expected 1 service loaded, got %d", len(services))
+	}
+
+	if services[0].Metadata.Name != "sys:gateway" {
+		t.Errorf("Expected service 'sys:gateway', got '%s'", services[0].Metadata.Name)
+	}
+}
