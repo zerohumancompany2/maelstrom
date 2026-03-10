@@ -202,3 +202,30 @@ func TestAdminService_OuterBoundaryOnly(t *testing.T) {
 		t.Errorf("Expected nil error for outer boundary, got %v", err)
 	}
 }
+
+// TestAdminService_TokenCreation - spec: arch-v1.md L467 (2FA-gated), L485 (authToken parameter)
+func TestAdminService_TokenCreation(t *testing.T) {
+	svc := NewAdminService()
+	adminSvc := svc.(*adminService)
+
+	token, err := adminSvc.authManager.CreateToken("admin-user", time.Second)
+	if err != nil {
+		t.Fatalf("Failed to create token: %v", err)
+	}
+
+	if token == "" {
+		t.Error("Expected non-empty token")
+	}
+
+	err = adminSvc.authManager.Verify2FA(token)
+	if err != nil {
+		t.Errorf("Expected valid token to verify, got error: %v", err)
+	}
+
+	time.Sleep(1500 * time.Millisecond)
+
+	err = adminSvc.authManager.Verify2FA(token)
+	if err == nil {
+		t.Error("Expected expired token to fail verification")
+	}
+}
