@@ -105,24 +105,24 @@ func TestMemoryService_Embed(t *testing.T) {
 	svc := NewMemoryService()
 
 	content := "test content for embedding"
-	
+
 	// Embed content to vector
 	vector, err := svc.Embed(content)
 	if err != nil {
 		t.Fatalf("Embed failed: %v", err)
 	}
-	
+
 	// Check vector dimension is consistent (384)
 	if len(vector) != 384 {
 		t.Errorf("Expected vector dimension 384, got %d", len(vector))
 	}
-	
+
 	// Check deterministic: same content produces same vector
 	vector2, err := svc.Embed(content)
 	if err != nil {
 		t.Fatalf("Embed failed on second call: %v", err)
 	}
-	
+
 	for i := range vector {
 		if vector[i] != vector2[i] {
 			t.Errorf("Embedding not deterministic at index %d: %f != %f", i, vector[i], vector2[i])
@@ -142,7 +142,7 @@ func TestMemoryService_VectorSearch(t *testing.T) {
 	if len(results) != 0 {
 		t.Errorf("Expected 0 results from empty store, got %d", len(results))
 	}
-	
+
 	// Store some items
 	item1 := MemoryItem{
 		ID:      "item-1",
@@ -154,21 +154,21 @@ func TestMemoryService_VectorSearch(t *testing.T) {
 		Content: "test content 2",
 		Vector:  []float32{0.0, 1.0, 0.0},
 	}
-	
+
 	svc.StoreVectorItem(item1)
 	svc.StoreVectorItem(item2)
-	
+
 	// Search with query similar to item1
 	query := []float32{1.0, 0.1, 0.0}
 	results, err = svc.VectorSearch(query, 2)
 	if err != nil {
 		t.Fatalf("VectorSearch failed: %v", err)
 	}
-	
+
 	if len(results) != 2 {
 		t.Errorf("Expected 2 results, got %d", len(results))
 	}
-	
+
 	// Check topK: requesting 1 should return 1
 	results, err = svc.VectorSearch(query, 1)
 	if err != nil {
@@ -177,7 +177,7 @@ func TestMemoryService_VectorSearch(t *testing.T) {
 	if len(results) != 1 {
 		t.Errorf("Expected 1 result with topK=1, got %d", len(results))
 	}
-	
+
 	// Check cosine similarity ranking: item1 should be first (more similar to query)
 	if results[0].ID != "item-1" {
 		t.Errorf("Expected item-1 to be first (most similar), got %s", results[0].ID)
@@ -189,37 +189,37 @@ func TestMemoryService_StoreItem(t *testing.T) {
 	svc := NewMemoryService()
 
 	metadata := map[string]any{"key": "value", "boundary": "system"}
-	
+
 	// Store item with content and metadata
 	memoryId, err := svc.Store("runtime-1", "test content", metadata)
 	if err != nil {
 		t.Fatalf("Store failed: %v", err)
 	}
-	
+
 	if memoryId == "" {
 		t.Error("Expected non-empty memory ID")
 	}
-	
+
 	// Item should be retrievable via VectorSearch
 	queryVector, err := svc.Embed("test content")
 	if err != nil {
 		t.Fatalf("Embed failed: %v", err)
 	}
-	
+
 	results, err := svc.VectorSearch(queryVector, 5)
 	if err != nil {
 		t.Fatalf("VectorSearch failed: %v", err)
 	}
-	
+
 	if len(results) != 1 {
 		t.Errorf("Expected 1 result, got %d", len(results))
 	}
-	
+
 	// Check that the stored item has the correct content
 	if results[0].Content != "test content" {
 		t.Errorf("Expected content 'test content', got '%s'", results[0].Content)
 	}
-	
+
 	// Check that vector was auto-computed (non-empty)
 	if len(results[0].Vector) == 0 {
 		t.Error("Expected auto-computed vector to be non-empty")
@@ -433,5 +433,49 @@ func TestMemoryService_BoundaryFilteredQuery(t *testing.T) {
 	// Should return all From nodes (alice, bob, charlie)
 	if len(nodes) != 3 {
 		t.Errorf("Expected 3 nodes for all knows, got %d", len(nodes))
+	}
+}
+
+// TestHotreloadableServices_MemoryContextMapInjection - spec: arch-v1.md L470, L488 (ContextMap injection via MessageSlice)
+func TestHotreloadableServices_MemoryContextMapInjection(t *testing.T) {
+	svc := NewMemoryService()
+
+	testVector := []float32{0.1, 0.2, 0.3, 0.4}
+	msg := MessageSlice{
+		ID:       "msg-001",
+		Content:  "test memory content",
+		Boundary: "dmz",
+		Taints:   []string{"USER_SUPPLIED"},
+	}
+	err := svc.Insert(testVector, msg)
+	if err != nil {
+		t.Fatalf("Expected no error inserting vector, got %v", err)
+	}
+
+	queryVector := []float32{0.11, 0.21, 0.31, 0.41}
+	results, err := svc.Query(queryVector, 5, "dmz")
+	if err != nil {
+		t.Fatalf("Expected no error querying, got %v", err)
+	}
+
+	if len(results) == 0 {
+		t.Error("Expected at least one result from query")
+	}
+
+	if results[0].Boundary != "dmz" {
+		t.Errorf("Expected boundary 'dmz', got '%s'", results[0].Boundary)
+	}
+
+	innerMsg := MessageSlice{ID: "msg-002", Content: "secret", Boundary: "inner", Taints: []string{"INNER_ONLY"}}
+	svc.Insert(testVector, innerMsg)
+
+	filteredResults, err := svc.Query(queryVector, 10, "outer")
+	if err != nil {
+		t.Fatalf("Expected no error querying with outer filter, got %v", err)
+	}
+	for _, r := range filteredResults {
+		if r.Boundary == "inner" {
+			t.Error("Expected inner boundary content to be filtered out for outer query")
+		}
 	}
 }

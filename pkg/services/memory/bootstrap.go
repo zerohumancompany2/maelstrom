@@ -5,6 +5,13 @@ import (
 	"github.com/maelstrom/v3/pkg/statechart"
 )
 
+type MessageSlice struct {
+	ID       string
+	Content  string
+	Boundary string
+	Taints   []string
+}
+
 // MemoryService interface for memory operations
 type MemoryService interface {
 	ID() string
@@ -21,6 +28,7 @@ type MemoryService interface {
 	AddEdge(from, to, relationship string, properties map[string]any) error
 	QueryPattern(pattern GraphPattern) ([]GraphNode, error)
 	TraverseRelationships(startNode string, maxDepth int) ([]GraphEdge, error)
+	Insert(vector []float32, msg MessageSlice) error
 	HandleMail(mail mail.Mail) error
 	Start() error
 	Stop() error

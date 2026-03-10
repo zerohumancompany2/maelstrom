@@ -87,12 +87,78 @@ func (s *memoryService) Store(runtimeId string, content string, metadata map[str
 	return id, nil
 }
 
+func (s *memoryService) Insert(vector []float32, msg MessageSlice) error {
+	item := MemoryItem{
+		ID:       msg.ID,
+		Content:  msg.Content,
+		Vector:   vector,
+		Boundary: msg.Boundary,
+		Metadata: map[string]any{
+			"taints": msg.Taints,
+		},
+	}
+	return s.vectorStore.Store(item)
+}
+
 func (s *memoryService) Query(vector []float32, topK int, boundaryFilter string) ([]MemoryResult, error) {
-	return []MemoryResult{}, nil
+	items, err := s.vectorStore.Search(vector, topK)
+	if err != nil {
+		return nil, err
+	}
+
+	results := make([]MemoryResult, 0, len(items))
+	for _, item := range items {
+		if boundaryFilter != "" {
+			switch boundaryFilter {
+			case "inner":
+				results = append(results, MemoryResult{
+					ID:       item.ID,
+					Content:  item.Content,
+					Score:    0,
+					Boundary: item.Boundary,
+					Metadata: item.Metadata,
+				})
+			case "dmz":
+				if item.Boundary != "inner" {
+					results = append(results, MemoryResult{
+						ID:       item.ID,
+						Content:  item.Content,
+						Score:    0,
+						Boundary: item.Boundary,
+						Metadata: item.Metadata,
+					})
+				}
+			case "outer":
+				if item.Boundary != "inner" && item.Boundary != "dmz" {
+					results = append(results, MemoryResult{
+						ID:       item.ID,
+						Content:  item.Content,
+						Score:    0,
+						Boundary: item.Boundary,
+						Metadata: item.Metadata,
+					})
+				}
+			}
+		} else {
+			results = append(results, MemoryResult{
+				ID:       item.ID,
+				Content:  item.Content,
+				Score:    0,
+				Boundary: item.Boundary,
+				Metadata: item.Metadata,
+			})
+		}
+	}
+
+	return results, nil
 }
 
 func (s *memoryService) QueryByQuery(query string, topK int, boundaryFilter string) ([]MemoryResult, error) {
-	return []MemoryResult{}, nil
+	vector, err := s.Embed(query)
+	if err != nil {
+		return nil, err
+	}
+	return s.Query(vector, topK, boundaryFilter)
 }
 
 func (s *memoryService) Delete(memoryId string) error {
