@@ -20,6 +20,43 @@ func TestPersistenceService_ID(t *testing.T) {
 	}
 }
 
+// TestPersistenceService_Snapshot verifies Snapshot creates snapshot with runtime state, taints, context
+// Spec Reference: arch-v1.md L468 (Snapshots, event sourcing, version migration), L486 (snapshot(runtimeId))
+func TestPersistenceService_Snapshot(t *testing.T) {
+	ps := NewPersistenceService().(*persistenceService)
+
+	runtimeID := statechart.RuntimeID("test-runtime-snapshot")
+	ps.state[string(runtimeID)] = map[string]any{"key": "value", "nested": map[string]any{"foo": "bar"}}
+	ps.taints[string(runtimeID)] = []string{"TOOL_OUTPUT"}
+
+	policy := security.EnforcementPolicy{AllowedOnExit: []string{"TOOL_OUTPUT"}, Enforcement: "strict"}
+	snap, err := ps.Snapshot(string(runtimeID), policy)
+
+	if err != nil {
+		t.Fatalf("Snapshot failed: %v", err)
+	}
+
+	if snap.ID == "" {
+		t.Error("Expected snapshot ID to be non-empty")
+	}
+
+	if snap.RuntimeID != string(runtimeID) {
+		t.Errorf("Expected RuntimeID %s, got %s", runtimeID, snap.RuntimeID)
+	}
+
+	if snap.State == nil {
+		t.Error("Expected snapshot state to be non-nil")
+	}
+
+	if len(snap.Taints) != 1 {
+		t.Errorf("Expected 1 taint, got %d", len(snap.Taints))
+	}
+
+	if snap.Timestamp.IsZero() {
+		t.Error("Expected snapshot timestamp to be non-zero")
+	}
+}
+
 func TestPersistence_SnapshotCreate(t *testing.T) {
 	ps := NewPersistenceService().(*persistenceService)
 
