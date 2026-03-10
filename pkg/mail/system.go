@@ -16,7 +16,7 @@ var ErrNotFound = errors.New("subscriber not found")
 
 // MailSystem provides publisher/subscriber coordination.
 type MailSystem struct {
-	subscribers map[string]chan Mail
+	subscribers map[string][]chan Mail
 	published   map[string]bool
 	mu          sync.RWMutex
 	lruCache    map[string]time.Time
@@ -26,7 +26,7 @@ type MailSystem struct {
 // NewMailSystem creates a new MailSystem.
 func NewMailSystem() *MailSystem {
 	return &MailSystem{
-		subscribers: make(map[string]chan Mail),
+		subscribers: make(map[string][]chan Mail),
 		published:   make(map[string]bool),
 		lruCache:    make(map[string]time.Time),
 		lruMaxSize:  1000,
@@ -37,23 +37,68 @@ func NewMailSystem() *MailSystem {
 // Returns Ack with delivery confirmation.
 // At-least-once delivery with deduplication via correlationId.
 func (ms *MailSystem) Publish(mail Mail) (Ack, error) {
-	// TODO: implement
-	return Ack{}, nil
+	ms.mu.Lock()
+	if ms.published[mail.CorrelationID] {
+		ms.mu.Unlock()
+		return Ack{}, ErrDuplicateMail
+	}
+	ms.published[mail.CorrelationID] = true
+	if len(ms.published) > ms.lruMaxSize {
+		var oldestTime time.Time
+		var oldestID string
+		for id, t := range ms.lruCache {
+			if oldestTime.IsZero() || t.Before(oldestTime) {
+				oldestTime = t
+				oldestID = id
+			}
+		}
+		if oldestID != "" {
+			delete(ms.published, oldestID)
+			delete(ms.lruCache, oldestID)
+		}
+	}
+	ms.lruCache[mail.CorrelationID] = time.Now()
+	subscribersCopy := make([]chan Mail, 0, len(ms.subscribers[mail.Target]))
+	for _, ch := range ms.subscribers[mail.Target] {
+		subscribersCopy = append(subscribersCopy, ch)
+	}
+	ms.mu.Unlock()
+
+	for _, ch := range subscribersCopy {
+		select {
+		case ch <- mail:
+		default:
+		}
+	}
+
+	return Ack{
+		MailID:        mail.ID,
+		CorrelationID: mail.CorrelationID,
+		DeliveredAt:   time.Now(),
+		Success:       true,
+	}, nil
 }
 
 // Subscribe registers a subscriber to receive mail for an address.
 // Returns a channel that receives mail.
 func (ms *MailSystem) Subscribe(address string) (<-chan Mail, error) {
-	// TODO: implement
-	return nil, nil
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+	ch := make(chan Mail, 1000)
+	ms.subscribers[address] = append(ms.subscribers[address], ch)
+	return ch, nil
 }
 
 // Unsubscribe removes a subscriber from receiving mail for an address.
 func (ms *MailSystem) Unsubscribe(address string, ch <-chan Mail) error {
-	// TODO: implement
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+	channels := ms.subscribers[address]
+	for i, existingCh := range channels {
+		if existingCh == ch {
+			ms.subscribers[address] = append(channels[:i], channels[i+1:]...)
+			break
+		}
+	}
 	return nil
 }
-
-// TODO: implement LRU cache management for deduplication
-// TODO: implement thread-safe queue management
-// TODO: implement concurrent safety for all operations

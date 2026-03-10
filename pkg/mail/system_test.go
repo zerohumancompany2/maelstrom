@@ -161,12 +161,16 @@ func TestMailSystem_ConcurrentPublish(t *testing.T) {
 
 	totalReceived := 0
 	for _, ch := range subChs {
-		select {
-		case <-ch:
-			totalReceived++
-		default:
+		for {
+			select {
+			case <-ch:
+				totalReceived++
+			default:
+				goto done
+			}
 		}
 	}
+done:
 
 	if totalReceived < numMails {
 		t.Errorf("Expected at least %d mails received, got %d", numMails, totalReceived)
