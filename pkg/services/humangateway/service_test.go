@@ -8,6 +8,23 @@ import (
 	"github.com/maelstrom/v3/pkg/mail"
 )
 
+// TestHumanGatewayService_ID - arch-v1.md L471
+// HumanGatewayService.ID() returns "sys:human-gateway"
+func TestHumanGatewayService_ID(t *testing.T) {
+	svc := NewHumanGatewayService()
+
+	id := svc.ID()
+	if id != "sys:human-gateway" {
+		t.Errorf("Expected ID 'sys:human-gateway', got '%s'", id)
+	}
+
+	// ID is immutable - multiple calls return same value
+	id2 := svc.ID()
+	if id != id2 {
+		t.Error("Expected ID to be immutable across calls")
+	}
+}
+
 func TestHumanGatewayService_HandleChat(t *testing.T) {
 	svc := NewHumanGatewayService()
 
