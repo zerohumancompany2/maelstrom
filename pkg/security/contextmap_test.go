@@ -384,3 +384,49 @@ func TestContextMap_EvictionSummarize(t *testing.T) {
 		t.Errorf("Expected total tokens <= %d after compression/eviction, got %d", budget, total)
 	}
 }
+
+func TestPrepareContextForBoundary_StripsForbidden(t *testing.T) {
+	contextBlockRegistry = make(map[string]BlockTaintInfo)
+
+	innerBlock := &ContextBlock{
+		Name:    "inner-block",
+		Content: "inner content",
+	}
+	secretBlock := &ContextBlock{
+		Name:    "secret-block",
+		Content: "secret content",
+	}
+	toolBlock := &ContextBlock{
+		Name:    "tool-block",
+		Content: "tool content",
+	}
+
+	contextBlockRegistry["inner-block"] = BlockTaintInfo{
+		Block:  innerBlock,
+		Taints: []string{"INNER_ONLY"},
+	}
+	contextBlockRegistry["secret-block"] = BlockTaintInfo{
+		Block:  secretBlock,
+		Taints: []string{"SECRET"},
+	}
+	contextBlockRegistry["tool-block"] = BlockTaintInfo{
+		Block:  toolBlock,
+		Taints: []string{"TOOL_OUTPUT"},
+	}
+
+	err := PrepareContextForBoundary("runtime-1", DMZBoundary)
+
+	if err != nil {
+		t.Fatalf("PrepareContextForBoundary returned error: %v", err)
+	}
+
+	if _, exists := contextBlockRegistry["inner-block"]; exists {
+		t.Errorf("Expected INNER_ONLY blocks to be stripped, but inner-block still exists")
+	}
+	if _, exists := contextBlockRegistry["secret-block"]; exists {
+		t.Errorf("Expected SECRET blocks to be stripped, but secret-block still exists")
+	}
+	if _, exists := contextBlockRegistry["tool-block"]; !exists {
+		t.Errorf("Expected TOOL_OUTPUT block to be preserved, but tool-block was removed")
+	}
+}

@@ -97,6 +97,10 @@ func PrepareContextForBoundary(runtimeId string, boundary BoundaryType) error {
 				isForbidden = true
 				break
 			}
+			if taint == "SECRET" && (boundary == DMZBoundary || boundary == OuterBoundary) {
+				isForbidden = true
+				break
+			}
 		}
 		if !isForbidden {
 			filtered = append(filtered, info.Block)
