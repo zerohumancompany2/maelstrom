@@ -28,13 +28,14 @@ type ToolsService interface {
 }
 
 type ToolDescriptor struct {
-	Name        string
-	Boundary    string
-	Schema      map[string]any
-	Isolation   string
-	TaintOutput []string
-	Type        string
-	ChartRef    string
+	Name          string
+	Boundary      string
+	Schema        map[string]any
+	Isolation     string
+	TaintOutput   []string
+	Type          string
+	ChartRef      string
+	MaxIterations int
 }
 
 type toolsService struct {

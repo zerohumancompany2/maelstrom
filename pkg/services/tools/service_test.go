@@ -750,3 +750,17 @@ func TestToolDescriptor_ChartRefField(t *testing.T) {
 		t.Errorf("Expected 'research-mini-v1', got '%s'", tool.ChartRef)
 	}
 }
+
+// arch-v1.md L569: MaxIterations field for sub-agent iteration limits
+func TestToolDescriptor_MaxIterationsField(t *testing.T) {
+	tool := ToolDescriptor{
+		Name:          "subAgentResearch",
+		Type:          "attachedSubAgent",
+		ChartRef:      "research-mini-v1",
+		MaxIterations: 10,
+	}
+
+	if tool.MaxIterations != 10 {
+		t.Errorf("Expected 10, got %d", tool.MaxIterations)
+	}
+}
