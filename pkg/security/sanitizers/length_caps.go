@@ -31,5 +31,19 @@ func (s *StreamLengthCaps) Sanitize(chunk []byte, chunkIndex int, totalSizeSoFar
 		isTruncated = true
 	}
 
+	// Enforce max total stream size
+	if s.MaxTotalSize > 0 {
+		remainingSize := s.MaxTotalSize - totalSizeSoFar
+		if len(chunk) > remainingSize {
+			availableSize := remainingSize - len(truncationMarker)
+			if availableSize < 0 {
+				availableSize = 0
+			}
+			chunk = chunk[:availableSize]
+			chunk = append(chunk, []byte(truncationMarker)...)
+			isTruncated = true
+		}
+	}
+
 	return chunk, isTruncated, nil
 }
