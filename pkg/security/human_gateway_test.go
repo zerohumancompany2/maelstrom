@@ -1,6 +1,10 @@
 package security
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/maelstrom/v3/pkg/mail"
+)
 
 func TestHumanGatewaySanitization_SanitizeContextMap_StripsForbiddenTaints(t *testing.T) {
 	ctx := ContextMap{
@@ -44,5 +48,35 @@ func TestHumanGatewaySanitization_SanitizeContextMap_StripsForbiddenTaints(t *te
 }
 
 func TestHumanGatewaySanitization_SanitizeMessageHistory_BoundaryEnforcement(t *testing.T) {
-	panic("not implemented")
+	messages := []mail.Mail{
+		{ID: "1", Type: mail.MailTypeUser, Content: "user message", Metadata: mail.MailMetadata{Taints: []string{}}},
+		{ID: "2", Type: mail.MailTypeToolResult, Content: "secret tool output", Metadata: mail.MailMetadata{Taints: []string{"SECRET"}}},
+		{ID: "3", Type: mail.MailTypeToolResult, Content: "inner tool output", Metadata: mail.MailMetadata{Taints: []string{"INNER_ONLY"}}},
+		{ID: "4", Type: mail.MailTypeAssistant, Content: "assistant response", Metadata: mail.MailMetadata{Taints: []string{}}},
+	}
+
+	result, err := SanitizeMessageHistory(messages, DMZBoundary)
+	if err != nil {
+		t.Fatalf("SanitizeMessageHistory returned error: %v", err)
+	}
+
+	if len(result) != len(messages) {
+		t.Errorf("SanitizeMessageHistory returned %d messages, want %d", len(result), len(messages))
+	}
+
+	if result[0].Content != "user message" {
+		t.Errorf("Message 0 content = %q, want %q", result[0].Content, "user message")
+	}
+
+	if result[1].Content != "[REDACTED: SECRET]" {
+		t.Errorf("Message 1 content = %q, want %q", result[1].Content, "[REDACTED: SECRET]")
+	}
+
+	if result[2].Content != "[REDACTED: INNER_ONLY]" {
+		t.Errorf("Message 2 content = %q, want %q", result[2].Content, "[REDACTED: INNER_ONLY]")
+	}
+
+	if result[3].Content != "assistant response" {
+		t.Errorf("Message 3 content = %q, want %q", result[3].Content, "assistant response")
+	}
 }

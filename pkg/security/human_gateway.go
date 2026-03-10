@@ -1,6 +1,10 @@
 package security
 
-import "github.com/maelstrom/v3/pkg/mail"
+import (
+	"fmt"
+
+	"github.com/maelstrom/v3/pkg/mail"
+)
 
 func SanitizeContextMap(ctx ContextMap, boundary BoundaryType) (ContextMap, error) {
 	forbiddenTaints := getHumanGatewayForbiddenTaints(boundary)
@@ -71,5 +75,19 @@ func contains(slice []string, item string) bool {
 }
 
 func SanitizeMessageHistory(messages []mail.Mail, boundary BoundaryType) ([]mail.Mail, error) {
-	panic("not implemented")
+	forbiddenTaints := getHumanGatewayForbiddenTaints(boundary)
+
+	result := make([]mail.Mail, len(messages))
+	for i, msg := range messages {
+		result[i] = msg
+
+		for _, taint := range msg.Metadata.Taints {
+			if contains(forbiddenTaints, taint) {
+				result[i].Content = fmt.Sprintf("[REDACTED: %s]", taint)
+				break
+			}
+		}
+	}
+
+	return result, nil
 }
