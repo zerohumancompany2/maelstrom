@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -370,7 +371,69 @@ func (r *E2ERuntime) AttemptDirectSyscall(agentID string, syscallType, path stri
 }
 
 func (r *E2ERuntime) CallTool(agentID, toolName, path string) (any, error) {
-	return nil, nil
+	r.mu.RLock()
+	agent, ok := r.agents[agentID]
+	r.mu.RUnlock()
+
+	if !ok {
+		return nil, fmt.Errorf("agent not found: %s", agentID)
+	}
+
+	if toolName != "readFile" {
+		return nil, fmt.Errorf("unknown tool: %s", toolName)
+	}
+
+	pathNamespace := ""
+	if strings.HasPrefix(path, "/agents/") {
+		parts := strings.Split(strings.TrimPrefix(path, "/agents/"), "/")
+		if len(parts) > 0 {
+			pathNamespace = "agent:" + parts[0]
+		}
+	}
+
+	if pathNamespace != "" && pathNamespace != agent.Namespace {
+		r.mu.Lock()
+		violationMail := mail.Mail{
+			ID:        "violation-" + agentID + "-namespace-isolation",
+			Type:      mail.MailTypeTaintViolation,
+			Source:    agentID,
+			Target:    "sys:observability",
+			Content:   map[string]interface{}{"type": "namespace_isolation_violation", "path": path, "target_namespace": pathNamespace},
+			CreatedAt: time.Now(),
+			Metadata: mail.MailMetadata{
+				Taints: []string{"NAMESPACE_ISOLATION_VIOLATION"},
+			},
+		}
+		r.violations = append(r.violations, &violationMail)
+		r.deadLetterQueue = append(r.deadLetterQueue, &violationMail)
+		r.mu.Unlock()
+
+		return nil, fmt.Errorf("namespace isolation violation")
+	}
+
+	ds, ok := r.dataSources["inmemory"]
+	if !ok {
+		return nil, fmt.Errorf("datasource not available")
+	}
+
+	taints, err := ds.GetTaints(path)
+	if err != nil {
+		return nil, err
+	}
+
+	toolResult := &mail.Mail{
+		ID:        "tool-result-" + agentID + "-" + path,
+		Type:      mail.MailTypeToolResult,
+		Source:    "sys:datasources",
+		Target:    agentID,
+		Content:   map[string]interface{}{"path": path, "content": "file-content"},
+		CreatedAt: time.Now(),
+		Metadata: mail.MailMetadata{
+			Taints: append([]string{"TOOL_OUTPUT"}, taints...),
+		},
+	}
+
+	return toolResult, nil
 }
 
 func (r *E2ERuntime) GetNamespace(agentID string) string {
