@@ -22,3 +22,11 @@ var PolicySeqFailFast = ExecutionPolicy{
 	MaxRetries: 2,
 	Isolation:  "strict",
 }
+
+// PolicyParContinue executes tools in parallel, continuing on failure.
+var PolicyParContinue = ExecutionPolicy{
+	Mode:        "par_continue",
+	MaxRetries:  1,
+	Isolation:   "strict",
+	MaxParallel: 8,
+}

@@ -45,3 +45,24 @@ func TestExecutionPolicy_SeqFailFastStructure(t *testing.T) {
 		t.Errorf("Expected Isolation to be 'strict', got '%s'", PolicySeqFailFast.Isolation)
 	}
 }
+
+func TestExecutionPolicy_ParContinueStructure(t *testing.T) {
+	// Given
+	// PolicyParContinue should be defined
+
+	// When
+	// Access PolicyParContinue fields
+
+	// Then
+	if PolicyParContinue.Mode != "par_continue" {
+		t.Errorf("Expected Mode to be 'par_continue', got '%s'", PolicyParContinue.Mode)
+	}
+
+	if PolicyParContinue.MaxParallel != 8 {
+		t.Errorf("Expected MaxParallel to be 8, got %d", PolicyParContinue.MaxParallel)
+	}
+
+	if PolicyParContinue.Isolation != "strict" {
+		t.Errorf("Expected Isolation to be 'strict', got '%s'", PolicyParContinue.Isolation)
+	}
+}
