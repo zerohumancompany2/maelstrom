@@ -1217,3 +1217,19 @@ func TestReportTaints_RecursiveCollection(t *testing.T) {
 		}
 	}
 }
+
+func TestReportTaints_EmptyForUntainted(t *testing.T) {
+	engineImpl := &taintEngineImpl{
+		taints: make(TaintMap),
+	}
+
+	service := NewBoundaryService(engineImpl)
+	taintMap, err := service.ReportTaints("runtime-1")
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if len(taintMap) != 0 {
+		t.Errorf("Expected empty TaintMap, got %d entries: %v", len(taintMap), taintMap)
+	}
+}
