@@ -660,3 +660,66 @@ func TestHotReload_DeletedStateFallback(t *testing.T) {
 		t.Errorf("Expected fallback to state 'idle', got %s", list[0].ActiveStates[0])
 	}
 }
+
+func TestHotReload_HistoryPreservation(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+		Root: &statechart.Node{
+			ID: "root",
+			Children: map[string]*statechart.Node{
+				"idle": {ID: "idle"},
+			},
+		},
+	}
+
+	originalRtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	svc.updateRuntimeState(string(originalRtID), "running")
+	svc.updateRuntimeState(string(originalRtID), "stopped")
+
+	originalHistory := svc.getStateHistory(string(originalRtID))
+	if len(originalHistory) != 3 {
+		t.Fatalf("Expected 3 state transitions, got %d", len(originalHistory))
+	}
+
+	snapshot := statechart.Snapshot{
+		RuntimeID:      originalRtID,
+		DefinitionID:   "test-chart",
+		ActiveStates:   []string{"stopped"},
+		RuntimeContext: statechart.RuntimeContext{ChartID: "test-chart", RuntimeID: string(originalRtID)},
+	}
+
+	newRtID, err := svc.restoreWithShallowHistory(snapshot)
+	if err != nil {
+		t.Fatalf("restoreWithShallowHistory should return nil error, got: %v", err)
+	}
+
+	if newRtID == "" {
+		t.Error("Expected non-empty RuntimeID")
+	}
+
+	newHistory := svc.getStateHistory(string(newRtID))
+	if len(newHistory) != 1 {
+		t.Errorf("Expected 1 state transition in new runtime, got %d", len(newHistory))
+	}
+
+	if newHistory[0].To != "stopped" {
+		t.Errorf("Expected state 'stopped', got %s", newHistory[0].To)
+	}
+
+	list, err := svc.List()
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+
+	if len(list) != 2 {
+		t.Errorf("Expected 2 runtimes, got %d", len(list))
+	}
+}
