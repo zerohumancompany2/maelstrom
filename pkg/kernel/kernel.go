@@ -49,6 +49,7 @@ type Kernel struct {
 type kernelApplicationContext struct {
 	kernel *Kernel
 	data   map[string]interface{}
+	taints map[string][]string
 	mu     sync.RWMutex
 }
 
@@ -62,13 +63,19 @@ func (k *kernelApplicationContext) Get(key string, callerBoundary string) (inter
 	if !ok {
 		return nil, nil, nil
 	}
-	return val, nil, nil
+	storedTaints := k.taints[key]
+	returnedTaints := make([]string, len(storedTaints))
+	copy(returnedTaints, storedTaints)
+	return val, returnedTaints, nil
 }
 
 func (k *kernelApplicationContext) Set(key string, value interface{}, taints []string, callerBoundary string) error {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	k.data[key] = value
+	storedTaints := make([]string, len(taints))
+	copy(storedTaints, taints)
+	k.taints[key] = storedTaints
 	return nil
 }
 
@@ -157,6 +164,7 @@ func (k *Kernel) Start(ctx context.Context) error {
 		appCtx := &kernelApplicationContext{
 			kernel: k,
 			data:   make(map[string]interface{}),
+			taints: make(map[string][]string),
 		}
 		k.appCtx = appCtx
 		bootstrapRTID, err = k.engine.Spawn(def, appCtx)

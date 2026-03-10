@@ -714,6 +714,40 @@ func assertDormantLogged(t *testing.T, logs []string) {
 	}
 }
 
+func TestApplicationContext_GetTaints_ReturnsStoredTaints(t *testing.T) {
+	appCtx := &kernelApplicationContext{
+		kernel: &Kernel{},
+		data:   make(map[string]interface{}),
+		taints: make(map[string][]string),
+	}
+
+	testKey := "user-data"
+	testValue := "test-value"
+	testTaints := []string{"PII", "USER_SUPPLIED"}
+
+	appCtx.Set(testKey, testValue, testTaints, "inner")
+
+	value, returnedTaints, err := appCtx.Get(testKey, "inner")
+
+	if err != nil {
+		t.Fatalf("Get() returned error: %v", err)
+	}
+
+	if value != testValue {
+		t.Errorf("Get() value: expected %v, got %v", testValue, value)
+	}
+
+	if len(returnedTaints) != len(testTaints) {
+		t.Fatalf("Get() taints length: expected %d, got %d", len(testTaints), len(returnedTaints))
+	}
+
+	for i, expectedTaint := range testTaints {
+		if returnedTaints[i] != expectedTaint {
+			t.Errorf("Get() taints[%d]: expected %q, got %q", i, expectedTaint, returnedTaints[i])
+		}
+	}
+}
+
 func TestKernel_BootstrapServices(t *testing.T) {
 	kernel := &Kernel{
 		engine:       statechart.NewEngine(),
