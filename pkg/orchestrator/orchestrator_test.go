@@ -129,3 +129,31 @@ func TestOrchestratorService_ExecuteSpawnsChart(t *testing.T) {
 		t.Error("Expected Execute() to return non-empty RuntimeID")
 	}
 }
+
+func TestOrchestratorService_ExecuteWithPolicy(t *testing.T) {
+	// Given
+	service := NewOrchestratorService()
+	toolCalls := []ToolCall{
+		{Name: "test-tool", Arguments: map[string]any{"key": "value"}},
+	}
+
+	// Test with different policies
+	policies := []ExecutionPolicy{
+		PolicySeqContinue,
+		PolicySeqFailFast,
+		PolicyParContinue,
+	}
+
+	// When & Then
+	for _, policy := range policies {
+		runtimeID, err := service.Execute(toolCalls, policy)
+
+		if err != nil {
+			t.Errorf("Expected Execute() with policy %s to return nil error, got %v", policy.Mode, err)
+		}
+
+		if runtimeID == "" {
+			t.Errorf("Expected Execute() with policy %s to return non-empty RuntimeID", policy.Mode)
+		}
+	}
+}
