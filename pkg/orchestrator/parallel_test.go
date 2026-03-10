@@ -131,3 +131,31 @@ func TestParallel_Continue_ResultsOrderedByToolName(t *testing.T) {
 		}
 	}
 }
+
+func TestParallel_Continue_EmptyToolList_ReturnsEmptyResults(t *testing.T) {
+	// Given
+	executor := NewParallelExecutor(PolicyParContinue)
+	toolCalls := []ToolCall{}
+
+	// When
+	resultChan, err := executor.Execute(toolCalls)
+
+	// Then
+	if err != nil {
+		t.Errorf("Expected Execute() to return nil error, got %v", err)
+	}
+
+	if resultChan == nil {
+		t.Fatal("Expected non-nil result channel")
+	}
+
+	// Collect all results
+	results := make([]ExecutionResultWithTool, 0)
+	for result := range resultChan {
+		results = append(results, result)
+	}
+
+	if len(results) != 0 {
+		t.Errorf("Expected 0 results for empty tool list, got %d", len(results))
+	}
+}
