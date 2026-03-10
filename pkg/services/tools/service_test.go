@@ -446,6 +446,7 @@ func TestToolRegistry_ListTools(t *testing.T) {
 
 // arch-v1.md L472: Tool registry and resolution
 // arch-v1.md L488: resolve(name, callerBoundary) → ToolDescriptor | notFound
+// arch-v1.md L261-270: Boundary types (outer, DMZ, inner) and enforcement rules
 func TestToolRegistry_Invoke(t *testing.T) {
 	svc := NewToolsService()
 
@@ -482,5 +483,83 @@ func TestToolRegistry_Invoke(t *testing.T) {
 	_, err = svc.Invoke("nonexistent-tool", map[string]any{}, "inner")
 	if err != nil {
 		t.Errorf("Invoke for unknown tool should return nil error, got %v", err)
+	}
+}
+
+// arch-v1.md L472: Tool registry and resolution
+// arch-v1.md L488: resolve(name, callerBoundary) → ToolDescriptor | notFound
+// arch-v1.md L261-270: Boundary types (outer, DMZ, inner) and enforcement rules
+func TestToolRegistry_BoundaryFiltering(t *testing.T) {
+	svc := NewToolsService()
+
+	innerTool := ToolDescriptor{
+		Name:      "inner-tool",
+		Boundary:  "inner",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "container",
+	}
+
+	dmzTool := ToolDescriptor{
+		Name:      "dmz-tool",
+		Boundary:  "dmz",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "sandbox",
+	}
+
+	outerTool := ToolDescriptor{
+		Name:      "outer-tool",
+		Boundary:  "outer",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "sandbox",
+	}
+
+	if err := svc.Register(innerTool); err != nil {
+		t.Fatalf("Register inner tool failed: %v", err)
+	}
+	if err := svc.Register(dmzTool); err != nil {
+		t.Fatalf("Register dmz tool failed: %v", err)
+	}
+	if err := svc.Register(outerTool); err != nil {
+		t.Fatalf("Register outer tool failed: %v", err)
+	}
+
+	tools, err := svc.List("inner")
+	if err != nil {
+		t.Fatalf("List for inner boundary failed: %v", err)
+	}
+
+	if len(tools) != 1 {
+		t.Errorf("Expected 1 tool for inner boundary, got %d", len(tools))
+	}
+
+	if tools[0].Name != "inner-tool" {
+		t.Errorf("Expected inner-tool, got %s", tools[0].Name)
+	}
+
+	tools, err = svc.List("dmz")
+	if err != nil {
+		t.Fatalf("List for dmz boundary failed: %v", err)
+	}
+
+	if len(tools) != 1 {
+		t.Errorf("Expected 1 tool for dmz boundary, got %d", len(tools))
+	}
+
+	tools, err = svc.List("outer")
+	if err != nil {
+		t.Fatalf("List for outer boundary failed: %v", err)
+	}
+
+	if len(tools) != 1 {
+		t.Errorf("Expected 1 tool for outer boundary, got %d", len(tools))
+	}
+
+	tools, err = svc.List("")
+	if err != nil {
+		t.Fatalf("List for all tools failed: %v", err)
+	}
+
+	if len(tools) != 3 {
+		t.Errorf("Expected 3 tools for empty filter, got %d", len(tools))
 	}
 }
