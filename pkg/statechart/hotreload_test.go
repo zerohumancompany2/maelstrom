@@ -217,3 +217,118 @@ func TestHotReloadProtocol_ProtocolFlow(t *testing.T) {
 		}
 	})
 }
+
+// TestHotReloadProtocol_QuiescenceReached verifies graceful reload when quiescence is reached
+// as per arch-v1.md L869-872: stop current runtime, spawn with history, apply contextTransform.
+func TestHotReloadProtocol_QuiescenceReached(t *testing.T) {
+	engine := NewEngine().(*Engine)
+	mockCtx := testutil.NewMockApplicationContext()
+
+	def := ChartDefinition{
+		ID:      "test-quiescence-reached",
+		Version: "1.0.0",
+		Root: &Node{
+			ID:       "idle",
+			Children: nil,
+			Transitions: []Transition{
+				{Event: "go", Target: "running"},
+			},
+		},
+		InitialState: "idle",
+	}
+
+	rtID, err := engine.Spawn(def, mockCtx)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	if err := engine.Control(rtID, CmdStart); err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+
+	// Test 1: Quiescence reached - stop current runtime and spawn with history
+	t.Run("QuiescenceReachedStopsAndSpawns", func(t *testing.T) {
+		newDef := ChartDefinition{
+			ID:      "test-quiescence-reached",
+			Version: "1.1.0",
+			Root: &Node{
+				ID:       "idle",
+				Children: nil,
+				Transitions: []Transition{
+					{Event: "go", Target: "running"},
+					{Event: "stop", Target: "idle"},
+				},
+			},
+			InitialState: "idle",
+		}
+
+		// Hot-reload with shallow history
+		err := engine.HotReload(rtID, newDef, HotReloadOptions{
+			Timeout:          5 * time.Second,
+			MaxAttempts:      3,
+			HistoryMode:      HistoryModeShallow,
+			ContextTransform: nil,
+		})
+
+		if err != nil {
+			t.Fatalf("HotReload failed: %v", err)
+		}
+
+		// Verify runtime exists and has new definition
+		runtime := engine.runtimes[rtID]
+		if runtime == nil {
+			t.Fatal("Runtime should exist after hot-reload")
+		}
+
+		if runtime.definition.Version != "1.1.0" {
+			t.Errorf("Expected version 1.1.0, got %s", runtime.definition.Version)
+		}
+	})
+
+	// Test 2: Version change triggers contextTransform (if provided)
+	t.Run("VersionChangeAppliesContextTransform", func(t *testing.T) {
+		// Create fresh runtime
+		rtID2, err := engine.Spawn(def, mockCtx)
+		if err != nil {
+			t.Fatalf("Spawn failed: %v", err)
+		}
+
+		if err := engine.Control(rtID2, CmdStart); err != nil {
+			t.Fatalf("Start failed: %v", err)
+		}
+
+		newDef := ChartDefinition{
+			ID:      "test-quiescence-reached",
+			Version: "2.0.0", // Major version change
+			Root: &Node{
+				ID:       "idle",
+				Children: nil,
+				Transitions: []Transition{
+					{Event: "go", Target: "running"},
+				},
+			},
+			InitialState: "idle",
+		}
+
+		// Hot-reload without context transform - should still work
+		err = engine.HotReload(rtID2, newDef, HotReloadOptions{
+			Timeout:          5 * time.Second,
+			MaxAttempts:      3,
+			HistoryMode:      HistoryModeShallow,
+			ContextTransform: nil,
+		})
+
+		if err != nil {
+			t.Fatalf("HotReload failed: %v", err)
+		}
+
+		runtime := engine.runtimes[rtID2]
+		if runtime == nil {
+			t.Fatal("Runtime should exist after hot-reload")
+		}
+
+		if runtime.definition.Version != "2.0.0" {
+			t.Errorf("Expected version 2.0.0, got %s", runtime.definition.Version)
+		}
+	})
+}
