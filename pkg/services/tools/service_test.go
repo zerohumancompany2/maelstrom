@@ -694,3 +694,34 @@ func TestToolRegistry_BoundaryEnforcement(t *testing.T) {
 		t.Errorf("Inner caller should access inner tool: %v", err)
 	}
 }
+
+// arch-v1.md L562, L566: TaintOutput field for tool descriptors
+func TestToolDescriptor_HasTaintOutputField(t *testing.T) {
+	tool := ToolDescriptor{
+		Name:        "webSearch",
+		Boundary:    "dmz",
+		Schema:      map[string]any{"type": "object"},
+		Isolation:   "container",
+		TaintOutput: []string{"TOOL_OUTPUT"},
+	}
+
+	if len(tool.TaintOutput) != 1 {
+		t.Errorf("Expected 1 taint output, got %d", len(tool.TaintOutput))
+	}
+
+	if tool.TaintOutput[0] != "TOOL_OUTPUT" {
+		t.Errorf("Expected 'TOOL_OUTPUT', got '%s'", tool.TaintOutput[0])
+	}
+
+	innerTool := ToolDescriptor{
+		Name:        "innerDbQuery",
+		Boundary:    "inner",
+		Schema:      map[string]any{"type": "object"},
+		Isolation:   "strict",
+		TaintOutput: []string{"TOOL_OUTPUT", "INNER_ONLY"},
+	}
+
+	if len(innerTool.TaintOutput) != 2 {
+		t.Errorf("Expected 2 taint outputs, got %d", len(innerTool.TaintOutput))
+	}
+}
