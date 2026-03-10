@@ -13,8 +13,8 @@ func TestNamespaceIsolate_CreateView(t *testing.T) {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	if view.ChartID != runtimeId {
-		t.Errorf("Expected ChartID %s, got %s", runtimeId, view.ChartID)
+	if view.RuntimeID != runtimeId {
+		t.Errorf("Expected RuntimeID %s, got %s", runtimeId, view.RuntimeID)
 	}
 
 	if view.Operation != operation {
