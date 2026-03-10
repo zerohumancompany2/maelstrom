@@ -66,6 +66,21 @@ func (s *datasourceService) GetTaints(path string) ([]string, error) {
 }
 
 func (s *datasourceService) ValidateAccess(path string, boundary security.BoundaryType) error {
+	taints, _ := s.GetTaints(path)
+	for _, taint := range taints {
+		switch boundary {
+		case security.InnerBoundary:
+			return nil
+		case security.DMZBoundary:
+			if taint == "inner" {
+				return fmt.Errorf("DMZ boundary cannot access inner taints")
+			}
+		case security.OuterBoundary:
+			if taint == "inner" {
+				return fmt.Errorf("Outer boundary cannot access inner taints")
+			}
+		}
+	}
 	return nil
 }
 

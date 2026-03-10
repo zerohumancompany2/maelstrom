@@ -241,3 +241,63 @@ func TestDataSourceService_GetTaints(t *testing.T) {
 		t.Errorf("Expected empty taints for nonexistent path, got %d", len(emptyTaints))
 	}
 }
+
+// TestDataSourceService_ValidateAccess - arch-v1.md L277-281: validate access by boundary
+func TestDataSourceService_ValidateAccess(t *testing.T) {
+	svc := NewDatasourceService()
+
+	err := svc.TagOnWrite("/path/outer.txt", []string{"outer"})
+	if err != nil {
+		t.Fatalf("TagOnWrite failed: %v", err)
+	}
+
+	err = svc.TagOnWrite("/path/dmz.txt", []string{"dmz"})
+	if err != nil {
+		t.Fatalf("TagOnWrite failed: %v", err)
+	}
+
+	err = svc.TagOnWrite("/path/inner.txt", []string{"inner"})
+	if err != nil {
+		t.Fatalf("TagOnWrite failed: %v", err)
+	}
+
+	err = svc.ValidateAccess("/path/outer.txt", security.OuterBoundary)
+	if err != nil {
+		t.Errorf("Outer boundary should access outer taints: %v", err)
+	}
+
+	err = svc.ValidateAccess("/path/dmz.txt", security.OuterBoundary)
+	if err != nil {
+		t.Errorf("Outer boundary should access dmz taints: %v", err)
+	}
+
+	err = svc.ValidateAccess("/path/inner.txt", security.OuterBoundary)
+	if err == nil {
+		t.Error("Outer boundary should NOT access inner taints")
+	}
+
+	err = svc.ValidateAccess("/path/dmz.txt", security.DMZBoundary)
+	if err != nil {
+		t.Errorf("DMZ boundary should access dmz taints: %v", err)
+	}
+
+	err = svc.ValidateAccess("/path/inner.txt", security.DMZBoundary)
+	if err == nil {
+		t.Error("DMZ boundary should NOT access inner taints")
+	}
+
+	err = svc.ValidateAccess("/path/outer.txt", security.InnerBoundary)
+	if err != nil {
+		t.Errorf("Inner boundary should access outer taints: %v", err)
+	}
+
+	err = svc.ValidateAccess("/path/dmz.txt", security.InnerBoundary)
+	if err != nil {
+		t.Errorf("Inner boundary should access dmz taints: %v", err)
+	}
+
+	err = svc.ValidateAccess("/path/inner.txt", security.InnerBoundary)
+	if err != nil {
+		t.Errorf("Inner boundary should access inner taints: %v", err)
+	}
+}
