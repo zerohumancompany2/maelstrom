@@ -443,3 +443,44 @@ func TestToolRegistry_ListTools(t *testing.T) {
 		t.Errorf("Expected 2 tools, got %d", len(tools))
 	}
 }
+
+// arch-v1.md L472: Tool registry and resolution
+// arch-v1.md L488: resolve(name, callerBoundary) → ToolDescriptor | notFound
+func TestToolRegistry_Invoke(t *testing.T) {
+	svc := NewToolsService()
+
+	tool := ToolDescriptor{
+		Name:      "invoke-test-tool",
+		Boundary:  "inner",
+		Schema:    map[string]any{"type": "object", "properties": map[string]any{"input": map[string]any{"type": "string"}}},
+		Isolation: "container",
+	}
+
+	err := svc.Register(tool)
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	result, err := svc.Invoke("invoke-test-tool", map[string]any{"input": "test-data"}, "inner")
+	if err != nil {
+		t.Fatalf("Invoke failed: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+
+	resultMap, ok := result.(map[string]any)
+	if !ok {
+		t.Fatal("Expected result to be map[string]any")
+	}
+
+	if resultMap["tool"] != "invoke-test-tool" {
+		t.Errorf("Expected tool name 'invoke-test-tool', got '%v'", resultMap["tool"])
+	}
+
+	_, err = svc.Invoke("nonexistent-tool", map[string]any{}, "inner")
+	if err != nil {
+		t.Errorf("Invoke for unknown tool should return nil error, got %v", err)
+	}
+}
