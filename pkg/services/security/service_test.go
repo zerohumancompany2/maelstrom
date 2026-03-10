@@ -2,6 +2,7 @@ package security
 
 import (
 	"testing"
+	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/security"
@@ -961,5 +962,73 @@ func TestRuntimeTaintQuery_ReturnsActiveTaints(t *testing.T) {
 
 	if len(taintMap) != 3 {
 		t.Errorf("Expected 3 objects in TaintMap, got %d", len(taintMap))
+	}
+}
+
+type mockPublisher struct {
+	publishedMails []mail.Mail
+}
+
+func (m *mockPublisher) Publish(msg mail.Mail) (mail.Ack, error) {
+	m.publishedMails = append(m.publishedMails, msg)
+	return mail.Ack{DeliveredAt: time.Now()}, nil
+}
+
+func TestRuntimeTaintQuery_EnablesViolationDetection(t *testing.T) {
+	svc := NewSecurityService()
+
+	mockPub := &mockPublisher{publishedMails: []mail.Mail{}}
+	svc.SetPublisher(mockPub)
+
+	err := svc.EmitTaintViolation("agent-789", "user-profile", []string{"INNER_ONLY"}, "forbidden taint crossing boundary")
+
+	if err != nil {
+		t.Errorf("Expected EmitTaintViolation to return nil error, got %v", err)
+	}
+
+	if len(mockPub.publishedMails) != 1 {
+		t.Errorf("Expected 1 mail to be published, got %d", len(mockPub.publishedMails))
+	}
+
+	publishedMail := mockPub.publishedMails[0]
+
+	if publishedMail.Type != mail.MailTypeTaintViolation {
+		t.Errorf("Expected mail type to be taint_violation, got %s", publishedMail.Type)
+	}
+
+	if publishedMail.Target != "sys:observability" {
+		t.Errorf("Expected mail target to be sys:observability, got %s", publishedMail.Target)
+	}
+
+	if publishedMail.Source != "sys:security" {
+		t.Errorf("Expected mail source to be sys:security, got %s", publishedMail.Source)
+	}
+
+	event, ok := publishedMail.Content.(TaintViolationEvent)
+	if !ok {
+		t.Error("Expected mail content to be TaintViolationEvent")
+	}
+
+	if event.RuntimeID != "agent-789" {
+		t.Errorf("Expected RuntimeID to be agent-789, got %s", event.RuntimeID)
+	}
+
+	if event.ObjectID != "user-profile" {
+		t.Errorf("Expected ObjectID to be user-profile, got %s", event.ObjectID)
+	}
+
+	hasInnerOnly := false
+	for _, t := range event.Taints {
+		if t == "INNER_ONLY" {
+			hasInnerOnly = true
+		}
+	}
+
+	if !hasInnerOnly {
+		t.Error("Expected Taints to contain INNER_ONLY")
+	}
+
+	if event.Reason != "forbidden taint crossing boundary" {
+		t.Errorf("Expected Reason to be 'forbidden taint crossing boundary', got %s", event.Reason)
 	}
 }
