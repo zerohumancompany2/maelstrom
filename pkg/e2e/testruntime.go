@@ -343,7 +343,30 @@ func (r *E2ERuntime) AssembleContextMapWithDataSource(agentID string, dataSource
 }
 
 func (r *E2ERuntime) AttemptDirectSyscall(agentID string, syscallType, path string) (bool, error) {
-	return true, nil
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	violationMail := mail.Mail{
+		ID:     "violation-" + agentID + "-direct-syscall",
+		Type:   mail.MailTypeTaintViolation,
+		Source: agentID,
+		Target: "sys:observability",
+		Content: map[string]interface{}{
+			"type":    "direct_syscall_blocked",
+			"syscall": syscallType,
+			"path":    path,
+			"policy":  "isolation_policy_violated",
+		},
+		CreatedAt: time.Now(),
+		Metadata: mail.MailMetadata{
+			Taints: []string{"DIRECT_SYSCALL_ATTEMPT"},
+		},
+	}
+
+	r.violations = append(r.violations, &violationMail)
+	r.deadLetterQueue = append(r.deadLetterQueue, &violationMail)
+
+	return true, fmt.Errorf("direct syscall not allowed - use mediated tool layer")
 }
 
 func (r *E2ERuntime) CallTool(agentID, toolName, path string) (any, error) {
