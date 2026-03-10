@@ -59,6 +59,43 @@ func TestDataSourceService_Get(t *testing.T) {
 	}
 }
 
+// TestDataSourceService_List - arch-v1.md L473: list all registered data sources
+func TestDataSourceService_List(t *testing.T) {
+	svc := NewDatasourceService()
+
+	// Empty list initially
+	names := svc.List()
+	if len(names) != 0 {
+		t.Errorf("Expected empty list, got %d items", len(names))
+	}
+
+	// Register datasources
+	err := svc.Register("localDisk", &LocalDiskDatasource{})
+	if err != nil {
+		t.Fatalf("Register localDisk failed: %v", err)
+	}
+
+	err = svc.Register("s3", &S3Datasource{})
+	if err != nil {
+		t.Fatalf("Register s3 failed: %v", err)
+	}
+
+	// List should return both
+	names = svc.List()
+	if len(names) != 2 {
+		t.Errorf("Expected 2 datasources, got %d", len(names))
+	}
+
+	// Verify names
+	found := make(map[string]bool)
+	for _, name := range names {
+		found[name] = true
+	}
+	if !found["localDisk"] || !found["s3"] {
+		t.Errorf("Expected 'localDisk' and 's3' in list, got %v", names)
+	}
+}
+
 func TestDatasources_Register(t *testing.T) {
 	svc := NewDatasourceService()
 
