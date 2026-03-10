@@ -73,3 +73,48 @@ func containsString(s, substr string) bool {
 	}
 	return false
 }
+
+func TestContextBlock_TaintPolicy_OVERRIDES_GLOBAL(t *testing.T) {
+	ClearAuditLog()
+
+	// Given: A global policy set to enforcement=strict on ChartDefinition
+	globalPolicy := TaintPolicyConfig{
+		Enforcement:   EnforcementStrict,
+		AllowedOnExit: []string{"TOOL_OUTPUT"},
+	}
+
+	// Given: A ContextBlock with explicit taintPolicy.enforcement=audit
+	block := ContextBlock{
+		Name:    "audit-block",
+		Content: "This contains PII data",
+		TaintPolicy: TaintPolicy{
+			RedactMode: "audit",
+		},
+	}
+
+	// When: FilterContextBlockWithGlobalPolicy is called (block is processed for LLM prompt)
+	filtered, err := FilterContextBlockWithGlobalPolicy(block, OuterBoundary, globalPolicy)
+
+	// Then: Per-block audit mode applies (not strict)
+	// Taint violations are logged but not blocked for this block
+	if err != nil {
+		t.Fatalf("Expected no error (audit mode should not block), got: %v", err)
+	}
+
+	// Verify block passes through unchanged (audit mode behavior)
+	if filtered.Name != "audit-block" {
+		t.Errorf("Expected block to pass through with audit mode, got name: %s", filtered.Name)
+	}
+	if filtered.Content != "This contains PII data" {
+		t.Errorf("Expected block content to be preserved with audit mode, got: %s", filtered.Content)
+	}
+
+	// Verify violation is logged to audit trail (not blocked)
+	lastLog := GetLastAuditLog()
+	if lastLog == "" {
+		t.Error("Expected violation to be logged to audit trail, but log is empty")
+	}
+	if !containsString(lastLog, "VIOLATION") {
+		t.Errorf("Expected audit log to contain VIOLATION, got: %s", lastLog)
+	}
+}
