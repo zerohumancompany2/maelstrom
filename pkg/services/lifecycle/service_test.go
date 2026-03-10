@@ -815,3 +815,37 @@ func TestHotReload_TemplateValidation(t *testing.T) {
 		t.Errorf("Expected validateTransformTemplate to return nil for valid template, got: %v", err)
 	}
 }
+
+func TestHardcodedServices_LifecycleSpawnTracking(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-agent",
+		Version:      "1.0.0",
+		InitialState: "idle",
+	}
+
+	runtimeID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	runtimes, err := svc.List()
+	if err != nil {
+		t.Fatalf("Expected no error from List, got %v", err)
+	}
+	if len(runtimes) != 1 {
+		t.Fatalf("Expected 1 runtime, got %d", len(runtimes))
+	}
+
+	info := runtimes[0]
+	if info.ID != string(runtimeID) {
+		t.Errorf("Expected runtime ID '%s', got '%s'", runtimeID, info.ID)
+	}
+	if info.DefinitionID != "test-agent" {
+		t.Errorf("Expected DefinitionID 'test-agent', got '%s'", info.DefinitionID)
+	}
+	if info.Boundary != mail.InnerBoundary {
+		t.Errorf("Expected Boundary InnerBoundary, got %s", info.Boundary)
+	}
+}
