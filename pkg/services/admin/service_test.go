@@ -2,7 +2,9 @@ package admin
 
 import (
 	"testing"
+	"time"
 
+	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/services/lifecycle"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
@@ -172,5 +174,31 @@ func TestAdminService_2FARequired(t *testing.T) {
 	err = svc.ExecuteCommand("test-command", "")
 	if err == nil {
 		t.Error("Expected error for empty token")
+	}
+}
+
+// TestAdminService_OuterBoundaryOnly - spec: arch-v1.md L467 (outer-only), L261-270 (Boundary Model)
+func TestAdminService_OuterBoundaryOnly(t *testing.T) {
+	svc := NewAdminService()
+	adminSvc := svc.(*adminService)
+
+	token, err := adminSvc.authManager.CreateToken("admin", time.Hour)
+	if err != nil {
+		t.Fatalf("Failed to create token: %v", err)
+	}
+
+	err = adminSvc.ExecuteCommandOnBoundary("test-command", token, mail.InnerBoundary)
+	if err == nil {
+		t.Error("Expected error for inner boundary")
+	}
+
+	err = adminSvc.ExecuteCommandOnBoundary("test-command", token, mail.DMZBoundary)
+	if err == nil {
+		t.Error("Expected error for DMZ boundary")
+	}
+
+	err = adminSvc.ExecuteCommandOnBoundary("test-command", token, mail.OuterBoundary)
+	if err != nil {
+		t.Errorf("Expected nil error for outer boundary, got %v", err)
 	}
 }

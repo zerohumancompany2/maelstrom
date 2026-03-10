@@ -3,6 +3,7 @@ package admin
 import (
 	"fmt"
 
+	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/security"
 	"github.com/maelstrom/v3/pkg/services/lifecycle"
 	"github.com/maelstrom/v3/pkg/statechart"
@@ -87,6 +88,22 @@ func (s *adminService) ExecuteCommand(cmd string, token string) error {
 
 	if err := s.authManager.Verify2FA(token); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (s *adminService) ExecuteCommandOnBoundary(cmd string, token string, boundary mail.BoundaryType) error {
+	if token == "" {
+		return fmt.Errorf("2FA token required")
+	}
+
+	if err := s.authManager.Verify2FA(token); err != nil {
+		return err
+	}
+
+	if boundary != mail.OuterBoundary {
+		return fmt.Errorf("admin commands only allowed on outer boundary, got: %s", boundary)
 	}
 
 	return nil
