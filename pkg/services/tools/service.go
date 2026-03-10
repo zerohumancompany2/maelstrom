@@ -3,6 +3,7 @@ package tools
 import (
 	"errors"
 
+	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/security"
 )
 
@@ -10,6 +11,7 @@ var (
 	ErrToolNotFound      = errors.New("tool not found")
 	ErrToolNotAccessible = errors.New("tool not accessible from this boundary")
 	ErrBoundaryViolation = errors.New("boundary violation: unauthorized tool access")
+	ErrDuplicateTool     = errors.New("tool with this name already registered")
 )
 
 type ToolsService interface {
@@ -20,6 +22,9 @@ type ToolsService interface {
 	Unregister(name string) error
 	RegisterByName(name string, tool ToolDescriptor) error
 	ResolveByName(name string) (ToolDescriptor, error)
+	HandleMail(mail mail.Mail) error
+	Start() error
+	Stop() error
 }
 
 type ToolDescriptor struct {
@@ -40,6 +45,9 @@ func NewToolsService() ToolsService {
 }
 
 func (s *toolsService) Register(tool ToolDescriptor) error {
+	if _, exists := s.registry[tool.Name]; exists {
+		return ErrDuplicateTool
+	}
 	s.registry[tool.Name] = tool
 	return nil
 }
@@ -123,4 +131,16 @@ func (s *toolsService) ResolveByName(name string) (ToolDescriptor, error) {
 		return zero, nil
 	}
 	return tool, nil
+}
+
+func (s *toolsService) HandleMail(m mail.Mail) error {
+	return nil
+}
+
+func (s *toolsService) Start() error {
+	return nil
+}
+
+func (s *toolsService) Stop() error {
+	return nil
 }

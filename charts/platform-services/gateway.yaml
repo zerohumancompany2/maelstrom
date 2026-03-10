@@ -1,0 +1,19 @@
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:gateway
+  core: true
+  displayName: Gateway Service
+spec:
+  chartRef: gateway-v1
+  requiredForKernelReady: true
+  replicas: 2
+  persistence:
+    enabled: true
+    snapshotEvery: "100 messages"
+  expose:
+    http:
+      port: 8080
+      tls: true
+    tcp:
+      port: 9090

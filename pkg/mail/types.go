@@ -51,6 +51,7 @@ type MailMetadata struct {
 	Stream      bool
 	StreamChunk *StreamChunk
 	IsFinal     bool
+	Adapter     string
 }
 
 type BoundaryType string

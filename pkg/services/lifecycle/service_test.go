@@ -437,3 +437,381 @@ func TestLifecycleService_HotReloadRollback(t *testing.T) {
 		t.Errorf("Expected state restored to 'running', got %s", list[0].ActiveStates[0])
 	}
 }
+
+func TestHotReload_QuiescenceEmptyQueue(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+	}
+
+	rtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	isQuiescent, err := svc.checkQuiescence(string(rtID))
+	if err != nil {
+		t.Fatalf("checkQuiescence should return nil error for empty queue, got: %v", err)
+	}
+	if !isQuiescent {
+		t.Error("Expected runtime to be quiescent with empty event queue")
+	}
+}
+
+func TestHotReload_QuiescenceNoActiveRegions(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+	}
+
+	rtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	isQuiescent, err := svc.checkQuiescence(string(rtID))
+	if err != nil {
+		t.Fatalf("checkQuiescence should return nil error, got: %v", err)
+	}
+	if !isQuiescent {
+		t.Error("Expected runtime to be quiescent with no active parallel regions")
+	}
+}
+
+func TestHotReload_QuiescenceNoInflightTools(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+	}
+
+	rtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	isQuiescent, err := svc.checkQuiescence(string(rtID))
+	if err != nil {
+		t.Fatalf("checkQuiescence should return nil error, got: %v", err)
+	}
+	if !isQuiescent {
+		t.Error("Expected runtime to be quiescent with no inflight tool calls")
+	}
+}
+
+func TestHotReload_PrepareForReload(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+	}
+
+	rtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	err = svc.prepareForReload(string(rtID), 1000)
+	if err != nil {
+		t.Fatalf("prepareForReload should return nil error for quiescent runtime, got: %v", err)
+	}
+}
+
+func TestHotReload_ShallowHistory(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	snapshot := statechart.Snapshot{
+		RuntimeID:      statechart.RuntimeID("original-runtime"),
+		DefinitionID:   "test-chart",
+		ActiveStates:   []string{"idle"},
+		RuntimeContext: statechart.RuntimeContext{ChartID: "test-chart", RuntimeID: "original-runtime"},
+	}
+
+	rtID, err := svc.restoreWithShallowHistory(snapshot)
+	if err != nil {
+		t.Fatalf("restoreWithShallowHistory should return nil error, got: %v", err)
+	}
+
+	if rtID == "" {
+		t.Error("Expected non-empty RuntimeID")
+	}
+
+	list, err := svc.List()
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+
+	if len(list) != 1 {
+		t.Errorf("Expected 1 runtime, got %d", len(list))
+	}
+
+	if list[0].ActiveStates[0] != "idle" {
+		t.Errorf("Expected state 'idle', got %s", list[0].ActiveStates[0])
+	}
+}
+
+func TestHotReload_DeepHistory(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+		Root: &statechart.Node{
+			ID: "root",
+			Children: map[string]*statechart.Node{
+				"idle": {
+					ID: "idle",
+					Children: map[string]*statechart.Node{
+						"sub-idle": {ID: "sub-idle"},
+					},
+				},
+			},
+		},
+	}
+
+	targetState := "idle/sub-idle"
+
+	snapshot := statechart.Snapshot{
+		RuntimeID:      statechart.RuntimeID("original-runtime"),
+		DefinitionID:   "test-chart",
+		ActiveStates:   []string{"idle"},
+		RuntimeContext: statechart.RuntimeContext{ChartID: "test-chart", RuntimeID: "original-runtime"},
+		RegionStates:   map[string]string{"idle": "sub-idle"},
+	}
+
+	rtID, err := svc.restoreWithDeepHistory(snapshot, targetState, def)
+	if err != nil {
+		t.Fatalf("restoreWithDeepHistory should return nil error, got: %v", err)
+	}
+
+	if rtID == "" {
+		t.Error("Expected non-empty RuntimeID")
+	}
+
+	list, err := svc.List()
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+
+	if len(list) != 1 {
+		t.Errorf("Expected 1 runtime, got %d", len(list))
+	}
+
+	if list[0].ActiveStates[0] != "sub-idle" {
+		t.Errorf("Expected state 'sub-idle', got %s", list[0].ActiveStates[0])
+	}
+}
+
+func TestHotReload_DeletedStateFallback(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+		Root: &statechart.Node{
+			ID: "root",
+			Children: map[string]*statechart.Node{
+				"idle": {ID: "idle"},
+			},
+		},
+	}
+
+	targetState := "deleted-state/path"
+
+	snapshot := statechart.Snapshot{
+		RuntimeID:      statechart.RuntimeID("original-runtime"),
+		DefinitionID:   "test-chart",
+		ActiveStates:   []string{"idle"},
+		RuntimeContext: statechart.RuntimeContext{ChartID: "test-chart", RuntimeID: "original-runtime"},
+		RegionStates:   map[string]string{"idle": "deleted-state"},
+	}
+
+	rtID, err := svc.restoreWithDeepHistory(snapshot, targetState, def)
+	if err != nil {
+		t.Fatalf("restoreWithDeepHistory should return nil error, got: %v", err)
+	}
+
+	if rtID == "" {
+		t.Error("Expected non-empty RuntimeID")
+	}
+
+	list, err := svc.List()
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+
+	if len(list) != 1 {
+		t.Errorf("Expected 1 runtime, got %d", len(list))
+	}
+
+	if list[0].ActiveStates[0] != "idle" {
+		t.Errorf("Expected fallback to state 'idle', got %s", list[0].ActiveStates[0])
+	}
+}
+
+func TestHotReload_HistoryPreservation(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+		Root: &statechart.Node{
+			ID: "root",
+			Children: map[string]*statechart.Node{
+				"idle": {ID: "idle"},
+			},
+		},
+	}
+
+	originalRtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	svc.updateRuntimeState(string(originalRtID), "running")
+	svc.updateRuntimeState(string(originalRtID), "stopped")
+
+	originalHistory := svc.getStateHistory(string(originalRtID))
+	if len(originalHistory) != 3 {
+		t.Fatalf("Expected 3 state transitions, got %d", len(originalHistory))
+	}
+
+	snapshot := statechart.Snapshot{
+		RuntimeID:      originalRtID,
+		DefinitionID:   "test-chart",
+		ActiveStates:   []string{"stopped"},
+		RuntimeContext: statechart.RuntimeContext{ChartID: "test-chart", RuntimeID: string(originalRtID)},
+	}
+
+	newRtID, err := svc.restoreWithShallowHistory(snapshot)
+	if err != nil {
+		t.Fatalf("restoreWithShallowHistory should return nil error, got: %v", err)
+	}
+
+	if newRtID == "" {
+		t.Error("Expected non-empty RuntimeID")
+	}
+
+	newHistory := svc.getStateHistory(string(newRtID))
+	if len(newHistory) != 1 {
+		t.Errorf("Expected 1 state transition in new runtime, got %d", len(newHistory))
+	}
+
+	if newHistory[0].To != "stopped" {
+		t.Errorf("Expected state 'stopped', got %s", newHistory[0].To)
+	}
+
+	list, err := svc.List()
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+
+	if len(list) != 2 {
+		t.Errorf("Expected 2 runtimes, got %d", len(list))
+	}
+}
+
+func TestHotReload_ContextTransform(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	oldContext := map[string]any{
+		"userId":   "user-123",
+		"state":    "idle",
+		"version":  "1.0.0",
+		"settings": map[string]any{"theme": "dark"},
+	}
+
+	newVersion := "2.0.0"
+
+	template := `{"userId":"{{GetMapValue .OldContext "userId"}}","state":"{{GetMapValue .OldContext "state"}}","newVersion":"{{.NewVersion}}","contextVersion":"{{.ContextVersion}}"}`
+
+	newContext, err := svc.applyContextTransform(oldContext, newVersion, template)
+	if err != nil {
+		t.Fatalf("applyContextTransform should return nil error, got: %v", err)
+	}
+
+	if newContext == nil {
+		t.Error("Expected non-nil new context")
+	}
+
+	newContextMap, ok := newContext.(map[string]any)
+	if !ok {
+		t.Error("Expected new context to be map[string]any")
+	}
+
+	if newContextMap["userId"] != "user-123" {
+		t.Errorf("Expected userId 'user-123', got %v", newContextMap["userId"])
+	}
+
+	if newContextMap["state"] != "idle" {
+		t.Errorf("Expected state 'idle', got %v", newContextMap["state"])
+	}
+
+	if newContextMap["newVersion"] != "2.0.0" {
+		t.Errorf("Expected newVersion '2.0.0', got %v", newContextMap["newVersion"])
+	}
+
+	if newContextMap["contextVersion"] != "2.0.0" {
+		t.Errorf("Expected contextVersion '2.0.0', got %v", newContextMap["contextVersion"])
+	}
+}
+
+func TestHotReload_TransformFailureFallback(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	oldContext := map[string]any{
+		"userId": "user-123",
+		"state":  "idle",
+	}
+
+	newVersion := "2.0.0"
+
+	invalidTemplate := `{{invalid syntax that will fail`
+
+	cleanStartCalled := false
+	cleanContext := map[string]any{"version": newVersion}
+
+	_, err := svc.applyContextTransformWithFallback(oldContext, newVersion, invalidTemplate, func() (any, error) {
+		cleanStartCalled = true
+		return cleanContext, nil
+	})
+
+	if err != nil {
+		t.Fatalf("applyContextTransformWithFallback should return nil error after fallback, got: %v", err)
+	}
+
+	if !cleanStartCalled {
+		t.Error("Expected cleanStart to be called on transform failure")
+	}
+}
+
+func TestHotReload_TemplateValidation(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	invalidTemplate := `{{invalid syntax that will fail`
+
+	err := svc.validateTransformTemplate(invalidTemplate)
+	if err == nil {
+		t.Error("Expected validateTransformTemplate to return error for invalid syntax")
+	}
+
+	validTemplate := `{"key":"{{GetMapValue .OldContext "key"}}","version":"{{.NewVersion}}"}`
+
+	err = svc.validateTransformTemplate(validTemplate)
+	if err != nil {
+		t.Errorf("Expected validateTransformTemplate to return nil for valid template, got: %v", err)
+	}
+}

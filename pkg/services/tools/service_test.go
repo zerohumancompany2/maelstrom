@@ -336,3 +336,361 @@ func TestBoundaryAwareTool_ViolationOnBreach(t *testing.T) {
 		t.Errorf("Expected ErrToolNotAccessible, got %v", err)
 	}
 }
+
+// arch-v1.md L472: Tool registry and resolution
+// arch-v1.md L488: resolve(name, callerBoundary) → ToolDescriptor | notFound
+func TestToolRegistry_Register(t *testing.T) {
+	svc := NewToolsService()
+
+	tool := ToolDescriptor{
+		Name:      "test-tool",
+		Boundary:  "inner",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "container",
+	}
+
+	err := svc.Register(tool)
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	err = svc.Register(tool)
+	if err == nil {
+		t.Fatal("Duplicate registration should return error, got nil")
+	}
+}
+
+// arch-v1.md L472: Tool registry and resolution
+// arch-v1.md L488: resolve(name, callerBoundary) → ToolDescriptor | notFound
+func TestToolRegistry_Resolve(t *testing.T) {
+	svc := NewToolsService()
+
+	tool := ToolDescriptor{
+		Name:      "resolve-test-tool",
+		Boundary:  "inner",
+		Schema:    map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string"}}},
+		Isolation: "container",
+	}
+
+	err := svc.Register(tool)
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	resolved, err := svc.Resolve("resolve-test-tool", "inner")
+	if err != nil {
+		t.Fatalf("Resolve failed: %v", err)
+	}
+
+	if resolved.Name != "resolve-test-tool" {
+		t.Errorf("Expected name 'resolve-test-tool', got '%s'", resolved.Name)
+	}
+
+	if resolved.Boundary != "inner" {
+		t.Errorf("Expected boundary 'inner', got '%s'", resolved.Boundary)
+	}
+
+	_, err = svc.Resolve("nonexistent-tool", "inner")
+	if err != ErrToolNotFound {
+		t.Errorf("Expected ErrToolNotFound for unknown tool, got %v", err)
+	}
+}
+
+// arch-v1.md L472: Tool registry and resolution
+// arch-v1.md L488: resolve(name, callerBoundary) → ToolDescriptor | notFound
+func TestToolRegistry_ListTools(t *testing.T) {
+	svc := NewToolsService()
+
+	tools, err := svc.List("")
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+
+	if len(tools) != 0 {
+		t.Errorf("Expected empty list, got %d tools", len(tools))
+	}
+
+	tool1 := ToolDescriptor{
+		Name:      "tool-1",
+		Boundary:  "inner",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "container",
+	}
+
+	tool2 := ToolDescriptor{
+		Name:      "tool-2",
+		Boundary:  "outer",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "sandbox",
+	}
+
+	err = svc.Register(tool1)
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	err = svc.Register(tool2)
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	tools, err = svc.List("")
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+
+	if len(tools) != 2 {
+		t.Errorf("Expected 2 tools, got %d", len(tools))
+	}
+}
+
+// arch-v1.md L472: Tool registry and resolution
+// arch-v1.md L488: resolve(name, callerBoundary) → ToolDescriptor | notFound
+// arch-v1.md L261-270: Boundary types (outer, DMZ, inner) and enforcement rules
+func TestToolRegistry_Invoke(t *testing.T) {
+	svc := NewToolsService()
+
+	tool := ToolDescriptor{
+		Name:      "invoke-test-tool",
+		Boundary:  "inner",
+		Schema:    map[string]any{"type": "object", "properties": map[string]any{"input": map[string]any{"type": "string"}}},
+		Isolation: "container",
+	}
+
+	err := svc.Register(tool)
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	result, err := svc.Invoke("invoke-test-tool", map[string]any{"input": "test-data"}, "inner")
+	if err != nil {
+		t.Fatalf("Invoke failed: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+
+	resultMap, ok := result.(map[string]any)
+	if !ok {
+		t.Fatal("Expected result to be map[string]any")
+	}
+
+	if resultMap["tool"] != "invoke-test-tool" {
+		t.Errorf("Expected tool name 'invoke-test-tool', got '%v'", resultMap["tool"])
+	}
+
+	_, err = svc.Invoke("nonexistent-tool", map[string]any{}, "inner")
+	if err != nil {
+		t.Errorf("Invoke for unknown tool should return nil error, got %v", err)
+	}
+}
+
+// arch-v1.md L472: Tool registry and resolution
+// arch-v1.md L488: resolve(name, callerBoundary) → ToolDescriptor | notFound
+// arch-v1.md L261-270: Boundary types (outer, DMZ, inner) and enforcement rules
+func TestToolRegistry_BoundaryFiltering(t *testing.T) {
+	svc := NewToolsService()
+
+	innerTool := ToolDescriptor{
+		Name:      "inner-tool",
+		Boundary:  "inner",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "container",
+	}
+
+	dmzTool := ToolDescriptor{
+		Name:      "dmz-tool",
+		Boundary:  "dmz",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "sandbox",
+	}
+
+	outerTool := ToolDescriptor{
+		Name:      "outer-tool",
+		Boundary:  "outer",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "sandbox",
+	}
+
+	if err := svc.Register(innerTool); err != nil {
+		t.Fatalf("Register inner tool failed: %v", err)
+	}
+	if err := svc.Register(dmzTool); err != nil {
+		t.Fatalf("Register dmz tool failed: %v", err)
+	}
+	if err := svc.Register(outerTool); err != nil {
+		t.Fatalf("Register outer tool failed: %v", err)
+	}
+
+	tools, err := svc.List("inner")
+	if err != nil {
+		t.Fatalf("List for inner boundary failed: %v", err)
+	}
+
+	if len(tools) != 1 {
+		t.Errorf("Expected 1 tool for inner boundary, got %d", len(tools))
+	}
+
+	if tools[0].Name != "inner-tool" {
+		t.Errorf("Expected inner-tool, got %s", tools[0].Name)
+	}
+
+	tools, err = svc.List("dmz")
+	if err != nil {
+		t.Fatalf("List for dmz boundary failed: %v", err)
+	}
+
+	if len(tools) != 1 {
+		t.Errorf("Expected 1 tool for dmz boundary, got %d", len(tools))
+	}
+
+	tools, err = svc.List("outer")
+	if err != nil {
+		t.Fatalf("List for outer boundary failed: %v", err)
+	}
+
+	if len(tools) != 1 {
+		t.Errorf("Expected 1 tool for outer boundary, got %d", len(tools))
+	}
+
+	tools, err = svc.List("")
+	if err != nil {
+		t.Fatalf("List for all tools failed: %v", err)
+	}
+
+	if len(tools) != 3 {
+		t.Errorf("Expected 3 tools for empty filter, got %d", len(tools))
+	}
+}
+
+// arch-v1.md L472: Tool registry and resolution
+// arch-v1.md L488: resolve(name, callerBoundary) → ToolDescriptor | notFound
+// arch-v1.md L261-270: Boundary types (outer, DMZ, inner) and enforcement rules
+func TestToolRegistry_InnerToolsInvisible(t *testing.T) {
+	svc := NewToolsService()
+
+	innerTool := ToolDescriptor{
+		Name:      "inner-db-query",
+		Boundary:  "inner",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "container",
+	}
+
+	dmzTool := ToolDescriptor{
+		Name:      "dmz-web-search",
+		Boundary:  "dmz",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "sandbox",
+	}
+
+	outerTool := ToolDescriptor{
+		Name:      "outer-http-client",
+		Boundary:  "outer",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "sandbox",
+	}
+
+	if err := svc.Register(innerTool); err != nil {
+		t.Fatalf("Register inner tool failed: %v", err)
+	}
+	if err := svc.Register(dmzTool); err != nil {
+		t.Fatalf("Register dmz tool failed: %v", err)
+	}
+	if err := svc.Register(outerTool); err != nil {
+		t.Fatalf("Register outer tool failed: %v", err)
+	}
+
+	_, err := svc.Resolve("inner-db-query", "outer")
+	if err == nil {
+		t.Fatal("Expected error when outer caller tries to access inner tool")
+	}
+
+	if err != ErrToolNotAccessible {
+		t.Errorf("Expected ErrToolNotAccessible, got %v", err)
+	}
+
+	_, err = svc.Resolve("inner-db-query", "dmz")
+	if err == nil {
+		t.Fatal("Expected error when dmz caller tries to access inner tool")
+	}
+
+	if err != ErrToolNotAccessible {
+		t.Errorf("Expected ErrToolNotAccessible, got %v", err)
+	}
+
+	_, err = svc.Resolve("dmz-web-search", "outer")
+	if err == nil {
+		t.Fatal("Expected error when outer caller tries to access dmz tool")
+	}
+
+	if err != ErrToolNotAccessible {
+		t.Errorf("Expected ErrToolNotAccessible, got %v", err)
+	}
+
+	_, err = svc.Resolve("dmz-web-search", "dmz")
+	if err != nil {
+		t.Errorf("DMZ caller should access DMZ tool: %v", err)
+	}
+
+	_, err = svc.Resolve("dmz-web-search", "inner")
+	if err != nil {
+		t.Errorf("Inner caller should access DMZ tool: %v", err)
+	}
+
+	_, err = svc.Resolve("outer-http-client", "outer")
+	if err != nil {
+		t.Errorf("Outer caller should access outer tool: %v", err)
+	}
+
+	_, err = svc.Resolve("outer-http-client", "dmz")
+	if err != nil {
+		t.Errorf("DMZ caller should access outer tool: %v", err)
+	}
+
+	_, err = svc.Resolve("outer-http-client", "inner")
+	if err != nil {
+		t.Errorf("Inner caller should access outer tool: %v", err)
+	}
+}
+
+// arch-v1.md L472: Tool registry and resolution
+// arch-v1.md L488: resolve(name, callerBoundary) → ToolDescriptor | notFound
+// arch-v1.md L261-270: Boundary types (outer, DMZ, inner) and enforcement rules
+func TestToolRegistry_BoundaryEnforcement(t *testing.T) {
+	svc := NewToolsService()
+
+	innerTool := ToolDescriptor{
+		Name:      "inner-db-query",
+		Boundary:  "inner",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "container",
+	}
+
+	if err := svc.Register(innerTool); err != nil {
+		t.Fatalf("Register inner tool failed: %v", err)
+	}
+
+	_, err := svc.Resolve("inner-db-query", "outer")
+	if err == nil {
+		t.Fatal("Expected error when outer caller tries to access inner tool")
+	}
+
+	if err != ErrToolNotAccessible {
+		t.Errorf("Expected ErrToolNotAccessible, got %v", err)
+	}
+
+	_, err = svc.Resolve("inner-db-query", "dmz")
+	if err == nil {
+		t.Fatal("Expected error when dmz caller tries to access inner tool")
+	}
+
+	if err != ErrToolNotAccessible {
+		t.Errorf("Expected ErrToolNotAccessible, got %v", err)
+	}
+
+	_, err = svc.Resolve("inner-db-query", "inner")
+	if err != nil {
+		t.Errorf("Inner caller should access inner tool: %v", err)
+	}
+}

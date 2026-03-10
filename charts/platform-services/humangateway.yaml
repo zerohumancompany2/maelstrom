@@ -1,0 +1,12 @@
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:humangateway
+  displayName: Human Gateway Service
+spec:
+  chartRef: humangateway-v1
+  replicas: 1
+  expose:
+    http:
+      port: 8082
+      tls: true

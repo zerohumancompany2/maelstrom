@@ -256,11 +256,8 @@ func TestE2E_AgentToolUsage(t *testing.T) {
 			t.Fatalf("Failed to isolate: %v", err)
 		}
 
-		if !view.Isolated {
-			t.Error("Expected isolated view")
-		}
-		if view.ChartID != "agent-123" {
-			t.Errorf("Expected chart ID 'agent-123', got '%s'", view.ChartID)
+		if view.RuntimeID != "agent-123" {
+			t.Errorf("Expected runtime ID 'agent-123', got '%s'", view.RuntimeID)
 		}
 	})
 

@@ -8,6 +8,182 @@ import (
 	"github.com/maelstrom/v3/pkg/statechart"
 )
 
+// TestPersistenceService_ID verifies ID() returns "sys:persistence"
+// Spec Reference: arch-v1.md L468 (sys:persistence service), L477-480 (Platform Service Contract)
+func TestPersistenceService_ID(t *testing.T) {
+	ps := NewPersistenceService().(*persistenceService)
+
+	id := ps.ID()
+
+	if id != "sys:persistence" {
+		t.Errorf("Expected ID 'sys:persistence', got '%s'", id)
+	}
+}
+
+// TestPersistenceService_Snapshot verifies Snapshot creates snapshot with runtime state, taints, context
+// Spec Reference: arch-v1.md L468 (Snapshots, event sourcing, version migration), L486 (snapshot(runtimeId))
+func TestPersistenceService_Snapshot(t *testing.T) {
+	ps := NewPersistenceService().(*persistenceService)
+
+	runtimeID := statechart.RuntimeID("test-runtime-snapshot")
+	ps.state[string(runtimeID)] = map[string]any{"key": "value", "nested": map[string]any{"foo": "bar"}}
+	ps.taints[string(runtimeID)] = []string{"TOOL_OUTPUT"}
+
+	policy := security.EnforcementPolicy{AllowedOnExit: []string{"TOOL_OUTPUT"}, Enforcement: "strict"}
+	snap, err := ps.Snapshot(string(runtimeID), policy)
+
+	if err != nil {
+		t.Fatalf("Snapshot failed: %v", err)
+	}
+
+	if snap.ID == "" {
+		t.Error("Expected snapshot ID to be non-empty")
+	}
+
+	if snap.RuntimeID != string(runtimeID) {
+		t.Errorf("Expected RuntimeID %s, got %s", runtimeID, snap.RuntimeID)
+	}
+
+	if snap.State == nil {
+		t.Error("Expected snapshot state to be non-nil")
+	}
+
+	if len(snap.Taints) != 1 {
+		t.Errorf("Expected 1 taint, got %d", len(snap.Taints))
+	}
+
+	if snap.Timestamp.IsZero() {
+		t.Error("Expected snapshot timestamp to be non-zero")
+	}
+}
+
+// TestPersistenceService_Restore verifies Restore from snapshot returns new RuntimeID
+// Spec Reference: arch-v1.md L468 (Snapshots, event sourcing, version migration), L486 (restore(snapshotId))
+func TestPersistenceService_Restore(t *testing.T) {
+	ps := NewPersistenceService().(*persistenceService)
+
+	originalID := statechart.RuntimeID("restore-test-original")
+	ps.state[string(originalID)] = map[string]any{"key": "value"}
+	ps.taints[string(originalID)] = []string{}
+
+	policy := security.EnforcementPolicy{AllowedOnExit: []string{}, Enforcement: "strict"}
+	snap, err := ps.Snapshot(string(originalID), policy)
+	if err != nil {
+		t.Fatalf("Snapshot failed: %v", err)
+	}
+
+	def := statechart.ChartDefinition{
+		ID:      "test-chart",
+		Version: "1.0.0",
+	}
+
+	restoredID, err := ps.Restore(string(snap.ID), def)
+	if err != nil {
+		t.Fatalf("Restore failed: %v", err)
+	}
+
+	if restoredID == "" {
+		t.Error("Expected restored ID to be non-empty")
+	}
+
+	if restoredID == originalID {
+		t.Error("Expected restored ID to be different from original")
+	}
+}
+
+// TestPersistenceService_AppendEvent verifies AppendEvent adds events with timestamps
+// Spec Reference: arch-v1.md L468 (event sourcing)
+func TestPersistenceService_AppendEvent(t *testing.T) {
+	ps := NewPersistenceService().(*persistenceService)
+
+	runtimeID := statechart.RuntimeID("event-test-append")
+	event := statechart.Event{
+		Type:          "test:event",
+		Payload:       map[string]any{"key": "value"},
+		CorrelationID: "corr-123",
+		Source:        "test-source",
+	}
+
+	err := ps.AppendEvent(string(runtimeID), event)
+	if err != nil {
+		t.Fatalf("AppendEvent failed: %v", err)
+	}
+
+	events, err := ps.GetEvents(string(runtimeID), "")
+	if err != nil {
+		t.Fatalf("GetEvents failed: %v", err)
+	}
+
+	if len(events) != 1 {
+		t.Errorf("Expected 1 event, got %d", len(events))
+	}
+
+	if events[0].Type != "test:event" {
+		t.Errorf("Expected event type 'test:event', got '%s'", events[0].Type)
+	}
+
+	if events[0].CorrelationID != "corr-123" {
+		t.Errorf("Expected correlation ID 'corr-123', got '%s'", events[0].CorrelationID)
+	}
+
+	if events[0].Source != "test-source" {
+		t.Errorf("Expected source 'test-source', got '%s'", events[0].Source)
+	}
+
+	if events[0].Timestamp.IsZero() {
+		t.Error("Expected event timestamp to be non-zero")
+	}
+}
+
+// TestPersistenceService_QueryEvents verifies QueryEvents returns events with filters in chronological order
+// Spec Reference: arch-v1.md L468 (event sourcing)
+func TestPersistenceService_QueryEvents(t *testing.T) {
+	ps := NewPersistenceService().(*persistenceService)
+
+	runtimeID := statechart.RuntimeID("query-test-events")
+
+	// Append multiple events
+	for i := 0; i < 5; i++ {
+		event := statechart.Event{
+			Type:          "test:event",
+			Payload:       map[string]any{"index": i},
+			CorrelationID: string(runtimeID),
+			Source:        "test-source",
+		}
+		if err := ps.AppendEvent(string(runtimeID), event); err != nil {
+			t.Fatalf("AppendEvent failed: %v", err)
+		}
+	}
+
+	// Query all events
+	allEvents, err := ps.GetEvents(string(runtimeID), "")
+	if err != nil {
+		t.Fatalf("GetEvents failed: %v", err)
+	}
+
+	if len(allEvents) != 5 {
+		t.Errorf("Expected 5 events, got %d", len(allEvents))
+	}
+
+	// Verify chronological order (timestamps should be non-decreasing)
+	for i := 1; i < len(allEvents); i++ {
+		if allEvents[i].Timestamp.Before(allEvents[i-1].Timestamp) {
+			t.Errorf("Events not in chronological order: event %d timestamp is before event %d", i, i-1)
+		}
+	}
+
+	// Query events since a specific event ID
+	sinceID := allEvents[2].ID
+	sinceEvents, err := ps.GetEvents(string(runtimeID), sinceID)
+	if err != nil {
+		t.Fatalf("GetEvents since failed: %v", err)
+	}
+
+	if len(sinceEvents) != 2 {
+		t.Errorf("Expected 2 events since ID, got %d", len(sinceEvents))
+	}
+}
+
 func TestPersistence_SnapshotCreate(t *testing.T) {
 	ps := NewPersistenceService().(*persistenceService)
 

@@ -1,13 +1,23 @@
 package lifecycle
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
+	"text/template"
 	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
+
+type transformData struct {
+	OldContext     any
+	NewVersion     string
+	ContextVersion string
+}
 
 type LifecycleService struct {
 	mu           sync.Mutex
@@ -196,4 +206,206 @@ func (l *LifecycleService) rollbackReload(serviceID string) error {
 		Timestamp: time.Now(),
 	})
 	return nil
+}
+
+func (l *LifecycleService) checkQuiescence(runtimeID string) (bool, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	_, exists := l.runtimes[statechart.RuntimeID(runtimeID)]
+	if !exists {
+		return false, statechart.ErrRuntimeNotFound
+	}
+	return true, nil
+}
+
+func (l *LifecycleService) prepareForReload(runtimeID string, timeoutMs int) error {
+	l.mu.Lock()
+	_, exists := l.runtimes[statechart.RuntimeID(runtimeID)]
+	if !exists {
+		l.mu.Unlock()
+		return statechart.ErrRuntimeNotFound
+	}
+	l.mu.Unlock()
+
+	timeout := time.Duration(timeoutMs) * time.Millisecond
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+
+	done := make(chan bool)
+	go func() {
+		for {
+			isQuiescent, err := l.checkQuiescence(runtimeID)
+			if err == nil && isQuiescent {
+				done <- true
+				return
+			}
+		}
+	}()
+
+	select {
+	case <-done:
+		return nil
+	case <-time.After(timeout):
+		return statechart.ErrQuiescenceTimeout
+	}
+}
+
+func (l *LifecycleService) restoreWithShallowHistory(snapshot statechart.Snapshot) (statechart.RuntimeID, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	id := statechart.RuntimeID(fmt.Sprintf("restored-%s-%d", snapshot.RuntimeID, len(l.runtimes)))
+	runtimeID := string(id)
+
+	l.runtimes[id] = RuntimeInfo{
+		ID:           runtimeID,
+		DefinitionID: snapshot.DefinitionID,
+		Boundary:     mail.InnerBoundary,
+		ActiveStates: snapshot.ActiveStates,
+		IsRunning:    false,
+	}
+
+	l.stateHistory[runtimeID] = []StateTransition{
+		{From: "", To: snapshot.ActiveStates[0], Timestamp: time.Now()},
+	}
+
+	return id, nil
+}
+
+func (l *LifecycleService) restoreWithDeepHistory(snapshot statechart.Snapshot, targetState string, def statechart.ChartDefinition) (statechart.RuntimeID, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	activeState := targetState
+	if regionState, ok := snapshot.RegionStates[snapshot.ActiveStates[0]]; ok {
+		activeState = regionState
+	}
+
+	fallbackToShallow := false
+	if def.Root != nil {
+		fullStatePath := snapshot.ActiveStates[0] + "/" + activeState
+		if !l.stateExistsInDefinition(def, fullStatePath) {
+			activeState = snapshot.ActiveStates[0]
+			fallbackToShallow = true
+		}
+	}
+
+	id := statechart.RuntimeID(fmt.Sprintf("restored-%s-%d", snapshot.RuntimeID, len(l.runtimes)))
+	runtimeID := string(id)
+
+	l.runtimes[id] = RuntimeInfo{
+		ID:           runtimeID,
+		DefinitionID: snapshot.DefinitionID,
+		Boundary:     mail.InnerBoundary,
+		ActiveStates: []string{activeState},
+		IsRunning:    false,
+	}
+
+	l.stateHistory[runtimeID] = []StateTransition{
+		{From: "", To: activeState, Timestamp: time.Now()},
+	}
+
+	if fallbackToShallow {
+		fmt.Printf("Warning: state %s not found, falling back to shallow history\n", targetState)
+	}
+
+	return id, nil
+}
+
+func (l *LifecycleService) stateExistsInDefinition(def statechart.ChartDefinition, statePath string) bool {
+	root := def.Root
+	if root == nil {
+		return false
+	}
+
+	parts := strings.Split(statePath, "/")
+	if len(parts) == 0 {
+		return false
+	}
+
+	current := root
+	if parts[0] == root.ID {
+		current = root
+	} else {
+		if child, ok := root.Children[parts[0]]; ok {
+			current = child
+		} else {
+			return false
+		}
+	}
+
+	for i := 1; i < len(parts); i++ {
+		part := parts[i]
+		if child, ok := current.Children[part]; ok {
+			current = child
+		} else {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (l *LifecycleService) applyContextTransform(oldContext any, newVersion string, templateStr string) (any, error) {
+	data := transformData{
+		OldContext:     oldContext,
+		NewVersion:     newVersion,
+		ContextVersion: newVersion,
+	}
+
+	funcMap := template.FuncMap{
+		"GetMapValue": func(m map[string]any, key string) any {
+			if val, ok := m[key]; ok {
+				return val
+			}
+			return ""
+		},
+	}
+
+	tmpl, err := template.New("contextTransform").Funcs(funcMap).Parse(templateStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return nil, fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal result: %w", err)
+	}
+
+	return result, nil
+}
+
+func (l *LifecycleService) applyContextTransformWithFallback(oldContext any, newVersion string, templateStr string, cleanStart func() (any, error)) (any, error) {
+	result, err := l.applyContextTransform(oldContext, newVersion, templateStr)
+	if err != nil {
+		fmt.Printf("Warning: transform failed, falling back to cleanStart: %v\n", err)
+		return cleanStart()
+	}
+	return result, nil
+}
+
+func validateTransformTemplate(templateStr string) error {
+	funcMap := template.FuncMap{
+		"GetMapValue": func(m map[string]any, key string) any {
+			if val, ok := m[key]; ok {
+				return val
+			}
+			return ""
+		},
+	}
+
+	_, err := template.New("contextTransform").Funcs(funcMap).Parse(templateStr)
+	if err != nil {
+		return fmt.Errorf("invalid template syntax: %w", err)
+	}
+	return nil
+}
+
+func (l *LifecycleService) validateTransformTemplate(templateStr string) error {
+	return validateTransformTemplate(templateStr)
 }

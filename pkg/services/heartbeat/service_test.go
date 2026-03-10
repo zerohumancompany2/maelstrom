@@ -2,7 +2,41 @@ package heartbeat
 
 import (
 	"testing"
+
+	"github.com/maelstrom/v3/pkg/mail"
 )
+
+// arch-v1.md L469: HeartbeatService must return ID "sys:heartbeat"
+func TestHeartbeatService_ID(t *testing.T) {
+	svc := NewHeartbeatService()
+
+	id := svc.ID()
+	if id != "sys:heartbeat" {
+		t.Errorf("Expected ID 'sys:heartbeat', got '%s'", id)
+	}
+}
+
+// arch-v1.md L469: HeartbeatService must schedule wake-ups using cron expressions
+func TestHeartbeatService_Schedule(t *testing.T) {
+	svc := NewHeartbeatService()
+
+	err := svc.Schedule("agent-1", "0 * * * *", "default template")
+	if err != nil {
+		t.Fatalf("Schedule failed: %v", err)
+	}
+
+	sched, err := svc.GetSchedule("agent-1")
+	if err != nil {
+		t.Fatalf("GetSchedule failed: %v", err)
+	}
+
+	if sched.CronExpr != "0 * * * *" {
+		t.Errorf("Expected cron '0 * * * *', got %s", sched.CronExpr)
+	}
+	if sched.Template != "default template" {
+		t.Errorf("Expected template 'default template', got %s", sched.Template)
+	}
+}
 
 func TestHeartbeat_Schedule(t *testing.T) {
 	svc := NewHeartbeatService()
@@ -79,7 +113,7 @@ func TestHeartbeat_Unschedule(t *testing.T) {
 	}
 }
 
-func TestHeartbeatService_Schedule(t *testing.T) {
+func TestHeartbeatService_ScheduleCron(t *testing.T) {
 	svc := NewHeartbeatService()
 
 	err := svc.ScheduleCron("0 * * * *")
@@ -88,11 +122,112 @@ func TestHeartbeatService_Schedule(t *testing.T) {
 	}
 }
 
-func TestHeartbeatService_Trigger(t *testing.T) {
+func TestHeartbeatService_TriggerAll(t *testing.T) {
 	svc := NewHeartbeatService()
 
 	err := svc.TriggerAll()
 	if err != nil {
 		t.Errorf("Expected nil error, got %v", err)
+	}
+}
+
+// arch-v1.md L469: HeartbeatService must unschedule wake-ups by job ID
+func TestHeartbeatService_Unschedule(t *testing.T) {
+	svc := NewHeartbeatService()
+
+	// First schedule a job
+	err := svc.Schedule("agent-1", "0 * * * *", "template")
+	if err != nil {
+		t.Fatalf("Schedule failed: %v", err)
+	}
+
+	// Unschedule the job
+	err = svc.Unschedule("agent-1")
+	if err != nil {
+		t.Fatalf("Unschedule failed: %v", err)
+	}
+
+	// Verify the schedule was removed
+	sched, err := svc.GetSchedule("agent-1")
+	if err != nil {
+		t.Fatalf("GetSchedule failed: %v", err)
+	}
+
+	if sched.AgentID != "" {
+		t.Errorf("Expected empty schedule after unschedule, got %v", sched)
+	}
+
+	// Unschedule non-existent job should return error
+	err = svc.Unschedule("non-existent")
+	if err == nil {
+		t.Error("Expected error when unscheduling non-existent job, got nil")
+	}
+}
+
+// arch-v1.md L469: HeartbeatService HEARTBEAT.md injection for scheduled agent wake-ups
+// arch-v1.md L1662: Wake-up triggers agent processing with mail delivered to inbox
+func TestHeartbeatService_WakeAgent(t *testing.T) {
+	svc := NewHeartbeatService()
+
+	// Schedule a wake-up for the agent
+	err := svc.Schedule("agent-1", "0 * * * *", "default template")
+	if err != nil {
+		t.Fatalf("Schedule failed: %v", err)
+	}
+
+	// Trigger wake-up should inject HEARTBEAT.md
+	err = svc.TriggerWakeUp("agent-1")
+	if err != nil {
+		t.Fatalf("TriggerWakeUp failed: %v", err)
+	}
+}
+
+// arch-v1.md L469: HEARTBEAT.md respects boundary rules
+// arch-v1.md L1662: Taints attached correctly based on agent boundary
+func TestHeartbeatService_WakeUpBoundaryEnforcement(t *testing.T) {
+	svc := NewHeartbeatService()
+
+	// Schedule a wake-up for the agent
+	err := svc.Schedule("agent-1", "0 * * * *", "default template")
+	if err != nil {
+		t.Fatalf("Schedule failed: %v", err)
+	}
+
+	// Trigger wake-up
+	err = svc.TriggerWakeUp("agent-1")
+	if err != nil {
+		t.Fatalf("TriggerWakeUp failed: %v", err)
+	}
+
+	// Verify boundary enforcement - HEARTBEAT.md should be on InnerBoundary
+	// and have appropriate taints attached
+	inbox := svc.GetInbox("agent-1")
+	if inbox == nil {
+		t.Fatal("Expected inbox to exist")
+	}
+
+	if len(inbox.Messages) == 0 {
+		t.Fatal("Expected inbox to have messages")
+	}
+
+	msg := inbox.Messages[0]
+	if msg.Metadata.Boundary != mail.InnerBoundary {
+		t.Errorf("Expected boundary InnerBoundary, got %s", msg.Metadata.Boundary)
+	}
+
+	if len(msg.Metadata.Taints) == 0 {
+		t.Error("Expected taints to be attached")
+	}
+}
+
+// arch-v1.md L469: Failed wake-up logged to observability
+// arch-v1.md L1662: Schedule continues for future wake-ups, error returned to caller
+func TestHeartbeatService_WakeUpFailure(t *testing.T) {
+	svc := NewHeartbeatService()
+
+	// Trigger wake-up for non-scheduled agent should fail
+	err := svc.TriggerWakeUp("non-scheduled-agent")
+	if err == nil {
+		t.Error("Expected error for non-scheduled agent, got nil")
 	}
 }

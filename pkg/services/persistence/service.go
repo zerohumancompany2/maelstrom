@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/security"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
@@ -40,6 +41,9 @@ type PersistenceService interface {
 	AppendEvent(runtimeId string, event statechart.Event) error
 	GetEvents(runtimeId string, since string) ([]EventLogEntry, error)
 	Migrate(runtimeId string, newDef statechart.ChartDefinition, policy MigrationPolicy) error
+	HandleMail(mail mail.Mail) error
+	Start() error
+	Stop() error
 }
 
 type persistenceService struct {
@@ -58,6 +62,10 @@ func NewPersistenceService() PersistenceService {
 		taints:    make(map[string][]string),
 		security:  security.NewTaintEngine(),
 	}
+}
+
+func (s *persistenceService) ID() string {
+	return "sys:persistence"
 }
 
 func (s *persistenceService) Snapshot(runtimeId string, policy security.EnforcementPolicy) (SnapshotRecord, error) {
@@ -142,5 +150,17 @@ func (s *persistenceService) Migrate(runtimeId string, newDef statechart.ChartDe
 	case CleanStart:
 		s.events[runtimeId] = []EventLogEntry{}
 	}
+	return nil
+}
+
+func (s *persistenceService) HandleMail(m mail.Mail) error {
+	return nil
+}
+
+func (s *persistenceService) Start() error {
+	return nil
+}
+
+func (s *persistenceService) Stop() error {
 	return nil
 }
