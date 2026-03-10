@@ -2,6 +2,7 @@ package heartbeat
 
 import (
 	"testing"
+	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
 )
@@ -225,9 +226,45 @@ func TestHeartbeatService_WakeUpBoundaryEnforcement(t *testing.T) {
 func TestHeartbeatService_WakeUpFailure(t *testing.T) {
 	svc := NewHeartbeatService()
 
-	// Trigger wake-up for non-scheduled agent should fail
 	err := svc.TriggerWakeUp("non-scheduled-agent")
 	if err == nil {
 		t.Error("Expected error for non-scheduled agent, got nil")
+	}
+}
+
+// TestHotreloadableServices_HeartbeatHEARTBEATInjection - spec: arch-v1.md L469 (HEARTBEAT.md injection)
+func TestHotreloadableServices_HeartbeatHEARTBEATInjection(t *testing.T) {
+	svc := NewHeartbeatService()
+	hbSvc := svc.(*heartbeatService)
+	runtimeId := "test-runtime-001"
+
+	interval := 5 * time.Second
+	hbSvc.schedules[runtimeId] = Schedule{
+		AgentID:  runtimeId,
+		CronExpr: "*/5 * * * *",
+		Template: "heartbeat",
+	}
+
+	err := hbSvc.InjectHEARTBEAT(runtimeId)
+	if err != nil {
+		t.Errorf("Expected no error injecting HEARTBEAT, got %v", err)
+	}
+
+	injected, err := hbSvc.GetInjectedContent(runtimeId)
+	if err != nil {
+		t.Fatalf("Expected no error getting injected content, got %v", err)
+	}
+	if injected.Type != "HEARTBEAT" {
+		t.Errorf("Expected content type 'HEARTBEAT', got '%s'", injected.Type)
+	}
+	if injected.Timestamp.IsZero() {
+		t.Error("Expected injection timestamp to be set")
+	}
+
+	select {
+	case <-hbSvc.NextWakeUp(runtimeId, interval):
+		// Wake-up occurred as expected
+	case <-time.After(interval + 1*time.Second):
+		t.Error("Expected wake-up to occur within configured interval")
 	}
 }

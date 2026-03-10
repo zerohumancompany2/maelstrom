@@ -9,19 +9,29 @@ import (
 	"github.com/maelstrom/v3/pkg/mail"
 )
 
+type InjectedContent struct {
+	Type      string
+	Timestamp time.Time
+	Content   string
+}
+
 var NotImplementedError = errors.New("not implemented")
 
 type heartbeatService struct {
-	schedules    map[string]Schedule
-	agentInboxes map[string]*mail.AgentInbox
-	publisher    mail.Publisher
-	mu           sync.Mutex
+	schedules       map[string]Schedule
+	agentInboxes    map[string]*mail.AgentInbox
+	publisher       mail.Publisher
+	injectedContent map[string]InjectedContent
+	wakeUpChannels  map[string]chan time.Time
+	mu              sync.Mutex
 }
 
 func NewHeartbeatService() HeartbeatService {
 	return &heartbeatService{
-		schedules:    make(map[string]Schedule),
-		agentInboxes: make(map[string]*mail.AgentInbox),
+		schedules:       make(map[string]Schedule),
+		agentInboxes:    make(map[string]*mail.AgentInbox),
+		injectedContent: make(map[string]InjectedContent),
+		wakeUpChannels:  make(map[string]chan time.Time),
 	}
 }
 
@@ -120,4 +130,54 @@ func (s *heartbeatService) Start() error {
 
 func (s *heartbeatService) Stop() error {
 	return nil
+}
+
+func (s *heartbeatService) InjectHEARTBEAT(runtimeId string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.injectedContent[runtimeId] = InjectedContent{
+		Type:      "HEARTBEAT",
+		Timestamp: time.Now(),
+		Content:   "HEARTBEAT.md",
+	}
+
+	return nil
+}
+
+func (s *heartbeatService) GetInjectedContent(runtimeId string) (InjectedContent, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	content, exists := s.injectedContent[runtimeId]
+	if !exists {
+		return InjectedContent{}, fmt.Errorf("no injected content for runtime: %s", runtimeId)
+	}
+
+	return content, nil
+}
+
+func (s *heartbeatService) NextWakeUp(runtimeId string, interval time.Duration) chan time.Time {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.wakeUpChannels[runtimeId]; !exists {
+		ch := make(chan time.Time, 1)
+		s.wakeUpChannels[runtimeId] = ch
+
+		go func() {
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
+			select {
+			case <-ticker.C:
+				select {
+				case ch <- time.Now():
+				default:
+				}
+			case <-time.After(interval * 2):
+			}
+		}()
+	}
+
+	return s.wakeUpChannels[runtimeId]
 }
