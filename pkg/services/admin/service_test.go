@@ -168,3 +168,39 @@ func TestHotreloadableServices_Admin2FAEnforcement(t *testing.T) {
 		t.Errorf("Expected no error for outer boundary access, got %v", err)
 	}
 }
+
+// TestHotreloadableServices_AdminCommandTypes - spec: arch-v1.md L485 (list, control, queryTaints, inject commands)
+func TestHotreloadableServices_AdminCommandTypes(t *testing.T) {
+	svc := NewAdminService()
+	adminSvc := svc.(*adminService)
+
+	token, err := adminSvc.authManager.CreateToken("admin", time.Hour)
+	if err != nil {
+		t.Fatalf("Failed to create token: %v", err)
+	}
+
+	err = svc.ExecuteCommand("list", token)
+	if err != nil {
+		t.Errorf("Expected list command to be accepted, got %v", err)
+	}
+
+	err = svc.ExecuteCommand("control", token)
+	if err != nil {
+		t.Errorf("Expected control command to be accepted, got %v", err)
+	}
+
+	err = svc.ExecuteCommand("queryTaints", token)
+	if err != nil {
+		t.Errorf("Expected queryTaints command to be accepted, got %v", err)
+	}
+
+	err = svc.ExecuteCommand("inject", token)
+	if err != nil {
+		t.Errorf("Expected inject command to be accepted, got %v", err)
+	}
+
+	err = svc.ExecuteCommand("invalidCommand", token)
+	if err == nil {
+		t.Error("Expected error for invalid command type")
+	}
+}

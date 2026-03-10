@@ -93,6 +93,17 @@ func (s *adminService) ExecuteCommand(cmd string, token string) error {
 		return err
 	}
 
+	validCommands := map[string]bool{
+		"list":        true,
+		"control":     true,
+		"queryTaints": true,
+		"inject":      true,
+	}
+
+	if !validCommands[cmd] {
+		return fmt.Errorf("invalid command: %s", cmd)
+	}
+
 	return nil
 }
 
