@@ -57,6 +57,40 @@ func TestPersistenceService_Snapshot(t *testing.T) {
 	}
 }
 
+// TestPersistenceService_Restore verifies Restore from snapshot returns new RuntimeID
+// Spec Reference: arch-v1.md L468 (Snapshots, event sourcing, version migration), L486 (restore(snapshotId))
+func TestPersistenceService_Restore(t *testing.T) {
+	ps := NewPersistenceService().(*persistenceService)
+
+	originalID := statechart.RuntimeID("restore-test-original")
+	ps.state[string(originalID)] = map[string]any{"key": "value"}
+	ps.taints[string(originalID)] = []string{}
+
+	policy := security.EnforcementPolicy{AllowedOnExit: []string{}, Enforcement: "strict"}
+	snap, err := ps.Snapshot(string(originalID), policy)
+	if err != nil {
+		t.Fatalf("Snapshot failed: %v", err)
+	}
+
+	def := statechart.ChartDefinition{
+		ID:      "test-chart",
+		Version: "1.0.0",
+	}
+
+	restoredID, err := ps.Restore(string(snap.ID), def)
+	if err != nil {
+		t.Fatalf("Restore failed: %v", err)
+	}
+
+	if restoredID == "" {
+		t.Error("Expected restored ID to be non-empty")
+	}
+
+	if restoredID == originalID {
+		t.Error("Expected restored ID to be different from original")
+	}
+}
+
 func TestPersistence_SnapshotCreate(t *testing.T) {
 	ps := NewPersistenceService().(*persistenceService)
 
