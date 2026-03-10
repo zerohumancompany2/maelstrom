@@ -421,3 +421,96 @@ func TestLayer7_integrationAllHardcodedServicesStart(t *testing.T) {
 		t.Errorf("Expected 1 service, got %d", len(svcList))
 	}
 }
+
+func TestLayer7_integrationAllHotReloadableServicesLoad(t *testing.T) {
+	// Create all 8 hot-reloadable services
+	gatewaySvc := gateway.NewGatewayService()
+	adminSvc := admin.NewAdminService()
+	persistenceSvc := persistence.NewPersistenceService()
+	heartbeatSvc := heartbeat.NewHeartbeatService()
+	memorySvc := memory.NewMemoryService()
+	humanGatewaySvc := humangateway.NewHumanGatewayService()
+	toolsSvc := tools.NewToolsService()
+	datasourcesSvc := datasources.NewDatasourceService()
+
+	// Test that all services can be instantiated and started
+	t.Run("gateway service loads", func(t *testing.T) {
+		if gatewaySvc == nil {
+			t.Error("Failed to create gateway service")
+		}
+		err := gatewaySvc.Start()
+		if err != nil {
+			t.Errorf("Failed to start gateway service: %v", err)
+		}
+	})
+
+	t.Run("admin service loads", func(t *testing.T) {
+		if adminSvc == nil {
+			t.Error("Failed to create admin service")
+		}
+		err := adminSvc.Start()
+		if err != nil {
+			t.Errorf("Failed to start admin service: %v", err)
+		}
+	})
+
+	t.Run("persistence service loads", func(t *testing.T) {
+		if persistenceSvc == nil {
+			t.Error("Failed to create persistence service")
+		}
+		err := persistenceSvc.Start()
+		if err != nil {
+			t.Errorf("Failed to start persistence service: %v", err)
+		}
+	})
+
+	t.Run("heartbeat service loads", func(t *testing.T) {
+		if heartbeatSvc == nil {
+			t.Error("Failed to create heartbeat service")
+		}
+		err := heartbeatSvc.Start()
+		if err != nil {
+			t.Errorf("Failed to start heartbeat service: %v", err)
+		}
+	})
+
+	t.Run("memory service loads", func(t *testing.T) {
+		if memorySvc == nil {
+			t.Error("Failed to create memory service")
+		}
+		err := memorySvc.Start()
+		if err != nil {
+			t.Errorf("Failed to start memory service: %v", err)
+		}
+	})
+
+	t.Run("human-gateway service loads", func(t *testing.T) {
+		if humanGatewaySvc == nil {
+			t.Error("Failed to create human-gateway service")
+		}
+		err := humanGatewaySvc.Start()
+		if err != nil {
+			t.Errorf("Failed to start human-gateway service: %v", err)
+		}
+	})
+
+	t.Run("tools service loads", func(t *testing.T) {
+		if toolsSvc == nil {
+			t.Error("Failed to create tools service")
+		}
+		err := toolsSvc.Start()
+		if err != nil {
+			t.Errorf("Failed to start tools service: %v", err)
+		}
+	})
+
+	t.Run("datasources service loads", func(t *testing.T) {
+		if datasourcesSvc == nil {
+			t.Error("Failed to create datasources service")
+		}
+		err := datasourcesSvc.Start()
+		if err != nil {
+			t.Errorf("Failed to start datasources service: %v", err)
+		}
+	})
+}
