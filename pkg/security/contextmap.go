@@ -1,5 +1,10 @@
 package security
 
+import (
+	"fmt"
+	"time"
+)
+
 type ContextMap struct {
 	Blocks     []*ContextBlock
 	TokenCount int
@@ -90,21 +95,26 @@ var contextBlockRegistry = make(map[string]BlockTaintInfo)
 
 func PrepareContextForBoundary(runtimeId string, boundary BoundaryType) error {
 	filtered := make([]*ContextBlock, 0)
-	for _, info := range contextBlockRegistry {
+	for name, info := range contextBlockRegistry {
 		isForbidden := false
+		forbiddenTaint := ""
 		for _, taint := range info.Taints {
 			if taint == "INNER_ONLY" && (boundary == DMZBoundary || boundary == OuterBoundary) {
 				isForbidden = true
+				forbiddenTaint = taint
 				break
 			}
 			if taint == "SECRET" && (boundary == DMZBoundary || boundary == OuterBoundary) {
 				isForbidden = true
+				forbiddenTaint = taint
 				break
 			}
 		}
-		if !isForbidden {
-			filtered = append(filtered, info.Block)
+		if isForbidden {
+			auditLog = append(auditLog, "DROPPED: forbidden taint "+forbiddenTaint+" for "+string(boundary)+" boundary - block "+name)
+			continue
 		}
+		filtered = append(filtered, info.Block)
 	}
 	contextBlockRegistry = make(map[string]BlockTaintInfo)
 	for _, block := range filtered {
@@ -119,9 +129,10 @@ func applyTaintPolicy(block *ContextBlock, boundary BoundaryType) *ContextBlock 
 		result := *block
 		content := result.Content
 		for _, rule := range block.TaintPolicy.RedactRules {
-			content = replaceTaint(content, rule.Taint, rule.Replacement)
+			content = applyRedactionRule(content, rule)
 		}
 		result.Content = content
+		auditLog = append(auditLog, "REDACTION: block "+block.Name+" redacted for boundary "+string(boundary))
 		return &result
 	}
 	return block
@@ -167,10 +178,49 @@ func isBoundaryAllowed(allowed []BoundaryType, boundary BoundaryType) bool {
 }
 
 func FilterContextBlockWithGlobalPolicy(block ContextBlock, boundary BoundaryType, globalPolicy TaintPolicyConfig) (ContextBlock, error) {
+	if block.TaintPolicy.RedactMode == "strict" || globalPolicy.Enforcement == EnforcementStrict {
+		return filterWithStrictEnforcement(block, boundary, globalPolicy)
+	}
 	if block.TaintPolicy.RedactMode != "" {
 		return FilterContextBlock(block, boundary)
 	}
 	return block, nil
+}
+
+func filterWithStrictEnforcement(block ContextBlock, boundary BoundaryType, globalPolicy TaintPolicyConfig) (ContextBlock, error) {
+	allowedSet := make(map[string]bool)
+	for _, t := range globalPolicy.AllowedOnExit {
+		allowedSet[t] = true
+	}
+
+	forbiddenTaints := getBlockForbiddenTaints(block, allowedSet)
+	if len(forbiddenTaints) == 0 {
+		return block, nil
+	}
+
+	forbiddenTaint := forbiddenTaints[0]
+	err := fmt.Errorf("strict enforcement blocked block with forbidden taint: %s", forbiddenTaint)
+
+	violation := TaintViolation{
+		RuntimeID:       block.Name,
+		SourceBoundary:  boundary,
+		TargetBoundary:  boundary,
+		ForbiddenTaints: forbiddenTaints,
+		Timestamp:       time.Now(),
+	}
+	ReportViolation(block.Name, violation)
+
+	return ContextBlock{}, err
+}
+
+func getBlockForbiddenTaints(block ContextBlock, allowedSet map[string]bool) []string {
+	forbidden := make([]string, 0)
+	for taint := range block.Taints {
+		if !allowedSet[taint] {
+			forbidden = append(forbidden, taint)
+		}
+	}
+	return forbidden
 }
 
 func replaceTaint(content, taint, replacement string) string {
@@ -181,6 +231,40 @@ func replaceTaint(content, taint, replacement string) string {
 			i += len(taint) - 1
 		} else {
 			result += string(content[i])
+		}
+	}
+	return result
+}
+
+func applyRedactionRule(content string, rule RedactRule) string {
+	result := content
+	if rule.Taint == "PII" {
+		redacted := replacePII(result, rule.Replacement)
+		if redacted != result {
+			return redacted
+		}
+		result = replaceTaint(result, "PII", rule.Replacement)
+	} else {
+		result = replaceTaint(result, rule.Taint, rule.Replacement)
+	}
+	return result
+}
+
+func replacePII(content, replacement string) string {
+	result := content
+	for i := 0; i < len(result); i++ {
+		if result[i] == '@' {
+			start := i - 1
+			for start >= 0 && (result[start] >= 'a' && result[start] <= 'z' || result[start] >= 'A' && result[start] <= 'Z' || result[start] >= '0' && result[start] <= '9' || result[start] == '.' || result[start] == '_' || result[start] == '-' || result[start] == '+') {
+				start--
+			}
+			start++
+			end := i + 1
+			for end < len(result) && (result[end] >= 'a' && result[end] <= 'z' || result[end] >= 'A' && result[end] <= 'Z' || result[end] >= '0' && result[end] <= '9' || result[end] == '.' || result[end] == '-') {
+				end++
+			}
+			result = result[:start] + replacement + result[end:]
+			break
 		}
 	}
 	return result
