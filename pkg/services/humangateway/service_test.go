@@ -91,6 +91,8 @@ func TestHumanGatewayService_GetSession(t *testing.T) {
 	}
 }
 
+// TestHumanGatewayService_HandleChat - arch-v1.md L732
+// Handle chat messages
 func TestHumanGatewayService_HandleChat(t *testing.T) {
 	svc := NewHumanGatewayService()
 
