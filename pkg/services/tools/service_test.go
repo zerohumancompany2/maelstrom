@@ -336,3 +336,26 @@ func TestBoundaryAwareTool_ViolationOnBreach(t *testing.T) {
 		t.Errorf("Expected ErrToolNotAccessible, got %v", err)
 	}
 }
+
+// arch-v1.md L472: Tool registry and resolution
+// arch-v1.md L488: resolve(name, callerBoundary) → ToolDescriptor | notFound
+func TestToolRegistry_Register(t *testing.T) {
+	svc := NewToolsService()
+
+	tool := ToolDescriptor{
+		Name:      "test-tool",
+		Boundary:  "inner",
+		Schema:    map[string]any{"type": "object"},
+		Isolation: "container",
+	}
+
+	err := svc.Register(tool)
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	err = svc.Register(tool)
+	if err == nil {
+		t.Fatal("Duplicate registration should return error, got nil")
+	}
+}

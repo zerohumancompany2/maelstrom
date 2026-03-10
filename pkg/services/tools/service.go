@@ -10,6 +10,7 @@ var (
 	ErrToolNotFound      = errors.New("tool not found")
 	ErrToolNotAccessible = errors.New("tool not accessible from this boundary")
 	ErrBoundaryViolation = errors.New("boundary violation: unauthorized tool access")
+	ErrDuplicateTool     = errors.New("tool with this name already registered")
 )
 
 type ToolsService interface {
@@ -40,6 +41,9 @@ func NewToolsService() ToolsService {
 }
 
 func (s *toolsService) Register(tool ToolDescriptor) error {
+	if _, exists := s.registry[tool.Name]; exists {
+		return ErrDuplicateTool
+	}
 	s.registry[tool.Name] = tool
 	return nil
 }
