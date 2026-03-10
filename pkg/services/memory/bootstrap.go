@@ -15,6 +15,9 @@ type MemoryService interface {
 	List(runtimeId string) ([]MemoryResult, error)
 	StoreKey(key string, value interface{}) error
 	QueryKey(key string) (interface{}, error)
+	AddEdge(from, to, relationship string, properties map[string]any) error
+	QueryPattern(pattern GraphPattern) ([]GraphNode, error)
+	TraverseRelationships(startNode string, maxDepth int) ([]GraphEdge, error)
 }
 
 // MemoryResult represents a memory entry

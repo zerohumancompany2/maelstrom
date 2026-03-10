@@ -10,12 +10,14 @@ var NotImplementedError = errors.New("not implemented")
 type memoryService struct {
 	store      map[string]interface{}
 	vectorStore VectorStore
+	graphStore GraphStore
 }
 
 func NewMemoryService() MemoryService {
 	return &memoryService{
-		store:       make(map[string]interface{}),
+		store:      make(map[string]interface{}),
 		vectorStore: newVectorStore(),
+		graphStore:  newGraphStore(),
 	}
 }
 
@@ -97,4 +99,16 @@ func (s *memoryService) Delete(memoryId string) error {
 
 func (s *memoryService) List(runtimeId string) ([]MemoryResult, error) {
 	return []MemoryResult{}, nil
+}
+
+func (s *memoryService) AddEdge(from, to, relationship string, properties map[string]any) error {
+	return s.graphStore.AddEdge(from, to, relationship, properties)
+}
+
+func (s *memoryService) QueryPattern(pattern GraphPattern) ([]GraphNode, error) {
+	return s.graphStore.Query(pattern)
+}
+
+func (s *memoryService) TraverseRelationships(startNode string, maxDepth int) ([]GraphEdge, error) {
+	return s.graphStore.Traverse(startNode, maxDepth)
 }

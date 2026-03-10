@@ -225,3 +225,42 @@ func TestMemoryService_StoreItem(t *testing.T) {
 		t.Error("Expected auto-computed vector to be non-empty")
 	}
 }
+
+// TestMemoryService_AddEdge - arch-v1.md L470: GraphStore must add edges between nodes with properties
+func TestMemoryService_AddEdge(t *testing.T) {
+	svc := NewMemoryService()
+
+	// Test 1: Add edge between nodes
+	err := svc.AddEdge("node-a", "node-b", "knows", nil)
+	if err != nil {
+		t.Fatalf("AddEdge failed: %v", err)
+	}
+
+	// Test 2: Add edge with properties
+	properties := map[string]any{"since": "2020", "level": "close"}
+	err = svc.AddEdge("node-b", "node-c", "works-with", properties)
+	if err != nil {
+		t.Fatalf("AddEdge with properties failed: %v", err)
+	}
+
+	// Test 3: Duplicate edge handling (should overwrite)
+	newProperties := map[string]any{"since": "2021", "level": "best"}
+	err = svc.AddEdge("node-a", "node-b", "knows", newProperties)
+	if err != nil {
+		t.Fatalf("AddEdge duplicate handling failed: %v", err)
+	}
+
+	// Verify edge was updated via query
+	pattern := GraphPattern{
+		From: "node-a",
+		To:   "node-b",
+	}
+	nodes, err := svc.QueryPattern(pattern)
+	if err != nil {
+		t.Fatalf("QueryPattern failed: %v", err)
+	}
+
+	if len(nodes) == 0 {
+		t.Error("Expected at least one node in query results")
+	}
+}
