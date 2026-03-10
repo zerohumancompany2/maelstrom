@@ -122,45 +122,6 @@ func TestHumanGatewayService_HandleChat(t *testing.T) {
 	}
 }
 
-func TestHumanGatewayService_ParseActionItem(t *testing.T) {
-	svc := NewHumanGatewayService()
-
-	items, err := svc.ParseActionItem("Please @pause processing")
-	if err != nil {
-		t.Errorf("Expected nil error, got %v", err)
-	}
-
-	if len(items) != 1 {
-		t.Errorf("Expected 1 action item, got %d", len(items))
-	}
-	if items[0].Type != "pause" {
-		t.Errorf("Expected type 'pause', got '%s'", items[0].Type)
-	}
-
-	items, err = svc.ParseActionItem("@inject-memory This is important")
-	if err != nil {
-		t.Errorf("Expected nil error, got %v", err)
-	}
-
-	if len(items) != 1 {
-		t.Errorf("Expected 1 action item, got %d", len(items))
-	}
-	if items[0].Type != "inject-memory" {
-		t.Errorf("Expected type 'inject-memory', got '%s'", items[0].Type)
-	}
-	if items[0].Payload != "This is important" {
-		t.Errorf("Expected payload 'This is important', got '%v'", items[0].Payload)
-	}
-
-	items, err = svc.ParseActionItem("Just a normal message")
-	if err != nil {
-		t.Errorf("Expected nil error, got %v", err)
-	}
-	if len(items) != 0 {
-		t.Errorf("Expected 0 action items, got %d", len(items))
-	}
-}
-
 func TestHumanGatewayService_SessionManagement(t *testing.T) {
 	svc := NewHumanGatewayService()
 
@@ -308,5 +269,55 @@ func TestHumanGatewayService_ContextMapSanitization(t *testing.T) {
 
 	if sanitizedOuter["taints"] != nil {
 		t.Error("Expected taints to be redacted for outer boundary")
+	}
+}
+
+// TestHumanGatewayService_ParseActionItem - arch-v1.md L734
+// Parse action item shorthands
+func TestHumanGatewayService_ParseActionItem(t *testing.T) {
+	svc := NewHumanGatewayService()
+
+	items, err := svc.ParseActionItem("@pause")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	if len(items) != 1 {
+		t.Errorf("Expected 1 action item, got %d", len(items))
+	}
+
+	if items[0].Type != "pause" {
+		t.Errorf("Expected type 'pause', got '%s'", items[0].Type)
+	}
+
+	items, err = svc.ParseActionItem("@inject-memory important data")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	if len(items) != 1 {
+		t.Errorf("Expected 1 action item, got %d", len(items))
+	}
+
+	if items[0].Type != "inject-memory" {
+		t.Errorf("Expected type 'inject-memory', got '%s'", items[0].Type)
+	}
+
+	payload, ok := items[0].Payload.(string)
+	if !ok {
+		t.Error("Expected payload to be string")
+	}
+
+	if payload != "important data" {
+		t.Errorf("Expected payload 'important data', got '%s'", payload)
+	}
+
+	items, err = svc.ParseActionItem("Just a normal message")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	if len(items) != 0 {
+		t.Errorf("Expected 0 action items, got %d", len(items))
 	}
 }
