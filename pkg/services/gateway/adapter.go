@@ -138,3 +138,34 @@ func (s *SMTPAdapter) NormalizeInbound(rawMessage any) (*mail.Mail, error) {
 func (s *SMTPAdapter) NormalizeOutbound(mail *mail.Mail) (any, error) {
 	return mail.Content, nil
 }
+
+// InternalGRPCAdapter implements internal gRPC channel adapter
+type InternalGRPCAdapter struct {
+	// Add fields as needed
+}
+
+func (g *InternalGRPCAdapter) Name() string {
+	return "grpc"
+}
+
+func (g *InternalGRPCAdapter) Handle(r *http.Request) error {
+	return nil
+}
+
+func (g *InternalGRPCAdapter) Stream() bool {
+	return false
+}
+
+func (g *InternalGRPCAdapter) NormalizeInbound(rawMessage any) (*mail.Mail, error) {
+	return &mail.Mail{
+		Type:    mail.MailReceived,
+		Content: rawMessage,
+		Metadata: mail.MailMetadata{
+			Adapter: "grpc",
+		},
+	}, nil
+}
+
+func (g *InternalGRPCAdapter) NormalizeOutbound(mail *mail.Mail) (any, error) {
+	return mail.Content, nil
+}
