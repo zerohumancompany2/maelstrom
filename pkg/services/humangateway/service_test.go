@@ -281,3 +281,32 @@ func TestHumanGatewayService_SendMessage(t *testing.T) {
 		t.Error("Expected error for nil session")
 	}
 }
+
+// TestHumanGatewayService_ContextMapSanitization - arch-v1.md L731
+// Sanitize ContextMap by boundary rules
+func TestHumanGatewayService_ContextMapSanitization(t *testing.T) {
+	ctx := ContextMapSnapshot{
+		"conversation": []any{"msg1", "msg2"},
+		"memory":       "important data",
+		"internal":     "secret data",
+	}
+
+	ctx["taints"] = map[string]any{
+		"FORBIDDEN": "should be redacted",
+		"USER":      "allowed",
+	}
+
+	sanitizedInner := SanitizeContextForBoundary(ctx, mail.InnerBoundary)
+	if len(sanitizedInner) != len(ctx) {
+		t.Errorf("Expected %d keys for inner boundary, got %d", len(ctx), len(sanitizedInner))
+	}
+
+	sanitizedOuter := SanitizeContextForBoundary(ctx, mail.OuterBoundary)
+	if len(sanitizedOuter) != 3 {
+		t.Errorf("Expected 3 keys for outer boundary, got %d", len(sanitizedOuter))
+	}
+
+	if sanitizedOuter["taints"] != nil {
+		t.Error("Expected taints to be redacted for outer boundary")
+	}
+}

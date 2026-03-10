@@ -47,8 +47,35 @@ func (h *HumanGatewayService) ParseActionItem(message string) ([]ActionItem, err
 
 func SanitizeContextForBoundary(ctx ContextMapSnapshot, boundary mail.BoundaryType) ContextMapSnapshot {
 	sanitized := make(ContextMapSnapshot)
+	
+	forbiddenTaints := map[string]bool{
+		"FORBIDDEN": true,
+		"INTERNAL":  true,
+		"SECRET":    true,
+	}
+
 	for k, v := range ctx {
-		sanitized[k] = v
+		switch boundary {
+		case mail.InnerBoundary:
+			sanitized[k] = v
+		case mail.DMZBoundary:
+			if vm, ok := v.(map[string]any); ok {
+				cleaned := make(map[string]any)
+				for tk, tv := range vm {
+					if !forbiddenTaints[tk] {
+						cleaned[tk] = tv
+					}
+				}
+				sanitized[k] = cleaned
+			} else {
+				sanitized[k] = v
+			}
+		case mail.OuterBoundary:
+			if _, ok := v.(map[string]any); ok {
+				continue
+			}
+			sanitized[k] = v
+		}
 	}
 	return sanitized
 }
