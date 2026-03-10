@@ -170,3 +170,39 @@ func TestDatasources_ValidateAccess(t *testing.T) {
 		t.Fatalf("ValidateAccess for outer failed: %v", err)
 	}
 }
+
+// TestDataSourceService_TagOnWrite - arch-v1.md L473, L1312: tag taints on write operation
+func TestDataSourceService_TagOnWrite(t *testing.T) {
+	svc := NewDatasourceService()
+
+	err := svc.TagOnWrite("/path/to/file.txt", []string{"confidential", "internal"})
+	if err != nil {
+		t.Fatalf("TagOnWrite failed: %v", err)
+	}
+
+	taints, err := svc.GetTaints("/path/to/file.txt")
+	if err != nil {
+		t.Fatalf("GetTaints failed: %v", err)
+	}
+
+	if len(taints) != 2 {
+		t.Errorf("Expected 2 taints, got %d", len(taints))
+	}
+
+	expected := map[string]bool{"confidential": true, "internal": true}
+	for _, taint := range taints {
+		if !expected[taint] {
+			t.Errorf("Unexpected taint: %s", taint)
+		}
+	}
+
+	err = svc.TagOnWrite("/path/to/file.txt", []string{})
+	if err != nil {
+		t.Fatalf("TagOnWrite with empty list failed: %v", err)
+	}
+
+	taints, _ = svc.GetTaints("/path/to/file.txt")
+	if len(taints) != 0 {
+		t.Errorf("Expected empty taints after clearing, got %d", len(taints))
+	}
+}

@@ -19,11 +19,13 @@ type DatasourceService interface {
 
 type datasourceService struct {
 	datasources map[string]datasource.DataSource
+	taints      map[string][]string
 }
 
 func NewDatasourceService() DatasourceService {
 	return &datasourceService{
 		datasources: make(map[string]datasource.DataSource),
+		taints:      make(map[string][]string),
 	}
 }
 
@@ -48,11 +50,19 @@ func (s *datasourceService) List() []string {
 }
 
 func (s *datasourceService) TagOnWrite(path string, taints []string) error {
+	s.taints[path] = make([]string, len(taints))
+	copy(s.taints[path], taints)
 	return nil
 }
 
 func (s *datasourceService) GetTaints(path string) ([]string, error) {
-	return []string{}, nil
+	taints, ok := s.taints[path]
+	if !ok {
+		return []string{}, nil
+	}
+	result := make([]string, len(taints))
+	copy(result, taints)
+	return result, nil
 }
 
 func (s *datasourceService) ValidateAccess(path string, boundary security.BoundaryType) error {
