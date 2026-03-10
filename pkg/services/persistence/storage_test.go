@@ -156,3 +156,100 @@ func TestStorageBackend_SaveEvent(t *testing.T) {
 		t.Error("Expected event timestamp to be non-zero")
 	}
 }
+
+// TestStorageBackend_QueryEvents
+// Spec Reference: arch-v1.md L468 (event sourcing)
+// Given: A StorageBackend instance with events saved
+// When: QueryEvents() is called with filters
+// Then: Events returned filtered by runtime ID and time range
+// Expected Result: Events filtered correctly by runtime ID, time range filtering functional
+func TestStorageBackend_QueryEvents(t *testing.T) {
+	backend := NewStorageBackend().(*storageBackend)
+
+	baseTime := time.Now()
+
+	event1 := Event{
+		ID:            "event-1",
+		RuntimeID:     "runtime-query-1",
+		Type:          "test:event1",
+		Payload:       map[string]any{"index": 1},
+		CorrelationID: "corr-1",
+		Source:        "test-source",
+		Timestamp:     baseTime.Add(-2 * time.Minute),
+	}
+
+	event2 := Event{
+		ID:            "event-2",
+		RuntimeID:     "runtime-query-1",
+		Type:          "test:event2",
+		Payload:       map[string]any{"index": 2},
+		CorrelationID: "corr-2",
+		Source:        "test-source",
+		Timestamp:     baseTime.Add(-1 * time.Minute),
+	}
+
+	event3 := Event{
+		ID:            "event-3",
+		RuntimeID:     "runtime-query-1",
+		Type:          "test:event3",
+		Payload:       map[string]any{"index": 3},
+		CorrelationID: "corr-3",
+		Source:        "test-source",
+		Timestamp:     baseTime,
+	}
+
+	event4 := Event{
+		ID:            "event-4",
+		RuntimeID:     "runtime-query-2",
+		Type:          "test:event4",
+		Payload:       map[string]any{"index": 4},
+		CorrelationID: "corr-4",
+		Source:        "test-source",
+		Timestamp:     baseTime,
+	}
+
+	for _, event := range []Event{event1, event2, event3, event4} {
+		err := backend.SaveEvent(event)
+		if err != nil {
+			t.Fatalf("SaveEvent failed: %v", err)
+		}
+	}
+
+	filters := EventFilters{
+		RuntimeID: "runtime-query-1",
+		StartTime: baseTime.Add(-90 * time.Second),
+		EndTime:   baseTime.Add(1 * time.Minute),
+	}
+
+	queryEvents, err := backend.QueryEvents(filters)
+	if err != nil {
+		t.Fatalf("QueryEvents failed: %v", err)
+	}
+
+	if len(queryEvents) != 2 {
+		t.Errorf("Expected 2 events in time range, got %d", len(queryEvents))
+	}
+
+	for _, ev := range queryEvents {
+		if ev.RuntimeID != filters.RuntimeID {
+			t.Errorf("Expected runtime ID %s, got %s", filters.RuntimeID, ev.RuntimeID)
+		}
+
+		if ev.Timestamp.Before(filters.StartTime) || ev.Timestamp.After(filters.EndTime) {
+			t.Errorf("Event timestamp %v outside of time range [%v, %v]", ev.Timestamp, filters.StartTime, filters.EndTime)
+		}
+	}
+
+	emptyFilters := EventFilters{
+		RuntimeID: "non-existent-runtime",
+	}
+
+	emptyEvents, err := backend.QueryEvents(emptyFilters)
+	if err != nil {
+		t.Fatalf("QueryEvents for non-existent runtime failed: %v", err)
+	}
+
+	if len(emptyEvents) != 0 {
+		t.Errorf("Expected 0 events for non-existent runtime, got %d", len(emptyEvents))
+	}
+}

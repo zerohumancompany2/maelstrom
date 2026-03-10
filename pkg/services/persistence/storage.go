@@ -80,5 +80,28 @@ func (s *storageBackend) SaveEvent(event Event) error {
 }
 
 func (s *storageBackend) QueryEvents(filters EventFilters) ([]Event, error) {
-	return nil, nil
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if filters.RuntimeID == "" {
+		return nil, ErrInvalidFilter
+	}
+
+	allEvents, ok := s.events[filters.RuntimeID]
+	if !ok {
+		return []Event{}, nil
+	}
+
+	var filtered []Event
+	for _, ev := range allEvents {
+		if !filters.StartTime.IsZero() && ev.Timestamp.Before(filters.StartTime) {
+			continue
+		}
+		if !filters.EndTime.IsZero() && ev.Timestamp.After(filters.EndTime) {
+			continue
+		}
+		filtered = append(filtered, ev)
+	}
+
+	return filtered, nil
 }
