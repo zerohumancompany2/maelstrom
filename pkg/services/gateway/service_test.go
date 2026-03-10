@@ -145,3 +145,21 @@ func TestGatewayService_RegisterAdapter_Success(t *testing.T) {
 		t.Errorf("Expected smtp adapter name 'smtp', got '%s'", adapt.Name())
 	}
 }
+
+// TestGatewayService_NormalizeInbound_UnregisteredAdapterReturnsError - Spec: arch-v1.md L670-671
+func TestGatewayService_NormalizeInbound_UnregisteredAdapterReturnsError(t *testing.T) {
+	svc := NewGatewayService()
+	rawMessage := map[string]any{
+		"from":    "user@example.com",
+		"subject": "Test Message",
+		"body":    "Hello, World!",
+	}
+
+	m, err := svc.NormalizeInbound("nonexistent", rawMessage)
+	if err == nil {
+		t.Error("Expected error for unregistered adapter, got nil")
+	}
+	if m != nil {
+		t.Error("Expected nil mail for unregistered adapter, got non-nil")
+	}
+}

@@ -110,6 +110,11 @@ func (g *gatewayService) ID() string {
 
 // NormalizeInbound normalizes inbound messages to mail_received
 func (g *gatewayService) NormalizeInbound(adapterName string, rawMessage any) (*mail.Mail, error) {
+	_, exists := g.adapters[adapterName]
+	if !exists {
+		return nil, errors.New("adapter not registered")
+	}
+
 	return &mail.Mail{
 		Type:    mail.MailReceived,
 		Content: rawMessage,
