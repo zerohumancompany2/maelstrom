@@ -321,3 +321,47 @@ func TestHumanGatewayService_ParseActionItem(t *testing.T) {
 		t.Errorf("Expected 0 action items, got %d", len(items))
 	}
 }
+
+// TestHumanGatewayService_AgentReply - arch-v1.md L733
+// Render agent replies in chat
+func TestHumanGatewayService_AgentReply(t *testing.T) {
+	svc := NewHumanGatewayService()
+
+	session, err := svc.CreateChatSession("agent-123")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	reply := mail.Mail{
+		ID:     "reply-1",
+		Type:   mail.MailTypeAssistant,
+		Source: "agent:agent-123",
+		Target: "human:agent-123",
+		Content: map[string]any{
+			"message": "Hello human!",
+		},
+	}
+
+	err = svc.AddAgentReply(session, reply)
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	if len(session.Messages) != 1 {
+		t.Errorf("Expected 1 message, got %d", len(session.Messages))
+	}
+
+	m := session.Messages[0]
+	if m.Type != mail.MailTypeAssistant {
+		t.Errorf("Expected MailTypeAssistant, got %s", m.Type)
+	}
+
+	if m.Source != "agent:agent-123" {
+		t.Errorf("Expected source 'agent:agent-123', got '%s'", m.Source)
+	}
+
+	err = svc.AddAgentReply(nil, reply)
+	if err == nil {
+		t.Error("Expected error for nil session")
+	}
+}

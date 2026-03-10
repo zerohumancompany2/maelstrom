@@ -102,3 +102,12 @@ func (h *HumanGatewayService) SendMessage(session *ChatSession, message string) 
 	session.Messages = append(session.Messages, mailMsg)
 	return nil
 }
+
+func (h *HumanGatewayService) AddAgentReply(session *ChatSession, reply mail.Mail) error {
+	if session == nil {
+		return fmt.Errorf("nil session")
+	}
+
+	session.Messages = append(session.Messages, reply)
+	return nil
+}
