@@ -4,6 +4,15 @@ import (
 	"testing"
 )
 
+// TestGatewayService_ID - Spec: arch-v1.md L466, L477-480
+func TestGatewayService_ID(t *testing.T) {
+	svc := NewGatewayService()
+	id := svc.ID()
+	if id != "sys:gateway" {
+		t.Errorf("Expected ID 'sys:gateway', got '%s'", id)
+	}
+}
+
 func TestGateway_RegisterAdapter(t *testing.T) {
 	// Test: Register webhook, websocket, sse, smtp adapters
 	svc := NewGatewayService()

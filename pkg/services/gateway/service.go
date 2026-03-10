@@ -1,6 +1,9 @@
 package gateway
 
 import (
+	"errors"
+
+	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/openapi"
 )
 
@@ -22,6 +25,7 @@ type GatewayMail struct {
 
 // GatewayService interface defines the gateway service API
 type GatewayService interface {
+	ID() string
 	RegisterAdapter(name string, adapter ChannelAdapter) error
 	Publish(mail GatewayMail) (GatewayAck, error)
 	PublishTo(mail GatewayMail) error
@@ -29,6 +33,8 @@ type GatewayService interface {
 	Unsubscribe(address string, ch <-chan GatewayMail) error
 	GetOpenAPI() (*openapi.Spec, error)
 	GetAdapter(name string) (ChannelAdapter, bool)
+	NormalizeInbound(adapterName string, rawMessage any) (*mail.Mail, error)
+	NormalizeOutbound(mail *mail.Mail, adapterName string) (any, error)
 }
 
 // gatewayService implements GatewayService
@@ -92,4 +98,19 @@ func (g *gatewayService) GetOpenAPI() (*openapi.Spec, error) {
 func (g *gatewayService) GetAdapter(name string) (ChannelAdapter, bool) {
 	adapter, ok := g.adapters[name]
 	return adapter, ok
+}
+
+// ID returns the service ID
+func (g *gatewayService) ID() string {
+	return "sys:gateway"
+}
+
+// NormalizeInbound normalizes inbound messages to mail_received
+func (g *gatewayService) NormalizeInbound(adapterName string, rawMessage any) (*mail.Mail, error) {
+	return nil, errors.New("not implemented")
+}
+
+// NormalizeOutbound normalizes outbound mail to channel-specific format
+func (g *gatewayService) NormalizeOutbound(mail *mail.Mail, adapterName string) (any, error) {
+	return nil, errors.New("not implemented")
 }
