@@ -161,3 +161,21 @@ func TestHeartbeatService_Unschedule(t *testing.T) {
 		t.Error("Expected error when unscheduling non-existent job, got nil")
 	}
 }
+
+// arch-v1.md L469: HeartbeatService HEARTBEAT.md injection for scheduled agent wake-ups
+// arch-v1.md L1662: Wake-up triggers agent processing with mail delivered to inbox
+func TestHeartbeatService_WakeAgent(t *testing.T) {
+	svc := NewHeartbeatService()
+
+	// Schedule a wake-up for the agent
+	err := svc.Schedule("agent-1", "0 * * * *", "default template")
+	if err != nil {
+		t.Fatalf("Schedule failed: %v", err)
+	}
+
+	// Trigger wake-up should inject HEARTBEAT.md
+	err = svc.TriggerWakeUp("agent-1")
+	if err != nil {
+		t.Fatalf("TriggerWakeUp failed: %v", err)
+	}
+}

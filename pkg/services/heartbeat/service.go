@@ -4,18 +4,24 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
+
+	"github.com/maelstrom/v3/pkg/mail"
 )
 
 var NotImplementedError = errors.New("not implemented")
 
 type heartbeatService struct {
-	schedules map[string]Schedule
-	mu        sync.Mutex
+	schedules   map[string]Schedule
+	agentInboxes map[string]*mail.AgentInbox
+	publisher   mail.Publisher
+	mu          sync.Mutex
 }
 
 func NewHeartbeatService() HeartbeatService {
 	return &heartbeatService{
-		schedules: make(map[string]Schedule),
+		schedules:    make(map[string]Schedule),
+		agentInboxes: make(map[string]*mail.AgentInbox),
 	}
 }
 
@@ -60,4 +66,30 @@ func (s *heartbeatService) ScheduleCron(cron string) error {
 
 func (s *heartbeatService) TriggerAll() error {
 	return nil
+}
+
+func (s *heartbeatService) TriggerWakeUp(agentID string) error {
+	s.mu.Lock()
+	inbox, exists := s.agentInboxes[agentID]
+	if !exists {
+		inbox = &mail.AgentInbox{ID: agentID}
+		s.agentInboxes[agentID] = inbox
+	}
+	s.mu.Unlock()
+
+	// HEARTBEAT.md injection - arch-v1.md L469
+	heartbeatMail := mail.Mail{
+		ID:        fmt.Sprintf("heartbeat-%s-%d", agentID, time.Now().UnixNano()),
+		Type:      mail.MailTypeHeartbeat,
+		Source:    "sys:heartbeat",
+		Target:    agentID,
+		Content:   "HEARTBEAT.md",
+		CreatedAt: time.Now(),
+		Metadata: mail.MailMetadata{
+			Boundary: mail.InnerBoundary,
+		},
+	}
+
+	// Deliver HEARTBEAT.md to agent inbox
+	return inbox.Push(heartbeatMail)
 }
