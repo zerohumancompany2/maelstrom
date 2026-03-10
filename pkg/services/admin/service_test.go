@@ -146,8 +146,14 @@ func TestAdmin_BoundaryOuter(t *testing.T) {
 
 func TestAdminService_AdminCommand(t *testing.T) {
 	svc := NewAdminService()
+	adminSvc := svc.(*adminService)
 
-	err := svc.ExecuteCommand("test-command", "valid-token")
+	token, err := adminSvc.authManager.CreateToken("admin", time.Hour)
+	if err != nil {
+		t.Fatalf("Failed to create token: %v", err)
+	}
+
+	err = svc.ExecuteCommand("test-command", token)
 	if err != nil {
 		t.Errorf("Expected nil error for valid command, got %v", err)
 	}
