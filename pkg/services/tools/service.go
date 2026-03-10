@@ -34,6 +34,7 @@ type ToolDescriptor struct {
 	Isolation   string
 	TaintOutput []string
 	Type        string
+	ChartRef    string
 }
 
 type toolsService struct {

@@ -737,3 +737,16 @@ func TestToolDescriptor_TypeField(t *testing.T) {
 		t.Errorf("Expected 'attachedSubAgent', got '%s'", tool.Type)
 	}
 }
+
+// arch-v1.md L569: ChartRef field for sub-agent chart reference
+func TestToolDescriptor_ChartRefField(t *testing.T) {
+	tool := ToolDescriptor{
+		Name:     "subAgentResearch",
+		Type:     "attachedSubAgent",
+		ChartRef: "research-mini-v1",
+	}
+
+	if tool.ChartRef != "research-mini-v1" {
+		t.Errorf("Expected 'research-mini-v1', got '%s'", tool.ChartRef)
+	}
+}
