@@ -345,3 +345,44 @@ func TestBootstrap_serviceLoadSequenceCorrect(t *testing.T) {
 		}
 	}
 }
+
+// TestBootstrap_steadyStateReached verifies kernel reaches steady state after bootstrap
+func TestBootstrap_steadyStateReached(t *testing.T) {
+	kernel := New()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Start kernel
+	err := kernel.Start(ctx)
+	if err != nil && err != context.DeadlineExceeded {
+		t.Logf("Kernel start returned: %v", err)
+	}
+
+	// Verify kernel reached steady state (dormant)
+	if !kernel.IsBootstrapComplete() {
+		t.Error("Bootstrap should be complete")
+	}
+
+	if !kernel.GetCompletionStatus() {
+		t.Error("Completion callback should have been invoked")
+	}
+
+	// Verify kernel is dormant (logs should contain "going dormant")
+	logs := kernel.GetLogOutput()
+	found := false
+	for _, log := range logs {
+		if strings.Contains(log, "going dormant") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("Expected kernel to log 'going dormant'")
+	}
+
+	// Verify kernel is ready
+	if !kernel.IsKernelReady() {
+		t.Error("Kernel should be ready after bootstrap")
+	}
+}
