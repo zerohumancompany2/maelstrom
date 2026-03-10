@@ -89,3 +89,13 @@ func TestMemoryService_Query(t *testing.T) {
 		t.Errorf("Expected 'test-value', got '%v'", val)
 	}
 }
+
+// TestMemoryService_ID - arch-v1.md L470: MemoryService must return ID "sys:memory"
+func TestMemoryService_ID(t *testing.T) {
+	svc := NewMemoryService()
+
+	id := svc.ID()
+	if id != "sys:memory" {
+		t.Errorf("Expected ID 'sys:memory', got '%s'", id)
+	}
+}

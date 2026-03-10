@@ -5,13 +5,19 @@ import "errors"
 var NotImplementedError = errors.New("not implemented")
 
 type memoryService struct {
-	store map[string]interface{}
+	store      map[string]interface{}
+	vectorStore VectorStore
 }
 
 func NewMemoryService() MemoryService {
 	return &memoryService{
-		store: make(map[string]interface{}),
+		store:       make(map[string]interface{}),
+		vectorStore: newVectorStore(),
 	}
+}
+
+func (s *memoryService) ID() string {
+	return "sys:memory"
 }
 
 func (s *memoryService) StoreKey(key string, value interface{}) error {
