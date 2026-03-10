@@ -58,6 +58,39 @@ func TestHumanGatewayService_CreateSession(t *testing.T) {
 	}
 }
 
+// TestHumanGatewayService_GetSession - arch-v1.md L728
+// Get chat session by ID
+func TestHumanGatewayService_GetSession(t *testing.T) {
+	svc := NewHumanGatewayService()
+
+	// Create a session first
+	session, err := svc.CreateChatSession("agent-789")
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	// Retrieve session by ID
+	retrieved := svc.GetSession("agent-789")
+	if retrieved == nil {
+		t.Error("Expected non-nil session")
+	}
+
+	if retrieved.AgentID != "agent-789" {
+		t.Errorf("Expected AgentID 'agent-789', got '%s'", retrieved.AgentID)
+	}
+
+	// Session data preserved between calls
+	if retrieved != session {
+		t.Error("Expected same session instance")
+	}
+
+	// Error for non-existent session (returns nil)
+	missing := svc.GetSession("non-existent")
+	if missing != nil {
+		t.Error("Expected nil for non-existent session")
+	}
+}
+
 func TestHumanGatewayService_HandleChat(t *testing.T) {
 	svc := NewHumanGatewayService()
 
