@@ -437,3 +437,26 @@ func TestLifecycleService_HotReloadRollback(t *testing.T) {
 		t.Errorf("Expected state restored to 'running', got %s", list[0].ActiveStates[0])
 	}
 }
+
+func TestHotReload_QuiescenceEmptyQueue(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+	}
+
+	rtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	isQuiescent, err := svc.checkQuiescence(string(rtID))
+	if err != nil {
+		t.Fatalf("checkQuiescence should return nil error for empty queue, got: %v", err)
+	}
+	if !isQuiescent {
+		t.Error("Expected runtime to be quiescent with empty event queue")
+	}
+}

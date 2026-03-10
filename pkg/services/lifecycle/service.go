@@ -197,3 +197,13 @@ func (l *LifecycleService) rollbackReload(serviceID string) error {
 	})
 	return nil
 }
+
+func (l *LifecycleService) checkQuiescence(runtimeID string) (bool, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	_, exists := l.runtimes[statechart.RuntimeID(runtimeID)]
+	if !exists {
+		return false, statechart.ErrRuntimeNotFound
+	}
+	return true, nil
+}
