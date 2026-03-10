@@ -438,6 +438,168 @@ func TestSecurityService_HandleMail_BoundaryTransition(t *testing.T) {
 	}
 }
 
+func TestSecurityService_TaintPropagate_NestedStructures(t *testing.T) {
+	svc := NewSecurityService()
+
+	inputObj := map[string]interface{}{
+		"name": "test",
+		"nested": map[string]interface{}{
+			"value": "nested-value",
+			"deep": map[string]interface{}{
+				"data": "deep-data",
+			},
+		},
+		"items": []interface{}{
+			map[string]interface{}{"id": 1, "value": "first"},
+			map[string]interface{}{"id": 2, "value": "second"},
+		},
+	}
+
+	result, err := svc.TaintPropagate(inputObj, []string{"PII", "SECRET"})
+
+	if err != nil {
+		t.Errorf("Expected TaintPropagate to return nil error, got %v", err)
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		t.Error("Expected result to be map[string]interface{}")
+	}
+
+	rootTaints, ok := resultMap["_taints"].([]string)
+	if !ok {
+		t.Error("Expected _taints key to be added to root object")
+	}
+
+	hasPII := false
+	hasSecret := false
+	for _, t := range rootTaints {
+		if t == "PII" {
+			hasPII = true
+		}
+		if t == "SECRET" {
+			hasSecret = true
+		}
+	}
+
+	if !hasPII || !hasSecret {
+		t.Error("Expected root to have PII and SECRET taints")
+	}
+
+	nested, ok := resultMap["nested"].(map[string]interface{})
+	if !ok {
+		t.Error("Expected nested to be map[string]interface{}")
+	}
+
+	nestedTaints, ok := nested["_taints"].([]string)
+	if !ok {
+		t.Error("Expected _taints key to be added to nested object")
+	}
+
+	nestedHasPII := false
+	nestedHasSecret := false
+	for _, t := range nestedTaints {
+		if t == "PII" {
+			nestedHasPII = true
+		}
+		if t == "SECRET" {
+			nestedHasSecret = true
+		}
+	}
+
+	if !nestedHasPII || !nestedHasSecret {
+		t.Error("Expected nested to have PII and SECRET taints")
+	}
+
+	deep, ok := nested["deep"].(map[string]interface{})
+	if !ok {
+		t.Error("Expected deep to be map[string]interface{}")
+	}
+
+	deepTaints, ok := deep["_taints"].([]string)
+	if !ok {
+		t.Error("Expected _taints key to be added to deep object")
+	}
+
+	deepHasPII := false
+	deepHasSecret := false
+	for _, t := range deepTaints {
+		if t == "PII" {
+			deepHasPII = true
+		}
+		if t == "SECRET" {
+			deepHasSecret = true
+		}
+	}
+
+	if !deepHasPII || !deepHasSecret {
+		t.Error("Expected deep to have PII and SECRET taints")
+	}
+
+	items, ok := resultMap["items"].([]interface{})
+	if !ok {
+		t.Error("Expected items to be []interface{}")
+	}
+
+	if len(items) != 2 {
+		t.Errorf("Expected 2 items, got %d", len(items))
+	}
+
+	firstItem, ok := items[0].(map[string]interface{})
+	if !ok {
+		t.Error("Expected first item to be map[string]interface{}")
+	}
+
+	firstTaints, ok := firstItem["_taints"].([]string)
+	if !ok {
+		t.Error("Expected _taints key to be added to first item")
+	}
+
+	firstHasPII := false
+	firstHasSecret := false
+	for _, t := range firstTaints {
+		if t == "PII" {
+			firstHasPII = true
+		}
+		if t == "SECRET" {
+			firstHasSecret = true
+		}
+	}
+
+	if !firstHasPII || !firstHasSecret {
+		t.Error("Expected first item to have PII and SECRET taints")
+	}
+
+	secondItem, ok := items[1].(map[string]interface{})
+	if !ok {
+		t.Error("Expected second item to be map[string]interface{}")
+	}
+
+	secondTaints, ok := secondItem["_taints"].([]string)
+	if !ok {
+		t.Error("Expected _taints key to be added to second item")
+	}
+
+	secondHasPII := false
+	secondHasSecret := false
+	for _, t := range secondTaints {
+		if t == "PII" {
+			secondHasPII = true
+		}
+		if t == "SECRET" {
+			secondHasSecret = true
+		}
+	}
+
+	if !secondHasPII || !secondHasSecret {
+		t.Error("Expected second item to have PII and SECRET taints")
+	}
+
+	if len(rootTaints) != 2 {
+		t.Errorf("Expected no duplicates in root taints, got %d taints: %v", len(rootTaints), rootTaints)
+	}
+}
+
 func TestSecurityService_TaintPropagate_sliceObjects(t *testing.T) {
 	svc := NewSecurityService()
 

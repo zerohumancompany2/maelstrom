@@ -67,7 +67,66 @@ func (s *SecurityService) ValidateAndSanitize(m mail.Mail, sourceBoundary, targe
 }
 
 func (s *SecurityService) TaintPropagate(obj any, newTaints []string) (any, error) {
-	return nil, NotImplementedError{}
+	result, ok := obj.(map[string]interface{})
+	if !ok {
+		return obj, nil
+	}
+
+	seen := make(map[string]bool)
+	merged := make([]string, 0)
+
+	if existing, ok := result["_taints"].([]string); ok {
+		for _, t := range existing {
+			if !seen[t] {
+				seen[t] = true
+				merged = append(merged, t)
+			}
+		}
+	}
+
+	for _, t := range newTaints {
+		if !seen[t] {
+			seen[t] = true
+			merged = append(merged, t)
+		}
+	}
+
+	result["_taints"] = merged
+
+	for key, value := range result {
+		if key == "_taints" {
+			continue
+		}
+		nested, ok := value.(map[string]interface{})
+		if ok {
+			propagated, err := s.TaintPropagate(nested, newTaints)
+			if err != nil {
+				return nil, err
+			}
+			result[key] = propagated
+			continue
+		}
+
+		slice, ok := value.([]interface{})
+		if ok {
+			var propagatedSlice []interface{}
+			for _, item := range slice {
+				itemMap, ok := item.(map[string]interface{})
+				if ok {
+					propagated, err := s.TaintPropagate(itemMap, newTaints)
+					if err != nil {
+						return nil, err
+					}
+					propagatedSlice = append(propagatedSlice, propagated)
+				} else {
+					propagatedSlice = append(propagatedSlice, item)
+				}
+			}
+			result[key] = propagatedSlice
+		}
+	}
+
+	return result, nil
 }
 
 func (s *SecurityService) ReportTaints(runtimeId string) (security.TaintMap, error) {
