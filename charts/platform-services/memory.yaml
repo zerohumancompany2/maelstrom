@@ -1,0 +1,12 @@
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:memory
+  core: true
+  displayName: Memory Service
+spec:
+  chartRef: memory-v1
+  requiredForKernelReady: true
+  replicas: 1
+  persistence:
+    enabled: false

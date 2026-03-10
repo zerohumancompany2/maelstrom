@@ -1,0 +1,11 @@
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:datasources
+  displayName: DataSources Service
+spec:
+  chartRef: datasources-v1
+  replicas: 1
+  persistence:
+    enabled: true
+    snapshotEvery: "200 messages"

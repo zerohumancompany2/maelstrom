@@ -1,0 +1,8 @@
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:tools
+  displayName: Tools Service
+spec:
+  chartRef: tools-v1
+  replicas: 1

@@ -1,0 +1,14 @@
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:admin
+  core: true
+  displayName: Admin Service
+spec:
+  chartRef: admin-v1
+  requiredForKernelReady: true
+  replicas: 1
+  expose:
+    http:
+      port: 8081
+      tls: true

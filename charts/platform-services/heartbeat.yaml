@@ -1,0 +1,10 @@
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:heartbeat
+  core: true
+  displayName: Heartbeat Service
+spec:
+  chartRef: heartbeat-v1
+  requiredForKernelReady: true
+  replicas: 1

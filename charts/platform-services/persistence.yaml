@@ -1,0 +1,13 @@
+apiVersion: maelstrom.dev/v1
+kind: PlatformService
+metadata:
+  name: sys:persistence
+  core: true
+  displayName: Persistence Service
+spec:
+  chartRef: persistence-v1
+  requiredForKernelReady: true
+  replicas: 1
+  persistence:
+    enabled: true
+    snapshotEvery: "50 messages"
