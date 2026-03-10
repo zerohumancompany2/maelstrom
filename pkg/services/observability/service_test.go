@@ -537,3 +537,34 @@ func TestObservabilityService_QueryDeadLettersLargeSet(t *testing.T) {
 		t.Errorf("Query took too long: %v", duration)
 	}
 }
+
+func TestHardcodedServices_ObservabilityDeadLetter(t *testing.T) {
+	svc := NewObservabilityService()
+
+	failedMail := mail.Mail{
+		ID:        "failed-001",
+		Type:      mail.MailTypeError,
+		Source:    "agent:failed",
+		Target:    "agent:target",
+		Content:   map[string]any{"error": "processing failed"},
+		CreatedAt: time.Now(),
+	}
+
+	svc.LogDeadLetter(failedMail, "Max retries exceeded")
+
+	entries, _ := svc.QueryDeadLetters()
+	if len(entries) != 1 {
+		t.Fatalf("Expected 1 dead-letter entry, got %d", len(entries))
+	}
+
+	entry := entries[0]
+	if entry.Mail.ID != "failed-001" {
+		t.Errorf("Expected MailID 'failed-001', got '%s'", entry.Mail.ID)
+	}
+	if entry.Reason != "Max retries exceeded" {
+		t.Errorf("Expected Reason 'Max retries exceeded', got '%s'", entry.Reason)
+	}
+	if entry.Logged.IsZero() {
+		t.Error("Expected Logged timestamp to be set")
+	}
+}
