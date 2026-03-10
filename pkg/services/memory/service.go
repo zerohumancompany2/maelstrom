@@ -1,6 +1,9 @@
 package memory
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 var NotImplementedError = errors.New("not implemented")
 
@@ -46,7 +49,30 @@ func (s *memoryService) QueryKey(key string) (interface{}, error) {
 }
 
 func (s *memoryService) Store(runtimeId string, content string, metadata map[string]any) (string, error) {
-	return "memory-1", nil
+	// Auto-compute vector from content
+	vector, err := s.vectorStore.Embed(content)
+	if err != nil {
+		return "", fmt.Errorf("failed to embed content: %w", err)
+	}
+	
+	// Generate unique ID
+	id := generateUniqueID(content, metadata)
+	
+	// Create and store memory item
+	item := MemoryItem{
+		ID:       id,
+		Content:  content,
+		Vector:   vector,
+		Metadata: metadata,
+		Boundary: metadata["boundary"].(string),
+	}
+	
+	err = s.vectorStore.Store(item)
+	if err != nil {
+		return "", fmt.Errorf("failed to store item: %w", err)
+	}
+	
+	return id, nil
 }
 
 func (s *memoryService) Query(vector []float32, topK int, boundaryFilter string) ([]MemoryResult, error) {

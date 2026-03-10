@@ -183,3 +183,45 @@ func TestMemoryService_VectorSearch(t *testing.T) {
 		t.Errorf("Expected item-1 to be first (most similar), got %s", results[0].ID)
 	}
 }
+
+// TestMemoryService_StoreItem - arch-v1.md L489: Item stored with metadata, vector auto-computed
+func TestMemoryService_StoreItem(t *testing.T) {
+	svc := NewMemoryService()
+
+	metadata := map[string]any{"key": "value", "boundary": "system"}
+	
+	// Store item with content and metadata
+	memoryId, err := svc.Store("runtime-1", "test content", metadata)
+	if err != nil {
+		t.Fatalf("Store failed: %v", err)
+	}
+	
+	if memoryId == "" {
+		t.Error("Expected non-empty memory ID")
+	}
+	
+	// Item should be retrievable via VectorSearch
+	queryVector, err := svc.Embed("test content")
+	if err != nil {
+		t.Fatalf("Embed failed: %v", err)
+	}
+	
+	results, err := svc.VectorSearch(queryVector, 5)
+	if err != nil {
+		t.Fatalf("VectorSearch failed: %v", err)
+	}
+	
+	if len(results) != 1 {
+		t.Errorf("Expected 1 result, got %d", len(results))
+	}
+	
+	// Check that the stored item has the correct content
+	if results[0].Content != "test content" {
+		t.Errorf("Expected content 'test content', got '%s'", results[0].Content)
+	}
+	
+	// Check that vector was auto-computed (non-empty)
+	if len(results[0].Vector) == 0 {
+		t.Error("Expected auto-computed vector to be non-empty")
+	}
+}
