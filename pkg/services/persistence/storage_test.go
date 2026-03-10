@@ -102,3 +102,57 @@ func TestStorageBackend_LoadSnapshot(t *testing.T) {
 		}
 	}
 }
+
+// TestStorageBackend_SaveEvent
+// Spec Reference: arch-v1.md L468 (event sourcing)
+// Given: A StorageBackend instance and an event to save
+// When: SaveEvent() is called with event
+// Then: Event saved with timestamp and associated with runtime ID
+// Expected Result: Event persisted with timestamp, runtime ID association maintained
+func TestStorageBackend_SaveEvent(t *testing.T) {
+	backend := NewStorageBackend().(*storageBackend)
+
+	event := Event{
+		ID:            "event-1",
+		RuntimeID:     "runtime-event-1",
+		Type:          "test:event",
+		Payload:       map[string]any{"key": "value"},
+		CorrelationID: "corr-123",
+		Source:        "test-source",
+		Timestamp:     time.Now(),
+	}
+
+	err := backend.SaveEvent(event)
+	if err != nil {
+		t.Fatalf("SaveEvent failed: %v", err)
+	}
+
+	events, ok := backend.events[event.RuntimeID]
+	if !ok {
+		t.Error("Expected events to be saved for runtime ID")
+	}
+
+	if len(events) != 1 {
+		t.Errorf("Expected 1 event, got %d", len(events))
+	}
+
+	if events[0].ID != event.ID {
+		t.Errorf("Expected event ID %s, got %s", event.ID, events[0].ID)
+	}
+
+	if events[0].Type != event.Type {
+		t.Errorf("Expected event type %s, got %s", event.Type, events[0].Type)
+	}
+
+	if events[0].CorrelationID != event.CorrelationID {
+		t.Errorf("Expected correlation ID %s, got %s", event.CorrelationID, events[0].CorrelationID)
+	}
+
+	if events[0].Source != event.Source {
+		t.Errorf("Expected source %s, got %s", event.Source, events[0].Source)
+	}
+
+	if events[0].Timestamp.IsZero() {
+		t.Error("Expected event timestamp to be non-zero")
+	}
+}

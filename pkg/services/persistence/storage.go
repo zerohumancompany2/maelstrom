@@ -73,6 +73,9 @@ func (s *storageBackend) LoadSnapshot(id string) (Snapshot, error) {
 }
 
 func (s *storageBackend) SaveEvent(event Event) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.events[event.RuntimeID] = append(s.events[event.RuntimeID], event)
 	return nil
 }
 
