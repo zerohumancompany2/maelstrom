@@ -410,3 +410,90 @@ func TestMailRouter_AllowedOnExit_Stripping(t *testing.T) {
 		t.Error("Expected SECRET taint to be stripped")
 	}
 }
+
+type mockSecurityServiceWithDeadLetter struct {
+	validateCalled bool
+	violationMail  Mail
+}
+
+func (m *mockSecurityServiceWithDeadLetter) ValidateAndSanitize(mail any, src, tgt BoundaryType, allowedOnExit []string) (any, error) {
+	m.validateCalled = true
+	if mailObj, ok := mail.(Mail); ok {
+		for _, taint := range mailObj.Metadata.Taints {
+			if taint == "SECRET" && tgt == InnerBoundary {
+				mailObj.Metadata.Taints = []string{"SECRET"}
+				return mailObj, fmt.Errorf("taint %q is forbidden", taint)
+			}
+		}
+	}
+	return mail, nil
+}
+
+func (m *mockSecurityServiceWithDeadLetter) MarkTaint(obj any, taints []string) (any, error) {
+	return obj, nil
+}
+
+func TestMailRouter_ViolationRouting_DeadLetter(t *testing.T) {
+	router := NewMailRouter()
+
+	observabilityInbox := &ServiceInbox{ID: "observability"}
+	router.SubscribeService("observability", observabilityInbox)
+
+	mockService := &mockSecurityServiceWithDeadLetter{}
+
+	mail := Mail{
+		ID:     "msg-004",
+		Source: "agent:outer-agent",
+		Target: "sys:test-service",
+		Type:   MailTypeUser,
+		Metadata: MailMetadata{
+			Boundary: InnerBoundary,
+			Taints:   []string{"SECRET"},
+		},
+	}
+
+	err := router.RouteWithSecurity(mail, mockService)
+	if err == nil {
+		t.Error("Expected error for forbidden taint")
+	}
+
+	if !mockService.validateCalled {
+		t.Error("Expected ValidateAndSanitize to be called")
+	}
+
+	observabilityInbox.mu.RLock()
+	if len(observabilityInbox.Messages) != 1 {
+		t.Errorf("Expected 1 violation message in observability inbox, got %d", len(observabilityInbox.Messages))
+	}
+	violationMail := observabilityInbox.Messages[0]
+	observabilityInbox.mu.RUnlock()
+
+	if violationMail.Type != MailTypeTaintViolation {
+		t.Errorf("Expected MailTypeTaintViolation, got %v", violationMail.Type)
+	}
+
+	if violationMail.Source != "sys:security" {
+		t.Errorf("Expected source sys:security, got %v", violationMail.Source)
+	}
+
+	if violationMail.Target != "sys:observability" {
+		t.Errorf("Expected target sys:observability, got %v", violationMail.Target)
+	}
+
+	content, ok := violationMail.Content.(map[string]interface{})
+	if !ok {
+		t.Error("Expected content to be map[string]interface{}")
+	}
+
+	if _, ok := content["sourceBoundary"]; !ok {
+		t.Error("Expected sourceBoundary in content")
+	}
+
+	if _, ok := content["targetBoundary"]; !ok {
+		t.Error("Expected targetBoundary in content")
+	}
+
+	if _, ok := content["forbiddenTaints"]; !ok {
+		t.Error("Expected forbiddenTaints in content")
+	}
+}

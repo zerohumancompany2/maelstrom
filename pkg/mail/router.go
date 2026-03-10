@@ -3,6 +3,7 @@ package mail
 import (
 	"errors"
 	"sync"
+	"time"
 )
 
 type MailRouter struct {
@@ -130,6 +131,9 @@ func (r *MailRouter) RouteWithSecurity(mail Mail, securityService SecurityServic
 	var allowedOnExit []string
 	sanitized, err := securityService.ValidateAndSanitize(mail, mail.Metadata.Boundary, mail.Metadata.Boundary, allowedOnExit)
 	if err != nil {
+		if sanitizedMail, ok := sanitized.(Mail); ok {
+			r.routeViolation(sanitizedMail)
+		}
 		return err
 	}
 	if sanitizedMail, ok := sanitized.(Mail); ok {
@@ -138,6 +142,17 @@ func (r *MailRouter) RouteWithSecurity(mail Mail, securityService SecurityServic
 	return r.Route(mail)
 }
 
-func (r *MailRouter) routeViolation(violation any) error {
-	return nil
+func (r *MailRouter) routeViolation(mail Mail) error {
+	violationMail := Mail{
+		Type:   MailTypeTaintViolation,
+		Source: "sys:security",
+		Target: "sys:observability",
+		Content: map[string]interface{}{
+			"sourceBoundary":  string(mail.Metadata.Boundary),
+			"targetBoundary":  string(mail.Metadata.Boundary),
+			"forbiddenTaints": mail.Metadata.Taints,
+			"timestamp":       time.Now(),
+		},
+	}
+	return r.Route(violationMail)
 }
