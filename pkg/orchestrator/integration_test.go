@@ -52,3 +52,51 @@ func TestIntegration_Orchestrator_EndToEndSequentialFlow(t *testing.T) {
 		}
 	}
 }
+
+func TestIntegration_Orchestrator_EndToEndParallelWithFailure(t *testing.T) {
+	// Given - Create OrchestratorService with policies registered
+	service := NewOrchestratorService()
+	_ = service.RegisterPolicy("par_continue", PolicyParContinue)
+
+	// Register test tools (some succeed, some fail)
+	tools := []ToolCall{
+		{Name: "success-tool-alpha", Arguments: map[string]any{"value": "result1"}},
+		{Name: "fail-tool-beta", Arguments: map[string]any{"should": "fail"}},
+		{Name: "success-tool-gamma", Arguments: map[string]any{"value": "result2"}},
+	}
+
+	// When - Execute parallel flow with continue policy
+	executor := NewParallelExecutor(PolicyParContinue)
+	resultChan, err := executor.Execute(tools)
+
+	// Then - Verify all tools executed concurrently despite failures
+	if err != nil {
+		t.Fatalf("Expected Execute() to return nil error, got %v", err)
+	}
+
+	// Collect all results
+	results := make([]ExecutionResultWithTool, 0, 3)
+	for result := range resultChan {
+		results = append(results, result)
+	}
+
+	// All tools should execute even if one fails
+	if len(results) != 3 {
+		t.Errorf("Expected 3 results (all tools executed), got %d", len(results))
+	}
+
+	// Verify results collected and ordered correctly by tool name
+	expectedOrder := []string{"fail-tool-beta", "success-tool-alpha", "success-tool-gamma"}
+	for i, expected := range expectedOrder {
+		if results[i].ToolName != expected {
+			t.Errorf("Expected result %d to be for tool '%s', got '%s'", i, expected, results[i].ToolName)
+		}
+	}
+
+	// Verify all results have output
+	for i, result := range results {
+		if result.Output == nil {
+			t.Errorf("Expected result %d to have non-nil output", i)
+		}
+	}
+}
