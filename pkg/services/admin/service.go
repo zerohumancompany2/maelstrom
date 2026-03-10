@@ -15,6 +15,7 @@ type AgentInfo struct {
 }
 
 type AdminService interface {
+	ID() string
 	ListAgents() ([]AgentInfo, error)
 	ControlAgent(id string, cmd string) error
 	QueryTaints(agentId string) (security.TaintMap, error)
@@ -30,6 +31,10 @@ func NewAdminService() AdminService {
 	return &adminService{
 		agents: make(map[string]AgentInfo),
 	}
+}
+
+func (s *adminService) ID() string {
+	return "sys:admin"
 }
 
 func (s *adminService) ListAgents() ([]AgentInfo, error) {

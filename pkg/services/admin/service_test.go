@@ -6,6 +6,16 @@ import (
 	"github.com/maelstrom/v3/pkg/statechart"
 )
 
+// TestAdminService_ID - spec: arch-v1.md L467, L477-480
+func TestAdminService_ID(t *testing.T) {
+	svc := NewAdminService()
+
+	id := svc.ID()
+	if id != "sys:admin" {
+		t.Errorf("Expected ID 'sys:admin', got '%s'", id)
+	}
+}
+
 func TestAdmin_2FARequired(t *testing.T) {
 	svc := NewAdminService()
 
