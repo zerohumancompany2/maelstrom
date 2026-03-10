@@ -19,7 +19,7 @@ var ErrNotFound = errors.New("service not found")
 // Service represents a service in the system.
 type Service interface {
 	ID() string
-	HandleMail(mail mail.Mail) error
+	HandleMail(mail mail.Mail) *OutcomeEvent
 	Start() error
 	Stop() error
 }

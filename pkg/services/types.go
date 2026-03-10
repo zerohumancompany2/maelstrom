@@ -2,6 +2,16 @@ package services
 
 import "time"
 
+// OutcomeEvent represents the result of handling a mail message.
+// Spec: arch-v1.md L479-480
+type OutcomeEvent struct {
+	ServiceID    string
+	MailID       string
+	Status       string
+	Timestamp    time.Time
+	ErrorDetails string
+}
+
 type Trace struct {
 	ID        string    // unique trace ID
 	RuntimeID string    // originating ChartRuntime

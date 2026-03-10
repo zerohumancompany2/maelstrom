@@ -32,7 +32,7 @@ func (m *mockService) ID() string {
 	return m.id
 }
 
-func (m *mockService) HandleMail(mail mail.Mail) error {
+func (m *mockService) HandleMail(mail mail.Mail) *OutcomeEvent {
 	return nil
 }
 
