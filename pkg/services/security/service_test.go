@@ -270,6 +270,59 @@ func TestSecurityService_CheckTaintPolicy_denied(t *testing.T) {
 	}
 }
 
+func TestSecurityService_NamespaceIsolate_FilteredView(t *testing.T) {
+	svc := NewSecurityService()
+
+	data := map[string]interface{}{
+		"items": []interface{}{
+			map[string]interface{}{"agentID": "agent-123", "value": "data-1"},
+			map[string]interface{}{"agentID": "agent-456", "value": "data-2"},
+			map[string]interface{}{"agentID": "agent-123", "value": "data-3"},
+		},
+	}
+
+	view, err := svc.NamespaceIsolateWithFilter("agent-123", "read", data)
+
+	if err != nil {
+		t.Errorf("Expected NamespaceIsolate to return nil error, got %v", err)
+	}
+
+	if view.RuntimeID != "agent-123" {
+		t.Errorf("Expected RuntimeID to be agent-123, got %s", view.RuntimeID)
+	}
+
+	if view.Operation != "read" {
+		t.Errorf("Expected Operation to be read, got %s", view.Operation)
+	}
+
+	contextData, ok := view.ContextData["items"].([]interface{})
+	if !ok {
+		t.Error("Expected ContextData to contain items")
+	}
+
+	if len(contextData) != 2 {
+		t.Errorf("Expected 2 items for agent-123, got %d", len(contextData))
+	}
+
+	firstItem, ok := contextData[0].(map[string]interface{})
+	if !ok {
+		t.Error("Expected first item to be map[string]interface{}")
+	}
+
+	if firstItem["value"] != "data-1" {
+		t.Error("Expected first item to be data-1")
+	}
+
+	secondItem, ok := contextData[1].(map[string]interface{})
+	if !ok {
+		t.Error("Expected second item to be map[string]interface{}")
+	}
+
+	if secondItem["value"] != "data-3" {
+		t.Error("Expected second item to be data-3")
+	}
+}
+
 func TestSecurityService_TaintPropagate_addTaints(t *testing.T) {
 	svc := NewSecurityService()
 

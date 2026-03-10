@@ -142,7 +142,53 @@ func (s *SecurityService) CheckTaintPolicy(data any, targetBoundary mail.Boundar
 }
 
 func (s *SecurityService) NamespaceIsolate(runtimeId string, operation string) (security.IsolatedView, error) {
-	return security.IsolatedView{}, NotImplementedError{}
+	return security.IsolatedView{
+		RuntimeID:   runtimeId,
+		Operation:   operation,
+		Boundary:    security.DMZBoundary,
+		ContextData: make(map[string]any),
+	}, nil
+}
+
+func (s *SecurityService) NamespaceIsolateWithFilter(runtimeId string, operation string, data map[string]interface{}) (security.IsolatedView, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	filteredData := make(map[string]interface{})
+
+	for key, value := range data {
+		if key == "items" {
+			items, ok := value.([]interface{})
+			if !ok {
+				filteredData[key] = value
+				continue
+			}
+
+			var filteredItems []interface{}
+			for _, item := range items {
+				itemMap, ok := item.(map[string]interface{})
+				if !ok {
+					filteredItems = append(filteredItems, item)
+					continue
+				}
+
+				if itemMap["agentID"] == runtimeId {
+					filteredItems = append(filteredItems, item)
+				}
+			}
+
+			filteredData[key] = filteredItems
+		} else {
+			filteredData[key] = value
+		}
+	}
+
+	return security.IsolatedView{
+		RuntimeID:   runtimeId,
+		Operation:   operation,
+		Boundary:    security.DMZBoundary,
+		ContextData: filteredData,
+	}, nil
 }
 
 func (s *SecurityService) Start() error {
