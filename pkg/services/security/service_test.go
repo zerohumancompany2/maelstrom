@@ -237,36 +237,89 @@ func TestSecurityService_ValidateAndSanitize_outerToInner(t *testing.T) {
 func TestSecurityService_NamespaceIsolate(t *testing.T) {
 	svc := NewSecurityService()
 
-	_, err := svc.NamespaceIsolate("agent-1", "read")
-	if err == nil {
-		t.Error("Expected NamespaceIsolate to return error for stub")
+	view, err := svc.NamespaceIsolate("agent-1", "read")
+	if err != nil {
+		t.Errorf("Expected NamespaceIsolate to return nil error, got %v", err)
+	}
+
+	if view.RuntimeID != "agent-1" {
+		t.Errorf("Expected RuntimeID to be agent-1, got %s", view.RuntimeID)
+	}
+
+	if view.Operation != "read" {
+		t.Errorf("Expected Operation to be read, got %s", view.Operation)
 	}
 }
 
 func TestSecurityService_NamespaceIsolate_multipleAgents(t *testing.T) {
 	svc := NewSecurityService()
 
-	_, err := svc.NamespaceIsolate("agent-alpha", "read")
-	if err == nil {
-		t.Error("Expected NamespaceIsolate to return error for stub")
+	view1, err1 := svc.NamespaceIsolate("agent-alpha", "read")
+	view2, err2 := svc.NamespaceIsolate("agent-beta", "write")
+
+	if err1 != nil {
+		t.Errorf("Expected NamespaceIsolate to return nil error, got %v", err1)
+	}
+
+	if err2 != nil {
+		t.Errorf("Expected NamespaceIsolate to return nil error, got %v", err2)
+	}
+
+	if view1.RuntimeID != "agent-alpha" {
+		t.Errorf("Expected RuntimeID to be agent-alpha, got %s", view1.RuntimeID)
+	}
+
+	if view2.RuntimeID != "agent-beta" {
+		t.Errorf("Expected RuntimeID to be agent-beta, got %s", view2.RuntimeID)
 	}
 }
 
 func TestSecurityService_CheckTaintPolicy_allowed(t *testing.T) {
 	svc := NewSecurityService()
 
-	_, err := svc.CheckTaintPolicy(nil, mail.OuterBoundary, security.TaintPolicy{})
-	if err == nil {
-		t.Error("Expected CheckTaintPolicy to return error for stub")
+	data := map[string]interface{}{
+		"_taints": []string{"INTERNAL"},
+	}
+
+	policy := security.TaintPolicy{
+		RedactMode: "audit",
+		AllowedForBoundary: []security.BoundaryType{
+			security.InnerBoundary,
+			security.OuterBoundary,
+		},
+	}
+
+	allowed, err := svc.CheckTaintPolicy(data, mail.OuterBoundary, policy)
+	if err != nil {
+		t.Errorf("Expected CheckTaintPolicy to return nil error, got %v", err)
+	}
+
+	if !allowed {
+		t.Error("Expected CheckTaintPolicy to return true for allowed transition")
 	}
 }
 
 func TestSecurityService_CheckTaintPolicy_denied(t *testing.T) {
 	svc := NewSecurityService()
 
-	_, err := svc.CheckTaintPolicy(nil, mail.OuterBoundary, security.TaintPolicy{})
-	if err == nil {
-		t.Error("Expected CheckTaintPolicy to return error for stub")
+	data := map[string]interface{}{
+		"_taints": []string{"INNER_ONLY"},
+	}
+
+	policy := security.TaintPolicy{
+		RedactMode: "strict",
+		AllowedForBoundary: []security.BoundaryType{
+			security.InnerBoundary,
+		},
+	}
+
+	allowed, err := svc.CheckTaintPolicy(data, mail.OuterBoundary, policy)
+	if err != nil {
+		t.Errorf("Expected CheckTaintPolicy to return nil error, got %v", err)
+	}
+
+	if allowed {
+		t.Error("Expected CheckTaintPolicy to return false for denied transition")
 	}
 }
 
