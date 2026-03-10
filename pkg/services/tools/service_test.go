@@ -764,3 +764,43 @@ func TestToolDescriptor_MaxIterationsField(t *testing.T) {
 		t.Errorf("Expected 10, got %d", tool.MaxIterations)
 	}
 }
+
+// TestHotreloadableServices_ToolsToolDescriptor - spec: arch-v1.md L487 (resolve returns ToolDescriptor)
+func TestHotreloadableServices_ToolsToolDescriptor(t *testing.T) {
+	svc := NewToolsService()
+
+	tool := ToolDescriptor{
+		Name:        "webSearch",
+		Boundary:    "dmz",
+		Schema:      map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string"}}},
+		Isolation:   "container",
+		TaintOutput: []string{"TOOL_OUTPUT", "EXTERNAL"},
+		Type:        "tool",
+		ChartRef:    "",
+	}
+	err := svc.Register(tool)
+	if err != nil {
+		t.Fatalf("Expected no error registering tool, got %v", err)
+	}
+
+	resolved, err := svc.Resolve("webSearch", "inner")
+	if err != nil {
+		t.Fatalf("Expected no error resolving tool, got %v", err)
+	}
+
+	if resolved.Name != "webSearch" {
+		t.Errorf("Expected Name 'webSearch', got '%s'", resolved.Name)
+	}
+	if resolved.Boundary != "dmz" {
+		t.Errorf("Expected Boundary 'dmz', got '%s'", resolved.Boundary)
+	}
+	if resolved.Isolation != "container" {
+		t.Errorf("Expected Isolation 'container', got '%s'", resolved.Isolation)
+	}
+	if len(resolved.TaintOutput) != 2 {
+		t.Errorf("Expected 2 TaintOutput entries, got %d", len(resolved.TaintOutput))
+	}
+	if resolved.Type != "tool" {
+		t.Errorf("Expected Type 'tool', got '%s'", resolved.Type)
+	}
+}
