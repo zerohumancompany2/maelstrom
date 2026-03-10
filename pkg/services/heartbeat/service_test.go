@@ -128,3 +128,36 @@ func TestHeartbeatService_TriggerAll(t *testing.T) {
 		t.Errorf("Expected nil error, got %v", err)
 	}
 }
+
+// arch-v1.md L469: HeartbeatService must unschedule wake-ups by job ID
+func TestHeartbeatService_Unschedule(t *testing.T) {
+	svc := NewHeartbeatService()
+
+	// First schedule a job
+	err := svc.Schedule("agent-1", "0 * * * *", "template")
+	if err != nil {
+		t.Fatalf("Schedule failed: %v", err)
+	}
+
+	// Unschedule the job
+	err = svc.Unschedule("agent-1")
+	if err != nil {
+		t.Fatalf("Unschedule failed: %v", err)
+	}
+
+	// Verify the schedule was removed
+	sched, err := svc.GetSchedule("agent-1")
+	if err != nil {
+		t.Fatalf("GetSchedule failed: %v", err)
+	}
+
+	if sched.AgentID != "" {
+		t.Errorf("Expected empty schedule after unschedule, got %v", sched)
+	}
+
+	// Unschedule non-existent job should return error
+	err = svc.Unschedule("non-existent")
+	if err == nil {
+		t.Error("Expected error when unscheduling non-existent job, got nil")
+	}
+}

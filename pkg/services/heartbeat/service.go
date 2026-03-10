@@ -2,6 +2,7 @@ package heartbeat
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 )
 
@@ -36,6 +37,9 @@ func (s *heartbeatService) ID() string {
 func (s *heartbeatService) Unschedule(agentId string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if _, exists := s.schedules[agentId]; !exists {
+		return fmt.Errorf("schedule not found for agent: %s", agentId)
+	}
 	delete(s.schedules, agentId)
 	return nil
 }
