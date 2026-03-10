@@ -1,6 +1,9 @@
 package heartbeat
 
-import "github.com/maelstrom/v3/pkg/statechart"
+import (
+	"github.com/maelstrom/v3/pkg/mail"
+	"github.com/maelstrom/v3/pkg/statechart"
+)
 
 // Schedule represents a heartbeat schedule
 type Schedule struct {
@@ -19,6 +22,7 @@ type HeartbeatService interface {
 	ScheduleCron(cron string) error
 	TriggerAll() error
 	TriggerWakeUp(agentID string) error
+	GetInbox(agentID string) *mail.AgentInbox
 }
 
 // BootstrapChart returns the chart definition for sys:heartbeat

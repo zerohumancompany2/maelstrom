@@ -87,9 +87,16 @@ func (s *heartbeatService) TriggerWakeUp(agentID string) error {
 		CreatedAt: time.Now(),
 		Metadata: mail.MailMetadata{
 			Boundary: mail.InnerBoundary,
+			Taints:   []string{"SYSTEM"},
 		},
 	}
 
 	// Deliver HEARTBEAT.md to agent inbox
 	return inbox.Push(heartbeatMail)
+}
+
+func (s *heartbeatService) GetInbox(agentID string) *mail.AgentInbox {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.agentInboxes[agentID]
 }

@@ -2,6 +2,8 @@ package heartbeat
 
 import (
 	"testing"
+
+	"github.com/maelstrom/v3/pkg/mail"
 )
 
 // arch-v1.md L469: HeartbeatService must return ID "sys:heartbeat"
@@ -177,5 +179,43 @@ func TestHeartbeatService_WakeAgent(t *testing.T) {
 	err = svc.TriggerWakeUp("agent-1")
 	if err != nil {
 		t.Fatalf("TriggerWakeUp failed: %v", err)
+	}
+}
+
+// arch-v1.md L469: HEARTBEAT.md respects boundary rules
+// arch-v1.md L1662: Taints attached correctly based on agent boundary
+func TestHeartbeatService_WakeUpBoundaryEnforcement(t *testing.T) {
+	svc := NewHeartbeatService()
+
+	// Schedule a wake-up for the agent
+	err := svc.Schedule("agent-1", "0 * * * *", "default template")
+	if err != nil {
+		t.Fatalf("Schedule failed: %v", err)
+	}
+
+	// Trigger wake-up
+	err = svc.TriggerWakeUp("agent-1")
+	if err != nil {
+		t.Fatalf("TriggerWakeUp failed: %v", err)
+	}
+
+	// Verify boundary enforcement - HEARTBEAT.md should be on InnerBoundary
+	// and have appropriate taints attached
+	inbox := svc.GetInbox("agent-1")
+	if inbox == nil {
+		t.Fatal("Expected inbox to exist")
+	}
+
+	if len(inbox.Messages) == 0 {
+		t.Fatal("Expected inbox to have messages")
+	}
+
+	msg := inbox.Messages[0]
+	if msg.Metadata.Boundary != mail.InnerBoundary {
+		t.Errorf("Expected boundary InnerBoundary, got %s", msg.Metadata.Boundary)
+	}
+
+	if len(msg.Metadata.Taints) == 0 {
+		t.Error("Expected taints to be attached")
 	}
 }
