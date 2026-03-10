@@ -85,3 +85,26 @@ func TestOrchestratorService_ResolveTool(t *testing.T) {
 		t.Errorf("Expected tool Name to be '%s', got '%s'", expectedTool.Name, result.Name)
 	}
 }
+
+func TestOrchestratorService_ResolveToolWithBoundary(t *testing.T) {
+	// Given
+	// Register an inner-boundary tool
+	innerTool := tools.ToolDescriptor{
+		Name:     "inner-tool",
+		Boundary: "inner",
+		Schema:   map[string]any{"type": "object"},
+	}
+
+	toolsService := tools.NewToolsService()
+	_ = toolsService.Register(innerTool)
+
+	service := NewOrchestratorServiceWithTools(toolsService)
+
+	// When - outer boundary tries to access inner tool
+	_, err := service.ResolveTool("inner-tool", "outer")
+
+	// Then - should fail due to boundary restriction
+	if err == nil {
+		t.Error("Expected ResolveTool() to return error for boundary violation")
+	}
+}
