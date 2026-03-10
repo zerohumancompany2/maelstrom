@@ -483,3 +483,26 @@ func TestHotReload_QuiescenceNoActiveRegions(t *testing.T) {
 		t.Error("Expected runtime to be quiescent with no active parallel regions")
 	}
 }
+
+func TestHotReload_QuiescenceNoInflightTools(t *testing.T) {
+	svc := NewLifecycleServiceWithoutEngine()
+
+	def := statechart.ChartDefinition{
+		ID:           "test-chart",
+		Version:      "1.0.0",
+		InitialState: "idle",
+	}
+
+	rtID, err := svc.Spawn(def)
+	if err != nil {
+		t.Fatalf("Spawn failed: %v", err)
+	}
+
+	isQuiescent, err := svc.checkQuiescence(string(rtID))
+	if err != nil {
+		t.Fatalf("checkQuiescence should return nil error, got: %v", err)
+	}
+	if !isQuiescent {
+		t.Error("Expected runtime to be quiescent with no inflight tool calls")
+	}
+}
