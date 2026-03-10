@@ -222,16 +222,16 @@ func TestSecurityService_ValidateAndSanitize_outerToInner(t *testing.T) {
 		t.Errorf("Expected outer→inner transition to be allowed, got error: %v", err)
 	}
 
-	hasExternalTaint := false
+	hasOuterBoundaryTaint := false
 	for _, taint := range result.Metadata.Taints {
-		if taint == "EXTERNAL" {
-			hasExternalTaint = true
+		if taint == "OUTER_BOUNDARY" {
+			hasOuterBoundaryTaint = true
 			break
 		}
 	}
 
-	if !hasExternalTaint {
-		t.Errorf("Expected EXTERNAL taint to be added for outer→inner transition, got: %v", result.Metadata.Taints)
+	if !hasOuterBoundaryTaint {
+		t.Errorf("Expected OUTER_BOUNDARY taint to be added for outer→inner transition, got: %v", result.Metadata.Taints)
 	}
 }
 
