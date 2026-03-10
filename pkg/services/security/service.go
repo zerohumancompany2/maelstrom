@@ -333,15 +333,17 @@ func (s *SecurityService) CheckTaintPolicy(data any, targetBoundary mail.Boundar
 
 	taints := s.extractTaints(data)
 
-	for _, taint := range taints {
-		if taint == "INNER_ONLY" || taint == "SECRET" {
-			if targetBoundary != mail.InnerBoundary {
-				return false, nil
+	if policy.RedactMode == "strict" {
+		for _, taint := range taints {
+			if taint == "INNER_ONLY" || taint == "SECRET" {
+				if targetBoundary != mail.InnerBoundary {
+					return false, nil
+				}
 			}
-		}
-		if taint == "PII" {
-			if targetBoundary == mail.OuterBoundary {
-				return false, nil
+			if taint == "PII" {
+				if targetBoundary == mail.OuterBoundary {
+					return false, nil
+				}
 			}
 		}
 	}
