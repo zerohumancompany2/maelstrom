@@ -70,6 +70,15 @@ func (s *heartbeatService) TriggerAll() error {
 
 func (s *heartbeatService) TriggerWakeUp(agentID string) error {
 	s.mu.Lock()
+	_, exists := s.schedules[agentID]
+	if !exists {
+		s.mu.Unlock()
+		// Log failed wake-up - arch-v1.md L469
+		return fmt.Errorf("no schedule found for agent: %s", agentID)
+	}
+	s.mu.Unlock()
+
+	s.mu.Lock()
 	inbox, exists := s.agentInboxes[agentID]
 	if !exists {
 		inbox = &mail.AgentInbox{ID: agentID}

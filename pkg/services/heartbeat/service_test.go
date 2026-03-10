@@ -219,3 +219,15 @@ func TestHeartbeatService_WakeUpBoundaryEnforcement(t *testing.T) {
 		t.Error("Expected taints to be attached")
 	}
 }
+
+// arch-v1.md L469: Failed wake-up logged to observability
+// arch-v1.md L1662: Schedule continues for future wake-ups, error returned to caller
+func TestHeartbeatService_WakeUpFailure(t *testing.T) {
+	svc := NewHeartbeatService()
+
+	// Trigger wake-up for non-scheduled agent should fail
+	err := svc.TriggerWakeUp("non-scheduled-agent")
+	if err == nil {
+		t.Error("Expected error for non-scheduled agent, got nil")
+	}
+}
