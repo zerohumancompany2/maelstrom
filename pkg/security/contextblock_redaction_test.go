@@ -48,3 +48,40 @@ func TestContextBlock_Redaction_AppliesPIIRules(t *testing.T) {
 		t.Error("Expected redaction to be logged to audit trail, but log is empty")
 	}
 }
+
+func TestContextBlock_Redaction_DROPS_FORBIDDEN_TAINTS(t *testing.T) {
+	// Given: A ContextBlock marked with taints=["INNER_ONLY"] attempting to cross to DMZ boundary
+	ClearAuditLog()
+	contextBlockRegistry = make(map[string]BlockTaintInfo)
+
+	innerBlock := &ContextBlock{
+		Name:    "inner-secret",
+		Content: "This is inner-only data",
+		TaintPolicy: TaintPolicy{
+			RedactMode: "redact",
+		},
+	}
+
+	contextBlockRegistry["inner-secret"] = BlockTaintInfo{
+		Block:  innerBlock,
+		Taints: []string{"INNER_ONLY"},
+	}
+
+	// When: prepareContextForBoundary is called
+	err := PrepareContextForBoundary("runtime-1", DMZBoundary)
+
+	// Then: entire block is removed from prompt
+	if err != nil {
+		t.Fatalf("PrepareContextForBoundary returned error: %v", err)
+	}
+
+	if _, exists := contextBlockRegistry["inner-secret"]; exists {
+		t.Error("Expected INNER_ONLY block to be dropped from DMZ boundary, but block still exists")
+	}
+
+	// Drop action logged with reason: "forbidden taint INNER_ONLY for DMZ boundary"
+	lastLog := GetLastAuditLog()
+	if lastLog == "" {
+		t.Error("Expected drop action to be logged to audit trail, but log is empty")
+	}
+}
