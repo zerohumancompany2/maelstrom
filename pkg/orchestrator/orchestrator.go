@@ -21,6 +21,7 @@ func NewOrchestratorService() *OrchestratorService {
 	return &OrchestratorService{
 		id:           "sys:orchestrator",
 		registry:     security.NewToolRegistry(),
+		library:      statechart.NewEngine(),
 		policies:     make(map[string]*ExecutionPolicy),
 		toolsService: tools.NewToolsService(),
 	}
@@ -30,6 +31,7 @@ func NewOrchestratorServiceWithTools(toolsService tools.ToolsService) *Orchestra
 	return &OrchestratorService{
 		id:           "sys:orchestrator",
 		registry:     security.NewToolRegistry(),
+		library:      statechart.NewEngine(),
 		policies:     make(map[string]*ExecutionPolicy),
 		toolsService: toolsService,
 	}
@@ -51,6 +53,12 @@ func (s *OrchestratorService) ResolveTool(name string, callerBoundary string) (t
 }
 
 func (s *OrchestratorService) Execute(toolCalls []ToolCall, policy ExecutionPolicy) (statechart.RuntimeID, error) {
-	// TODO: Implement execution
-	return "", nil
+	def := statechart.ChartDefinition{
+		ID: "orchestrator",
+		Root: &statechart.Node{
+			ID: "root",
+		},
+	}
+
+	return s.library.Spawn(def, nil)
 }

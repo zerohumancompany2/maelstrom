@@ -108,3 +108,24 @@ func TestOrchestratorService_ResolveToolWithBoundary(t *testing.T) {
 		t.Error("Expected ResolveTool() to return error for boundary violation")
 	}
 }
+
+func TestOrchestratorService_ExecuteSpawnsChart(t *testing.T) {
+	// Given
+	service := NewOrchestratorService()
+	toolCalls := []ToolCall{
+		{Name: "test-tool", Arguments: map[string]any{"key": "value"}},
+	}
+	policy := PolicySeqContinue
+
+	// When
+	runtimeID, err := service.Execute(toolCalls, policy)
+
+	// Then
+	if err != nil {
+		t.Errorf("Expected Execute() to return nil error, got %v", err)
+	}
+
+	if runtimeID == "" {
+		t.Error("Expected Execute() to return non-empty RuntimeID")
+	}
+}
