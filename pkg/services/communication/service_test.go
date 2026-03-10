@@ -717,3 +717,40 @@ func TestCommunicationService_DeduplicationConcurrent(t *testing.T) {
 		t.Errorf("Expected fewer than %d duplicates, got %d", numGoroutines, duplicateCount)
 	}
 }
+
+func TestHardcodedServices_CommunicationPublishAck(t *testing.T) {
+	svc := NewCommunicationService()
+
+	received, _ := svc.Subscribe("topic:test")
+
+	testMail := mail.Mail{
+		ID:            "msg-001",
+		CorrelationID: "corr-001",
+		Type:          mail.MailTypeUser,
+		Source:        "agent:sender",
+		Target:        "topic:test",
+		Content:       map[string]any{"text": "hello"},
+		CreatedAt:     time.Now(),
+	}
+
+	ack, err := svc.Publish(testMail)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if ack.CorrelationID != testMail.CorrelationID {
+		t.Errorf("Expected CorrelationID 'corr-001', got '%s'", ack.CorrelationID)
+	}
+	if ack.DeliveredAt.IsZero() {
+		t.Error("Expected DeliveredAt to be set")
+	}
+
+	select {
+	case m := <-received:
+		if m.ID != testMail.ID {
+			t.Errorf("Expected mail ID 'msg-001', got '%s'", m.ID)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Error("Expected mail to be delivered to subscriber")
+	}
+}
