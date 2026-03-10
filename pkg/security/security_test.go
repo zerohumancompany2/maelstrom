@@ -289,12 +289,12 @@ func TestBoundaryService_Namespace(t *testing.T) {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	if !view.Isolated {
-		t.Error("Expected view to be isolated")
+	if view.RuntimeID != "chart-123" {
+		t.Errorf("Expected chart-123, got %s", view.RuntimeID)
 	}
 
-	if view.ChartID != "chart-123" {
-		t.Errorf("Expected chart-123, got %s", view.ChartID)
+	if view.Boundary != DMZBoundary {
+		t.Errorf("Expected DMZBoundary, got %s", view.Boundary)
 	}
 }
 

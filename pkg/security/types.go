@@ -410,10 +410,9 @@ type BoundaryService interface {
 }
 
 type IsolatedView struct {
-	ChartID   string
+	RuntimeID string
 	Operation string
-	Namespace string
-	Isolated  bool
+	Boundary  BoundaryType
 }
 
 type boundaryServiceImpl struct {
@@ -438,9 +437,9 @@ func (s *boundaryServiceImpl) CheckForbidden(taints []string, boundary BoundaryT
 
 func (s *boundaryServiceImpl) NamespaceIsolate(chartID, operation string) (IsolatedView, error) {
 	return IsolatedView{
-		ChartID:   chartID,
+		RuntimeID: chartID,
 		Operation: operation,
-		Isolated:  true,
+		Boundary:  DMZBoundary,
 	}, nil
 }
 
