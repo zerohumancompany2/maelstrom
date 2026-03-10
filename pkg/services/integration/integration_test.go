@@ -589,3 +589,96 @@ func TestLayer7_integrationEndToEndServiceCommunication(t *testing.T) {
 	_ = senderSvc.HandleMail(testMail)
 	_ = receiverSvc.HandleMail(testMail)
 }
+
+func TestLayer7_integrationHotReloadWithActiveAgents(t *testing.T) {
+	// Create communication service
+	commSvc := communication.NewCommunicationService()
+	err := commSvc.Start()
+	if err != nil {
+		t.Fatalf("Failed to start communication service: %v", err)
+	}
+
+	// Create active agent (simulated by subscribing to a topic)
+	agentChan, err := commSvc.Subscribe("agent:test-agent")
+	if err != nil {
+		t.Fatalf("Failed to subscribe agent: %v", err)
+	}
+
+	// Send mail to active agent
+	agentMail := mail.Mail{
+		ID:     "agent-test-1",
+		Type:   mail.MailTypeUser,
+		Source: "sys:gateway",
+		Target: "agent:test-agent",
+		Content: map[string]any{
+			"message": "test for active agent",
+		},
+		Metadata: mail.MailMetadata{
+			Boundary: mail.InnerBoundary,
+		},
+	}
+
+	ack, err := commSvc.Publish(agentMail)
+	if err != nil {
+		t.Fatalf("Failed to publish to agent: %v", err)
+	}
+
+	if !ack.Success {
+		t.Error("Mail to active agent was not delivered")
+	}
+
+	// Verify agent receives mail
+	select {
+	case receivedMail := <-agentChan:
+		if receivedMail.ID != agentMail.ID {
+			t.Errorf("Agent received wrong mail ID")
+		}
+	case <-time.After(1 * time.Second):
+		t.Error("Timeout waiting for agent mail")
+	}
+
+	// Test hot-reload scenario: unsubscribe and resubscribe (simulating agent reload)
+	err = commSvc.Unsubscribe("agent:test-agent", agentChan)
+	if err != nil {
+		t.Logf("Unsubscribe error (expected if not implemented): %v", err)
+	}
+
+	// Resubscribe with new channel (simulating reloaded agent)
+	newAgentChan, err := commSvc.Subscribe("agent:test-agent")
+	if err != nil {
+		t.Fatalf("Failed to resubscribe agent: %v", err)
+	}
+
+	// Send new mail after reload
+	agentMail2 := mail.Mail{
+		ID:     "agent-test-2",
+		Type:   mail.MailTypeUser,
+		Source: "sys:gateway",
+		Target: "agent:test-agent",
+		Content: map[string]any{
+			"message": "test after reload",
+		},
+		Metadata: mail.MailMetadata{
+			Boundary: mail.InnerBoundary,
+		},
+	}
+
+	ack2, err := commSvc.Publish(agentMail2)
+	if err != nil {
+		t.Fatalf("Failed to publish to reloaded agent: %v", err)
+	}
+
+	if !ack2.Success {
+		t.Error("Mail to reloaded agent was not delivered")
+	}
+
+	// Verify reloaded agent receives mail
+	select {
+	case receivedMail := <-newAgentChan:
+		if receivedMail.ID != agentMail2.ID {
+			t.Errorf("Reloaded agent received wrong mail ID")
+		}
+	case <-time.After(1 * time.Second):
+		t.Error("Timeout waiting for reloaded agent mail")
+	}
+}
