@@ -110,7 +110,13 @@ func (g *gatewayService) ID() string {
 
 // NormalizeInbound normalizes inbound messages to mail_received
 func (g *gatewayService) NormalizeInbound(adapterName string, rawMessage any) (*mail.Mail, error) {
-	return nil, errors.New("not implemented")
+	return &mail.Mail{
+		Type:    mail.MailReceived,
+		Content: rawMessage,
+		Metadata: mail.MailMetadata{
+			Adapter: adapterName,
+		},
+	}, nil
 }
 
 // NormalizeOutbound normalizes outbound mail to channel-specific format

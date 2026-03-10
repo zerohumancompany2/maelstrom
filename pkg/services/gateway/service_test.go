@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"testing"
+
+	"github.com/maelstrom/v3/pkg/mail"
 )
 
 // TestGatewayService_ID - Spec: arch-v1.md L466, L477-480
@@ -26,6 +28,29 @@ func TestGatewayService_RegisterAdapter_DuplicateReturnsError(t *testing.T) {
 	// Duplicate registration should return error
 	if err := svc.RegisterAdapter("webhook", adapter); err == nil {
 		t.Error("Expected error on duplicate registration, got nil")
+	}
+}
+
+// TestGatewayService_NormalizeInbound - Spec: arch-v1.md L670-671
+func TestGatewayService_NormalizeInbound(t *testing.T) {
+	svc := NewGatewayService()
+	rawMessage := map[string]any{
+		"from":    "user@example.com",
+		"subject": "Test Message",
+		"body":    "Hello, World!",
+	}
+
+	m, err := svc.NormalizeInbound("webhook", rawMessage)
+	if err != nil {
+		t.Fatalf("NormalizeInbound failed: %v", err)
+	}
+
+	if m.Type != mail.MailReceived {
+		t.Errorf("Expected mail type 'mail_received', got '%s'", m.Type)
+	}
+
+	if m.Metadata.Adapter != "webhook" {
+		t.Errorf("Expected adapter 'webhook', got '%s'", m.Metadata.Adapter)
 	}
 }
 
