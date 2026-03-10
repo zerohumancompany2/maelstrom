@@ -70,3 +70,32 @@ func TestParallel_Continue_CollectsAllResults(t *testing.T) {
 		}
 	}
 }
+
+func TestParallel_Continue_FailureDoesNotStopOthers(t *testing.T) {
+	// Given
+	executor := NewParallelExecutor(PolicyParContinue)
+	toolCalls := []ToolCall{
+		{Name: "success-tool-1", Arguments: map[string]any{"value": "result1"}},
+		{Name: "fail-tool", Arguments: map[string]any{"should": "fail"}},
+		{Name: "success-tool-2", Arguments: map[string]any{"value": "result2"}},
+	}
+
+	// When
+	resultChan, err := executor.Execute(toolCalls)
+
+	// Then
+	if err != nil {
+		t.Errorf("Expected Execute() to return nil error, got %v", err)
+	}
+
+	// Collect all results
+	results := make([]ExecutionResult, 0, 3)
+	for result := range resultChan {
+		results = append(results, result)
+	}
+
+	// All tools should execute even if one fails
+	if len(results) != 3 {
+		t.Errorf("Expected 3 results (all tools executed), got %d", len(results))
+	}
+}
