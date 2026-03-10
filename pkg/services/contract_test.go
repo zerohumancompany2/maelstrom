@@ -89,3 +89,23 @@ func TestServiceContract_outcomeEventContainsTimestamp(t *testing.T) {
 		t.Error("Expected Timestamp to be non-zero")
 	}
 }
+
+// TestServiceContract_outcomeEventContainsServiceID - spec: arch-v1.md L479-480
+// Acceptance Criteria: OutcomeEvent contains ServiceID field
+func TestServiceContract_outcomeEventContainsServiceID(t *testing.T) {
+	expectedServiceID := "sys:test"
+	svc := &contractMockService{id: expectedServiceID}
+	m := mail.Mail{
+		ID:      "test-mail-4",
+		Source:  "agent:test",
+		Target:  "sys:test",
+		Type:    mail.MailTypeUser,
+		Content: "test",
+	}
+
+	outcome := svc.HandleMail(m)
+
+	if outcome.ServiceID != expectedServiceID {
+		t.Errorf("Expected ServiceID to be '%s', got '%s'", expectedServiceID, outcome.ServiceID)
+	}
+}
