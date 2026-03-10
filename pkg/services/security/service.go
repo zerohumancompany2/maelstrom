@@ -83,6 +83,66 @@ func (s *SecurityService) HandleMail(m *mail.Mail) error {
 		m.Metadata.Boundary = targetBoundary
 	}
 
+	for _, taint := range m.Metadata.Taints {
+		if taint == "INNER_ONLY" && (sourceBoundary == mail.DMZBoundary || sourceBoundary == mail.InnerBoundary) {
+			if targetBoundary == mail.OuterBoundary {
+				violationMail := mail.Mail{
+					ID:        fmt.Sprintf("violation-%s", m.ID),
+					Type:      mail.MailTypeTaintViolation,
+					Source:    m.Source,
+					Target:    "sys:observability",
+					Content:   map[string]interface{}{"type": "taint_violation", "forbidden_taints": []string{"INNER_ONLY"}, "mail_id": m.ID},
+					CreatedAt: time.Now(),
+					Metadata: mail.MailMetadata{
+						Taints: m.Metadata.Taints,
+					},
+				}
+				if s.publisher != nil {
+					s.publisher.Publish(violationMail)
+				}
+				return fmt.Errorf("INNER_ONLY taint forbidden on outer boundary")
+			}
+		}
+		if taint == "SECRET" && (sourceBoundary == mail.DMZBoundary || sourceBoundary == mail.InnerBoundary) {
+			if targetBoundary == mail.OuterBoundary {
+				violationMail := mail.Mail{
+					ID:        fmt.Sprintf("violation-%s", m.ID),
+					Type:      mail.MailTypeTaintViolation,
+					Source:    m.Source,
+					Target:    "sys:observability",
+					Content:   map[string]interface{}{"type": "taint_violation", "forbidden_taints": []string{"SECRET"}, "mail_id": m.ID},
+					CreatedAt: time.Now(),
+					Metadata: mail.MailMetadata{
+						Taints: m.Metadata.Taints,
+					},
+				}
+				if s.publisher != nil {
+					s.publisher.Publish(violationMail)
+				}
+				return fmt.Errorf("SECRET taint forbidden on outer boundary")
+			}
+		}
+		if taint == "PII" {
+			if targetBoundary == mail.OuterBoundary {
+				violationMail := mail.Mail{
+					ID:        fmt.Sprintf("violation-%s", m.ID),
+					Type:      mail.MailTypeTaintViolation,
+					Source:    m.Source,
+					Target:    "sys:observability",
+					Content:   map[string]interface{}{"type": "taint_violation", "forbidden_taints": []string{"PII"}, "mail_id": m.ID},
+					CreatedAt: time.Now(),
+					Metadata: mail.MailMetadata{
+						Taints: m.Metadata.Taints,
+					},
+				}
+				if s.publisher != nil {
+					s.publisher.Publish(violationMail)
+				}
+				return fmt.Errorf("PII taint forbidden on outer boundary")
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -93,6 +153,66 @@ func (s *SecurityService) ValidateBoundary(source, target mail.BoundaryType) err
 func (s *SecurityService) ValidateAndSanitize(m mail.Mail, sourceBoundary, targetBoundary mail.BoundaryType) (mail.Mail, error) {
 	result := m
 	result.Metadata.Boundary = targetBoundary
+
+	for _, taint := range m.Metadata.Taints {
+		if taint == "INNER_ONLY" && (sourceBoundary == mail.DMZBoundary || sourceBoundary == mail.InnerBoundary) {
+			if targetBoundary == mail.OuterBoundary {
+				violationMail := mail.Mail{
+					ID:        fmt.Sprintf("violation-%s", m.ID),
+					Type:      mail.MailTypeTaintViolation,
+					Source:    m.Source,
+					Target:    "sys:observability",
+					Content:   map[string]interface{}{"type": "taint_violation", "forbidden_taints": []string{"INNER_ONLY"}, "mail_id": m.ID},
+					CreatedAt: time.Now(),
+					Metadata: mail.MailMetadata{
+						Taints: m.Metadata.Taints,
+					},
+				}
+				if s.publisher != nil {
+					s.publisher.Publish(violationMail)
+				}
+				return result, fmt.Errorf("INNER_ONLY taint forbidden on outer boundary")
+			}
+		}
+		if taint == "SECRET" && (sourceBoundary == mail.DMZBoundary || sourceBoundary == mail.InnerBoundary) {
+			if targetBoundary == mail.OuterBoundary {
+				violationMail := mail.Mail{
+					ID:        fmt.Sprintf("violation-%s", m.ID),
+					Type:      mail.MailTypeTaintViolation,
+					Source:    m.Source,
+					Target:    "sys:observability",
+					Content:   map[string]interface{}{"type": "taint_violation", "forbidden_taints": []string{"SECRET"}, "mail_id": m.ID},
+					CreatedAt: time.Now(),
+					Metadata: mail.MailMetadata{
+						Taints: m.Metadata.Taints,
+					},
+				}
+				if s.publisher != nil {
+					s.publisher.Publish(violationMail)
+				}
+				return result, fmt.Errorf("SECRET taint forbidden on outer boundary")
+			}
+		}
+		if taint == "PII" {
+			if targetBoundary == mail.OuterBoundary {
+				violationMail := mail.Mail{
+					ID:        fmt.Sprintf("violation-%s", m.ID),
+					Type:      mail.MailTypeTaintViolation,
+					Source:    m.Source,
+					Target:    "sys:observability",
+					Content:   map[string]interface{}{"type": "taint_violation", "forbidden_taints": []string{"PII"}, "mail_id": m.ID},
+					CreatedAt: time.Now(),
+					Metadata: mail.MailMetadata{
+						Taints: m.Metadata.Taints,
+					},
+				}
+				if s.publisher != nil {
+					s.publisher.Publish(violationMail)
+				}
+				return result, fmt.Errorf("PII taint forbidden on outer boundary")
+			}
+		}
+	}
 
 	if sourceBoundary == mail.InnerBoundary && targetBoundary == mail.OuterBoundary {
 		return result, nil
