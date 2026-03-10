@@ -70,3 +70,22 @@ func TestServiceContract_outcomeEventContainsStatus(t *testing.T) {
 		t.Errorf("Expected Status to be 'success', got '%s'", outcome.Status)
 	}
 }
+
+// TestServiceContract_outcomeEventContainsTimestamp - spec: arch-v1.md L479-480
+// Acceptance Criteria: OutcomeEvent contains Timestamp field
+func TestServiceContract_outcomeEventContainsTimestamp(t *testing.T) {
+	svc := &contractMockService{id: "sys:test"}
+	m := mail.Mail{
+		ID:      "test-mail-3",
+		Source:  "agent:test",
+		Target:  "sys:test",
+		Type:    mail.MailTypeUser,
+		Content: "test",
+	}
+
+	outcome := svc.HandleMail(m)
+
+	if outcome.Timestamp.IsZero() {
+		t.Error("Expected Timestamp to be non-zero")
+	}
+}
