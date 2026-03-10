@@ -6,6 +6,7 @@ import (
 )
 
 type DatasourceService interface {
+	ID() string
 	Get(name string) (datasource.DataSource, error)
 	List() []string
 	TagOnWrite(path string, taints []string) error
@@ -22,6 +23,10 @@ func NewDatasourceService() DatasourceService {
 	return &datasourceService{
 		datasources: make(map[string]datasource.DataSource),
 	}
+}
+
+func (s *datasourceService) ID() string {
+	return "sys:datasources"
 }
 
 func (s *datasourceService) Get(name string) (datasource.DataSource, error) {

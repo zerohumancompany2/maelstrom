@@ -6,6 +6,16 @@ import (
 	"github.com/maelstrom/v3/pkg/security"
 )
 
+// TestDataSourceService_ID - arch-v1.md L473: sys:datasources service ID
+func TestDataSourceService_ID(t *testing.T) {
+	svc := NewDatasourceService()
+
+	id := svc.ID()
+	if id != "sys:datasources" {
+		t.Errorf("Expected ID 'sys:datasources', got '%s'", id)
+	}
+}
+
 func TestDatasources_Register(t *testing.T) {
 	svc := NewDatasourceService()
 
