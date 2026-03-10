@@ -84,3 +84,52 @@ func TestSubAgent_AttachedAutoTerminated(t *testing.T) {
 		t.Error("Expected child runtime to be terminated (snapshot should fail)")
 	}
 }
+
+func TestSubAgent_Detached_FireAndForget_IndependentLifecycle(t *testing.T) {
+	// Given
+	engine := statechart.NewEngine()
+	parentDef := statechart.ChartDefinition{
+		ID: "parent",
+		Root: &statechart.Node{
+			ID: "root",
+		},
+	}
+	parentID, err := engine.Spawn(parentDef, nil)
+	if err != nil {
+		t.Fatalf("Failed to spawn parent: %v", err)
+	}
+
+	config := SubAgentConfig{
+		Type:     SubAgentDetached,
+		ChartRef: "detached-chart",
+	}
+
+	executor := NewSubAgentExecutor(config, "test-ns", parentID, engine)
+
+	// When - spawn detached sub-agent
+	childID, err := executor.spawnDetached()
+
+	// Then - child should be spawned independently
+	if err != nil {
+		t.Fatalf("Expected spawnDetached() to return nil error, got %v", err)
+	}
+
+	if childID == "" {
+		t.Error("Expected spawnDetached() to return non-empty RuntimeID")
+	}
+
+	// Verify child is independent (not bound to parent lifecycle)
+	// Parent can be stopped without affecting child
+	err = engine.Control(parentID, statechart.CmdStop)
+	if err != nil {
+		t.Fatalf("Expected parent stop to succeed: %v", err)
+	}
+
+	// Child should still exist after parent stops
+	_, err = engine.(interface {
+		Snapshot(statechart.RuntimeID) (statechart.Snapshot, error)
+	}).Snapshot(childID)
+	if err != nil {
+		t.Errorf("Expected child runtime to still exist after parent stops, got error: %v", err)
+	}
+}

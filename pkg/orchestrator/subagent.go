@@ -63,7 +63,19 @@ func (e *SubAgentExecutor) spawnAttached() (statechart.RuntimeID, error) {
 }
 
 func (e *SubAgentExecutor) spawnDetached() (statechart.RuntimeID, error) {
-	panic("not implemented")
+	def := statechart.ChartDefinition{
+		ID: e.config.ChartRef,
+		Root: &statechart.Node{
+			ID: "root",
+		},
+	}
+
+	childID, err := e.engine.Spawn(def, nil)
+	if err != nil {
+		return "", err
+	}
+
+	return childID, nil
 }
 
 func (e *SubAgentExecutor) emitSubAgentDone(result any, message []mail.Mail) error {
