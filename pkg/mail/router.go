@@ -122,14 +122,18 @@ func (t *Topic) Unsubscribe(sub TopicSubscriber) error {
 }
 
 type SecurityService interface {
-	ValidateAndSanitize(mail any, src, tgt BoundaryType) (any, error)
+	ValidateAndSanitize(mail any, src, tgt BoundaryType, allowedOnExit []string) (any, error)
 	MarkTaint(obj any, taints []string) (any, error)
 }
 
 func (r *MailRouter) RouteWithSecurity(mail Mail, securityService SecurityService) error {
-	_, err := securityService.ValidateAndSanitize(mail, mail.Metadata.Boundary, mail.Metadata.Boundary)
+	var allowedOnExit []string
+	sanitized, err := securityService.ValidateAndSanitize(mail, mail.Metadata.Boundary, mail.Metadata.Boundary, allowedOnExit)
 	if err != nil {
 		return err
+	}
+	if sanitizedMail, ok := sanitized.(Mail); ok {
+		mail = sanitizedMail
 	}
 	return r.Route(mail)
 }

@@ -228,7 +228,7 @@ type mockSecurityService struct {
 	validateTgt    BoundaryType
 }
 
-func (m *mockSecurityService) ValidateAndSanitize(mail any, src, tgt BoundaryType) (any, error) {
+func (m *mockSecurityService) ValidateAndSanitize(mail any, src, tgt BoundaryType, allowedOnExit []string) (any, error) {
 	m.validateCalled = true
 	m.validateMail = mail
 	m.validateSrc = src
@@ -274,7 +274,7 @@ type mockSecurityServiceWithViolation struct {
 	violation       any
 }
 
-func (m *mockSecurityServiceWithViolation) ValidateAndSanitize(mail any, src, tgt BoundaryType) (any, error) {
+func (m *mockSecurityServiceWithViolation) ValidateAndSanitize(mail any, src, tgt BoundaryType, allowedOnExit []string) (any, error) {
 	m.validateCalled = true
 	if mailObj, ok := mail.(Mail); ok {
 		for _, taint := range mailObj.Metadata.Taints {
@@ -325,5 +325,88 @@ func TestMailRouter_BoundaryValidation_ForbiddenTransition(t *testing.T) {
 
 	if !mockService.violationCalled {
 		t.Error("Expected violation to be detected")
+	}
+}
+
+type mockSecurityServiceWithAllowedOnExit struct {
+	validateCalled bool
+	allowedOnExit  []string
+}
+
+func (m *mockSecurityServiceWithAllowedOnExit) ValidateAndSanitize(mail any, src, tgt BoundaryType, allowedOnExit []string) (any, error) {
+	m.validateCalled = true
+	if mailObj, ok := mail.(Mail); ok {
+		allowedSet := make(map[string]bool)
+		for _, a := range m.allowedOnExit {
+			allowedSet[a] = true
+		}
+		remaining := make([]string, 0)
+		for _, taint := range mailObj.Metadata.Taints {
+			if allowedSet[taint] {
+				remaining = append(remaining, taint)
+			}
+		}
+		mailObj.Metadata.Taints = remaining
+		mail = mailObj
+		return mail, nil
+	}
+	return mail, nil
+}
+
+func (m *mockSecurityServiceWithAllowedOnExit) MarkTaint(obj any, taints []string) (any, error) {
+	return obj, nil
+}
+
+func TestMailRouter_AllowedOnExit_Stripping(t *testing.T) {
+	router := NewMailRouter()
+
+	serviceInbox := &ServiceInbox{ID: "test-service"}
+	router.SubscribeService("test-service", serviceInbox)
+
+	mockService := &mockSecurityServiceWithAllowedOnExit{
+		allowedOnExit: []string{"TOOL_OUTPUT"},
+	}
+
+	mail := Mail{
+		ID:     "msg-003",
+		Source: "agent:inner-agent",
+		Target: "sys:test-service",
+		Type:   MailTypeUser,
+		Metadata: MailMetadata{
+			Taints: []string{"PII", "TOOL_OUTPUT", "SECRET"},
+		},
+	}
+
+	err := router.RouteWithSecurity(mail, mockService)
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+
+	if !mockService.validateCalled {
+		t.Error("Expected ValidateAndSanitize to be called")
+	}
+
+	serviceInbox.mu.RLock()
+	if len(serviceInbox.Messages) != 1 {
+		t.Errorf("Expected 1 message in inbox, got %d", len(serviceInbox.Messages))
+	}
+	routedMail := serviceInbox.Messages[0]
+	serviceInbox.mu.RUnlock()
+
+	allowedSet := make(map[string]bool)
+	for _, taint := range routedMail.Metadata.Taints {
+		allowedSet[taint] = true
+	}
+
+	if !allowedSet["TOOL_OUTPUT"] {
+		t.Error("Expected TOOL_OUTPUT taint to be preserved")
+	}
+
+	if allowedSet["PII"] {
+		t.Error("Expected PII taint to be stripped")
+	}
+
+	if allowedSet["SECRET"] {
+		t.Error("Expected SECRET taint to be stripped")
 	}
 }
