@@ -120,6 +120,17 @@ func (sr *ServiceRegistry) List() []string {
 	return names
 }
 
+// DiscoverServices returns all registered services.
+func (sr *ServiceRegistry) DiscoverServices() []Service {
+	sr.mu.RLock()
+	defer sr.mu.RUnlock()
+	services := make([]Service, 0, len(sr.services))
+	for _, svc := range sr.services {
+		services = append(services, svc)
+	}
+	return services
+}
+
 // TODO: implement lifecycle tracking (registered, running, stopped)
 // TODO: implement thread-safe operations
 // TODO: implement well-known ID addressing for sys:* services
