@@ -151,3 +151,38 @@ func TestServiceDiscovery_registryReportsServiceDependencies(t *testing.T) {
 		t.Fatalf("GetDependencies('sys:nonexistent') returned %d deps, want 0", len(deps))
 	}
 }
+
+func TestServiceDiscovery_dynamicServiceRegistration(t *testing.T) {
+	sr := NewServiceRegistry()
+
+	// Initially empty
+	services := sr.DiscoverServices()
+	if len(services) != 0 {
+		t.Fatalf("DiscoverServices() returned %d services, want 0", len(services))
+	}
+
+	// Register a service dynamically
+	svc := &mockService{id: "sys:dyn:service"}
+	err := sr.Register("sys:dyn:service", svc)
+	if err != nil {
+		t.Fatalf("Register() returned error: %v", err)
+	}
+
+	// Verify it's discoverable
+	services = sr.DiscoverServices()
+	if len(services) != 1 {
+		t.Fatalf("DiscoverServices() returned %d services, want 1", len(services))
+	}
+	if services[0].ID() != "sys:dyn:service" {
+		t.Fatalf("DiscoverServices() returned wrong service: %s", services[0].ID())
+	}
+
+	// Verify it can be retrieved
+	retrieved, ok := sr.Get("sys:dyn:service")
+	if !ok {
+		t.Fatal("Get() returned false for dynamically registered service")
+	}
+	if retrieved != svc {
+		t.Fatal("Get() returned wrong service instance")
+	}
+}
