@@ -122,8 +122,22 @@ func (g *gatewayService) SendHumanMessage(agentID string, message string) (*mail
 }
 
 // RenderAgentReply renders an agent's mail reply as a chat message
-func (g *gatewayService) RenderAgentReply(mail *mail.Mail) ChatMessage {
-	panic("not implemented")
+func (g *gatewayService) RenderAgentReply(m *mail.Mail) ChatMessage {
+	content := m.Content
+	str, ok := content.(string)
+	if !ok {
+		str = fmt.Sprintf("%v", content)
+	}
+
+	return ChatMessage{
+		ID:        m.ID,
+		Content:   str,
+		Taints:    m.Metadata.Taints,
+		Boundary:  string(m.Metadata.Boundary),
+		Type:      "assistant",
+		Source:    m.Source,
+		IsPartial: m.Type == mail.MailTypePartialAssistant,
+	}
 }
 
 // ParseActionItem parses action item shorthands from chat input

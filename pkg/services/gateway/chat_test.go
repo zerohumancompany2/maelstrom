@@ -226,3 +226,79 @@ func TestHumanChat_MessageBecomesMailReceived(t *testing.T) {
 		t.Error("Expected mail to have timestamp")
 	}
 }
+
+func TestHumanChat_AgentRepliesViaMail(t *testing.T) {
+	svc := NewGatewayService()
+	agentID := "agent:dmz"
+
+	// Setup: Create session
+	session, err := svc.CreateChatSession(agentID)
+	if err != nil {
+		t.Fatalf("Expected no error creating session, got %v", err)
+	}
+
+	// Agent replies via normal mail flow (arch-v1.md L733)
+	agentMail := &mail.Mail{
+		ID:      "mail-001",
+		Type:    mail.Assistant,
+		Source:  agentID,
+		Target:  "user",
+		Content: "I can help you with that request.",
+		Metadata: mail.MailMetadata{
+			Boundary: mail.OuterBoundary,
+			Taints:   []string{},
+		},
+	}
+
+	// Render back in chat UI (arch-v1.md L733)
+	chatMessage := svc.RenderAgentReply(agentMail)
+
+	// Verify chat message created (arch-v1.md L733)
+	if chatMessage.Content == "" {
+		t.Error("Expected chat message to be rendered")
+	}
+
+	// Verify content matches mail content (arch-v1.md L733)
+	if chatMessage.Content != agentMail.Content {
+		t.Errorf("Expected content '%s', got '%s'", agentMail.Content, chatMessage.Content)
+	}
+
+	// Verify type is assistant (arch-v1.md L733)
+	if chatMessage.Type != "assistant" {
+		t.Errorf("Expected type 'assistant', got '%s'", chatMessage.Type)
+	}
+
+	// Verify source is agent
+	if chatMessage.Source != agentID {
+		t.Errorf("Expected source '%s', got '%s'", agentID, chatMessage.Source)
+	}
+
+	// Test partial_assistant mail type (arch-v1.md L733)
+	partialMail := &mail.Mail{
+		ID:      "mail-002",
+		Type:    mail.PartialAssistant,
+		Source:  agentID,
+		Content: "This is a partial response... ",
+		Metadata: mail.MailMetadata{
+			Boundary: mail.OuterBoundary,
+			Stream:   true,
+		},
+	}
+
+	partialMessage := svc.RenderAgentReply(partialMail)
+
+	// Verify partial message rendered (arch-v1.md L733)
+	if partialMessage.Type != "assistant" {
+		t.Errorf("Expected type 'assistant' for partial, got '%s'", partialMessage.Type)
+	}
+
+	if partialMessage.IsPartial != true {
+		t.Error("Expected IsPartial to be true")
+	}
+
+	// Verify message added to session
+	session.Messages = append(session.Messages, chatMessage)
+	if len(session.Messages) != 1 {
+		t.Errorf("Expected 1 message in session, got %d", len(session.Messages))
+	}
+}
