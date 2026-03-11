@@ -3,6 +3,7 @@ package gateway
 import (
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/openapi"
@@ -24,6 +25,54 @@ type GatewayMail struct {
 	Metadata map[string]string
 }
 
+// AgentState represents the current state of an agent
+type AgentState struct {
+	Name       string
+	AgentID    string
+	ContextMap *ContextMap
+	EnteredAt  time.Time
+}
+
+// ContextMap represents the context assembled for an agent
+type ContextMap struct {
+	Session          *SessionData
+	MemoryBlocks     []*MemoryBlock
+	Taints           []string
+	StreamingEnabled bool
+	StreamCommit     bool
+	Strategy         string
+	N                int
+}
+
+// SessionData represents session information
+type SessionData struct {
+	ID        string
+	AgentID   string
+	Messages  []Message
+	CreatedAt time.Time
+}
+
+// Message represents a message in the session
+type Message struct {
+	Role    string
+	Content string
+	Taints  []string
+}
+
+// MemoryBlock represents a memory block
+type MemoryBlock struct {
+	ID      string
+	Content string
+	Taints  []string
+}
+
+// ToolCall represents a tool execution request
+type ToolCall struct {
+	Name      string
+	Arguments map[string]any
+	Taints    []string
+}
+
 // GatewayService interface defines the gateway service API
 type GatewayService interface {
 	ID() string
@@ -39,6 +88,14 @@ type GatewayService interface {
 	HandleMail(mail mail.Mail) error
 	Start() error
 	Stop() error
+	HandleUserInput(input string, sessionID string) (*mail.Mail, error)
+	DispatchEvent(agentID string, m mail.Mail) (*AgentState, error)
+	AssembleContextMap(agentID string) (*ContextMap, error)
+	ExecuteTool(toolCall ToolCall, namespace string) (*mail.Mail, error)
+	EmitPartialAssistant(content string, sequence int) (*mail.StreamChunk, error)
+	StripForbiddenTaints(chunk *mail.StreamChunk) (*mail.StreamChunk, error)
+	FormatSSEChunk(chunk *mail.StreamChunk) (string, error)
+	FormatWebSocketChunk(chunk *mail.StreamChunk) ([]byte, error)
 }
 
 // gatewayService implements GatewayService
@@ -198,4 +255,46 @@ func (g *gatewayService) Start() error {
 
 func (g *gatewayService) Stop() error {
 	return nil
+}
+
+func (g *gatewayService) AssembleContextMap(agentID string) (*ContextMap, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (g *gatewayService) HandleUserInput(input string, sessionID string) (*mail.Mail, error) {
+	m := &mail.Mail{
+		Type:    mail.MailReceived,
+		Source:  "user",
+		Target:  "agent:dmz",
+		Content: input,
+		Metadata: mail.MailMetadata{
+			Boundary: mail.OuterBoundary,
+			Taints:   []string{"USER_SUPPLIED"},
+		},
+	}
+	return m, nil
+}
+
+func (g *gatewayService) DispatchEvent(agentID string, m mail.Mail) (*AgentState, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (g *gatewayService) ExecuteTool(toolCall ToolCall, namespace string) (*mail.Mail, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (g *gatewayService) EmitPartialAssistant(content string, sequence int) (*mail.StreamChunk, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (g *gatewayService) StripForbiddenTaints(chunk *mail.StreamChunk) (*mail.StreamChunk, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (g *gatewayService) FormatSSEChunk(chunk *mail.StreamChunk) (string, error) {
+	return "", errors.New("not implemented")
+}
+
+func (g *gatewayService) FormatWebSocketChunk(chunk *mail.StreamChunk) ([]byte, error) {
+	return nil, errors.New("not implemented")
 }
