@@ -95,3 +95,41 @@ func TestStreamingPath_MailToLLMStream(t *testing.T) {
 		t.Error("Expected streaming enabled for LLM call")
 	}
 }
+
+func TestStreamingPath_LLMAssistantToStreamChunk(t *testing.T) {
+	svc := NewGatewayService()
+
+	// LLM returns assistant response
+	llmResponse := "This is the assistant response to your query."
+
+	// Engine emits partial_assistant Messages (stream: true) (arch-v1.md L681)
+	chunk, err := svc.EmitPartialAssistant(llmResponse, 1)
+	if err != nil {
+		t.Fatalf("Expected no error emitting partial assistant, got %v", err)
+	}
+
+	// Verify StreamChunk format (arch-v1.md L696-701)
+	if chunk.Chunk != llmResponse {
+		t.Errorf("Expected chunk content '%s', got '%s'", llmResponse, chunk.Chunk)
+	}
+
+	// Verify sequence number
+	if chunk.Sequence != 1 {
+		t.Errorf("Expected sequence 1, got %d", chunk.Sequence)
+	}
+
+	// Verify isFinal flag for single chunk
+	if !chunk.IsFinal {
+		t.Error("Expected isFinal to be true for single chunk")
+	}
+
+	// Verify taints array exists (arch-v1.md L696-701)
+	if chunk.Taints == nil {
+		t.Error("Expected taints array to exist")
+	}
+
+	// Verify partial_assistant message type
+	if chunk.MessageType != "partial_assistant" {
+		t.Errorf("Expected message type 'partial_assistant', got '%s'", chunk.MessageType)
+	}
+}

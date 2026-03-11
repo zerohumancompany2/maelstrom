@@ -309,7 +309,14 @@ func (g *gatewayService) ExecuteTool(toolCall ToolCall, namespace string) (*mail
 }
 
 func (g *gatewayService) EmitPartialAssistant(content string, sequence int) (*mail.StreamChunk, error) {
-	return nil, errors.New("not implemented")
+	chunk := &mail.StreamChunk{
+		Chunk:       content,
+		Sequence:    sequence,
+		IsFinal:     true,
+		Taints:      []string{},
+		MessageType: "partial_assistant",
+	}
+	return chunk, nil
 }
 
 func (g *gatewayService) StripForbiddenTaints(chunk *mail.StreamChunk) (*mail.StreamChunk, error) {

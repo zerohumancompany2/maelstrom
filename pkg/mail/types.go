@@ -65,10 +65,11 @@ const (
 )
 
 type StreamChunk struct {
-	Data     string
-	Sequence int
-	IsFinal  bool
-	Taints   []string
+	Chunk       string   `json:"chunk"`
+	Sequence    int      `json:"sequence"`
+	IsFinal     bool     `json:"isFinal"`
+	Taints      []string `json:"taints"`
+	MessageType string   `json:"messageType"`
 }
 
 type Ack struct {
