@@ -27,6 +27,7 @@ const (
 	MailTypePartialAssistant MailType = "partial_assistant"
 	MailTypeSubagentDone     MailType = "subagent_done"
 	MailTypeTaintViolation   MailType = "taint_violation"
+	MailTypeMailSend         MailType = "mail_send"
 
 	// Aliases for backward compatibility
 	User             = MailTypeUser
@@ -40,6 +41,7 @@ const (
 	PartialAssistant = MailTypePartialAssistant
 	SubagentDone     = MailTypeSubagentDone
 	TaintViolation   = MailTypeTaintViolation
+	MailSend         = MailTypeMailSend
 )
 
 type MailMetadata struct {
