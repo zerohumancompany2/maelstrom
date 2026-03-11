@@ -226,3 +226,97 @@ func TestHTTPExposure_AuthMiddlewareApplied(t *testing.T) {
 		t.Error("Expected GET /api/v1/agents/{id}/ to be protected")
 	}
 }
+
+func TestHTTPExposure_EventSurfaceIsAPISurface(t *testing.T) {
+	svc := NewGatewayService()
+
+	// Setup: Chart with events that become API surface (arch-v1.md L722)
+	chart := Chart{
+		Name:     "agent:dmz",
+		Boundary: "dmz",
+		States: []State{
+			{
+				Name: "Idle",
+				On: map[string]Transition{
+					"user_query": {To: "Processing"},
+					"status":     {To: "Idle"},
+				},
+			},
+			{
+				Name: "Processing",
+				On: map[string]Transition{
+					"tool_result": {To: "Idle"},
+				},
+			},
+		},
+		Expose: &Exposure{
+			HTTP: &HTTPExposure{
+				Path: "/api/v1/agents/{id}/",
+				Events: []HTTPEvent{
+					{Trigger: "user_query", Method: "POST"},
+					{Trigger: "status", Method: "GET"},
+				},
+			},
+		},
+	}
+
+	// The event surface of the chart becomes the API surface (arch-v1.md L722)
+	endpoints, err := svc.MapEventToAPI(chart)
+	if err != nil {
+		t.Fatalf("Expected no error mapping events to API, got %v", err)
+	}
+
+	// Verify API endpoints match event triggers
+	if len(endpoints) != 2 {
+		t.Errorf("Expected 2 API endpoints, got %d", len(endpoints))
+	}
+
+	// Verify user_query event maps to POST endpoint
+	var userQueryEndpoint *APIEndpoint
+	var statusEndpoint *APIEndpoint
+	for i := range endpoints {
+		ep := &endpoints[i]
+		if ep.Trigger == "user_query" {
+			userQueryEndpoint = ep
+		}
+		if ep.Trigger == "status" {
+			statusEndpoint = ep
+		}
+	}
+
+	if userQueryEndpoint == nil {
+		t.Error("Expected user_query endpoint")
+	} else {
+		if userQueryEndpoint.Method != "POST" {
+			t.Errorf("Expected user_query to map to POST, got %s", userQueryEndpoint.Method)
+		}
+		if userQueryEndpoint.Path != "/api/v1/agents/{id}/" {
+			t.Errorf("Expected path '/api/v1/agents/{id}/', got '%s'", userQueryEndpoint.Path)
+		}
+	}
+
+	if statusEndpoint == nil {
+		t.Error("Expected status endpoint")
+	} else {
+		if statusEndpoint.Method != "GET" {
+			t.Errorf("Expected status to map to GET, got %s", statusEndpoint.Method)
+		}
+		if statusEndpoint.Path != "/api/v1/agents/{id}/" {
+			t.Errorf("Expected path '/api/v1/agents/{id}/', got '%s'", statusEndpoint.Path)
+		}
+	}
+
+	// Verify internal events NOT exposed (tool_result not in expose block)
+	var toolResultEndpoint *APIEndpoint
+	for i := range endpoints {
+		ep := &endpoints[i]
+		if ep.Trigger == "tool_result" {
+			toolResultEndpoint = ep
+			break
+		}
+	}
+
+	if toolResultEndpoint != nil {
+		t.Error("Expected tool_result event NOT to be exposed (not in expose block)")
+	}
+}
