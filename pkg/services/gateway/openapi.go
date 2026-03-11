@@ -44,6 +44,9 @@ func (g *OpenAPIGen) GenerateSpec(charts []Chart) (*OpenAPISpec, error) {
 	}
 
 	for _, chart := range charts {
+		if !canExposeChart(chart) {
+			continue
+		}
 		if chart.Expose == nil || chart.Expose.HTTP == nil {
 			continue
 		}
@@ -70,6 +73,13 @@ func (g *OpenAPIGen) GenerateSpec(charts []Chart) (*OpenAPISpec, error) {
 	}
 
 	return spec, nil
+}
+
+func canExposeChart(chart Chart) bool {
+	if chart.Boundary == "inner" {
+		return false
+	}
+	return chart.Boundary == "dmz" || chart.Boundary == "outer"
 }
 
 func normalizeOperationID(id string) string {

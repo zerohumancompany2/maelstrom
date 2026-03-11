@@ -320,3 +320,57 @@ func TestHTTPExposure_EventSurfaceIsAPISurface(t *testing.T) {
 		t.Error("Expected tool_result event NOT to be exposed (not in expose block)")
 	}
 }
+
+func TestHTTPExposure_InnerBoundaryNotExposed(t *testing.T) {
+	svc := NewGatewayService()
+
+	// Setup: Inner-boundary chart with expose block (arch-v1.md L723)
+	innerChart := Chart{
+		Name:     "orchestrator:inner",
+		Boundary: "inner",
+		Expose: &Exposure{
+			HTTP: &HTTPExposure{
+				Path: "/api/v1/orchestrator/",
+				Events: []HTTPEvent{
+					{Trigger: "execute", Method: "POST"},
+				},
+			},
+		},
+	}
+
+	// Inner-boundary Charts are never directly exposed (arch-v1.md L723)
+	canExpose := svc.CanExpose(innerChart)
+	if canExpose {
+		t.Error("Expected inner-boundary chart to NOT be exposable")
+	}
+
+	// Verify inner chart not registered even with expose block
+	charts := []Chart{innerChart}
+	err := svc.RegisterEndpoints(charts)
+	if err != nil {
+		t.Fatalf("Expected no error registering endpoints, got %v", err)
+	}
+
+	// Verify no endpoints registered for inner chart
+	gwSvc := svc.(*gatewayService)
+	if len(gwSvc.protectedEndpoints) != 0 {
+		t.Errorf("Expected 0 endpoints for inner chart, got %d", len(gwSvc.protectedEndpoints))
+	}
+
+	// Verify OpenAPI spec excludes inner chart
+	gen := NewOpenAPIGen()
+	spec, err := gen.GenerateSpec(charts)
+	if err != nil {
+		t.Fatalf("Expected no error generating spec, got %v", err)
+	}
+
+	// Verify /api/v1/orchestrator/ NOT in spec (arch-v1.md L723)
+	if _, exists := spec.Paths["/api/v1/orchestrator/"]; exists {
+		t.Error("Expected inner-boundary path NOT in OpenAPI spec")
+	}
+
+	// Verify spec has no paths from inner chart
+	if len(spec.Paths) != 0 {
+		t.Errorf("Expected 0 paths in spec for inner chart, got %d", len(spec.Paths))
+	}
+}
