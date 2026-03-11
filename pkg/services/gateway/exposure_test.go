@@ -1,6 +1,9 @@
 package gateway
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"slices"
 	"testing"
 )
 
@@ -143,5 +146,83 @@ expose:
 	}
 	if chart.Expose.HTTP.Events[1].Method != "GET" {
 		t.Errorf("Expected method 'GET', got '%s'", chart.Expose.HTTP.Events[1].Method)
+	}
+}
+
+func TestHTTPExposure_AuthMiddlewareApplied(t *testing.T) {
+	svc := NewGatewayService()
+	authMiddleware := NewAuthMiddleware()
+
+	// Setup: Create handler with auth middleware
+	baseHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// Apply auth middleware (arch-v1.md L722)
+	protectedHandler := authMiddleware.Apply(baseHandler)
+
+	// Test without auth header
+	req := httptest.NewRequest("GET", "/api/v1/agents/test/", nil)
+	rr := httptest.NewRecorder()
+
+	protectedHandler.ServeHTTP(rr, req)
+
+	// Verify 401 Unauthorized (arch-v1.md L722)
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("Expected status 401, got %d", rr.Code)
+	}
+
+	// Test with valid auth header
+	req2 := httptest.NewRequest("GET", "/api/v1/agents/test/", nil)
+	req2.Header.Set("Authorization", "Bearer valid-token-123")
+	rr2 := httptest.NewRecorder()
+
+	protectedHandler.ServeHTTP(rr2, req2)
+
+	// Verify 200 OK with valid auth
+	if rr2.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", rr2.Code)
+	}
+
+	// Verify sys:gateway registers all endpoints with auth middleware (arch-v1.md L722)
+	charts := []Chart{
+		{
+			Name:     "agent:dmz",
+			Boundary: "dmz",
+			Expose: &Exposure{
+				HTTP: &HTTPExposure{
+					Path: "/api/v1/agents/{id}/",
+					Events: []HTTPEvent{
+						{Trigger: "user_query", Method: "POST"},
+						{Trigger: "status", Method: "GET"},
+					},
+				},
+			},
+		},
+	}
+
+	// Register endpoints with auth middleware
+	err := svc.RegisterEndpoints(charts)
+	if err != nil {
+		t.Fatalf("Expected no error registering endpoints, got %v", err)
+	}
+
+	// Verify all endpoints have auth middleware applied
+	gwSvc := svc.(*gatewayService)
+	if len(gwSvc.protectedEndpoints) != 2 {
+		t.Errorf("Expected 2 protected endpoints, got %d", len(gwSvc.protectedEndpoints))
+	}
+
+	// Verify both POST and GET are protected
+	protectedMethods := []string{}
+	for method := range gwSvc.protectedEndpoints {
+		protectedMethods = append(protectedMethods, method)
+	}
+
+	if !slices.Contains(protectedMethods, "POST /api/v1/agents/{id}/") {
+		t.Error("Expected POST /api/v1/agents/{id}/ to be protected")
+	}
+	if !slices.Contains(protectedMethods, "GET /api/v1/agents/{id}/") {
+		t.Error("Expected GET /api/v1/agents/{id}/ to be protected")
 	}
 }

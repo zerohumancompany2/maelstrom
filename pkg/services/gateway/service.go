@@ -96,6 +96,9 @@ type GatewayService interface {
 	StripForbiddenTaints(chunk *mail.StreamChunk) (*mail.StreamChunk, error)
 	FormatSSEChunk(chunk *mail.StreamChunk) (string, error)
 	FormatWebSocketChunk(chunk *mail.StreamChunk) ([]byte, error)
+	RegisterEndpoints(charts []Chart) error
+	MapEventToAPI(chart Chart) ([]APIEndpoint, error)
+	CanExpose(chart Chart) bool
 }
 
 // gatewayService implements GatewayService
@@ -364,15 +367,41 @@ func (g *gatewayService) FormatWebSocketChunk(chunk *mail.StreamChunk) ([]byte, 
 
 // RegisterEndpoints registers chart endpoints with auth middleware
 func (g *gatewayService) RegisterEndpoints(charts []Chart) error {
+	for _, chart := range charts {
+		if !g.CanExpose(chart) {
+			continue
+		}
+		if chart.Expose == nil || chart.Expose.HTTP == nil {
+			continue
+		}
+		for _, event := range chart.Expose.HTTP.Events {
+			key := event.Method + " " + chart.Expose.HTTP.Path
+			g.protectedEndpoints[key] = true
+		}
+	}
 	return nil
 }
 
 // MapEventToAPI maps event surface to API surface
 func (g *gatewayService) MapEventToAPI(chart Chart) ([]APIEndpoint, error) {
-	return nil, nil
+	var endpoints []APIEndpoint
+	if chart.Expose == nil || chart.Expose.HTTP == nil {
+		return endpoints, nil
+	}
+	for _, event := range chart.Expose.HTTP.Events {
+		endpoints = append(endpoints, APIEndpoint{
+			Trigger: event.Trigger,
+			Method:  event.Method,
+			Path:    chart.Expose.HTTP.Path,
+		})
+	}
+	return endpoints, nil
 }
 
 // CanExpose checks if a chart can be exposed based on boundary
 func (g *gatewayService) CanExpose(chart Chart) bool {
-	return false
+	if chart.Boundary == "inner" {
+		return false
+	}
+	return chart.Boundary == "dmz" || chart.Boundary == "outer"
 }
