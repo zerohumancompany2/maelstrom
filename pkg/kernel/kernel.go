@@ -48,6 +48,11 @@ type Kernel struct {
 	failService          string
 	failMu               sync.RWMutex
 	chartRegistryRunning atomic.Bool
+	dormant              atomic.Bool
+	dormantMu            sync.RWMutex
+	dormantSince         time.Time
+	platformServices     map[string]*platform.PlatformService
+	platformServicesMu   sync.RWMutex
 }
 
 // kernelApplicationContext provides application context with kernel engine access.
@@ -401,7 +406,7 @@ func (k *Kernel) waitForKernelReady(ctx context.Context, bootstrapRTID statechar
 	}
 }
 
-// handleKernelReadyEvent handles the KERNEL_READY event by starting ChartRegistry.
+// handleKernelReadyEvent handles the KERNEL_READY event by starting ChartRegistry and loading platform services.
 func (k *Kernel) handleKernelReadyEvent() {
 	log.Println("[kernel] Received KERNEL_READY event, starting ChartRegistry")
 
@@ -416,7 +421,92 @@ func (k *Kernel) handleKernelReadyEvent() {
 		return
 	}
 
-	log.Println("[kernel] ChartRegistry started, ready to load platform services")
+	log.Println("[kernel] ChartRegistry started, loading platform services")
+
+	if err := k.loadAndStartPlatformServices(servicesDir); err != nil {
+		log.Printf("[kernel] Failed to load platform services: %v", err)
+		return
+	}
+
+	log.Println("[kernel] All platform services loaded, entering dormant state")
+	k.enterDormantState()
+}
+
+// loadAndStartPlatformServices loads and starts all 8 platform services from ChartRegistry.
+func (k *Kernel) loadAndStartPlatformServices(servicesDir string) error {
+	registry := k.GetChartRegistry()
+	if registry == nil {
+		return fmt.Errorf("chart registry not initialized")
+	}
+
+	services, err := registry.LoadPlatformServices()
+	if err != nil {
+		return fmt.Errorf("failed to load services: %w", err)
+	}
+
+	if len(services) == 0 {
+		log.Println("[kernel] No platform services found in directory")
+		return nil
+	}
+
+	log.Printf("[kernel] Loading %d platform services", len(services))
+
+	k.platformServicesMu.Lock()
+	k.platformServices = make(map[string]*platform.PlatformService)
+	k.platformServicesMu.Unlock()
+
+	for i := range services {
+		svc := &services[i]
+		if err := k.startPlatformService(svc); err != nil {
+			log.Printf("[kernel] Failed to start service %s: %v", svc.Metadata.Name, err)
+			continue
+		}
+
+		k.platformServicesMu.Lock()
+		k.platformServices[svc.Metadata.Name] = svc
+		k.platformServicesMu.Unlock()
+
+		log.Printf("[kernel] Started platform service: %s", svc.Metadata.Name)
+	}
+
+	return nil
+}
+
+// startPlatformService starts a single platform service.
+func (k *Kernel) startPlatformService(svc *platform.PlatformService) error {
+	if k.engine == nil {
+		return fmt.Errorf("engine not initialized")
+	}
+
+	def, err := svc.ToChartDefinition(statechart.DefaultHydrator())
+	if err != nil {
+		return fmt.Errorf("failed to convert to chart definition: %w", err)
+	}
+
+	rtID, err := k.engine.Spawn(def, k.appCtx)
+	if err != nil {
+		return fmt.Errorf("failed to spawn runtime: %w", err)
+	}
+
+	if err := k.engine.Control(rtID, statechart.CmdStart); err != nil {
+		return fmt.Errorf("failed to start runtime: %w", err)
+	}
+
+	k.mu.Lock()
+	k.services[svc.Metadata.Name] = rtID
+	k.serviceReady[svc.Metadata.Name] = true
+	k.mu.Unlock()
+
+	return nil
+}
+
+// enterDormantState transitions the kernel to dormant state.
+func (k *Kernel) enterDormantState() {
+	k.dormant.Store(true)
+	k.dormantMu.Lock()
+	k.dormantSince = time.Now()
+	k.dormantMu.Unlock()
+	log.Println("[kernel] Kernel entered dormant state at", k.dormantSince.Format(time.RFC3339))
 }
 
 func (k *Kernel) CaptureLog(msg string) {
@@ -654,4 +744,34 @@ func (k *Kernel) IsChartRegistryRunning() bool {
 // SetChartRegistryRunning sets the ChartRegistry running state.
 func (k *Kernel) SetChartRegistryRunning(running bool) {
 	k.chartRegistryRunning.Store(running)
+}
+
+// IsDormant returns true if the kernel is in dormant state.
+func (k *Kernel) IsDormant() bool {
+	return k.dormant.Load()
+}
+
+// GetDormantSince returns the time when the kernel entered dormant state.
+func (k *Kernel) GetDormantSince() time.Time {
+	k.dormantMu.RLock()
+	defer k.dormantMu.RUnlock()
+	return k.dormantSince
+}
+
+// GetPlatformServices returns a copy of the loaded platform services.
+func (k *Kernel) GetPlatformServices() map[string]*platform.PlatformService {
+	k.platformServicesMu.RLock()
+	defer k.platformServicesMu.RUnlock()
+	result := make(map[string]*platform.PlatformService, len(k.platformServices))
+	for k, v := range k.platformServices {
+		result[k] = v
+	}
+	return result
+}
+
+// GetPlatformServiceCount returns the number of loaded platform services.
+func (k *Kernel) GetPlatformServiceCount() int {
+	k.platformServicesMu.RLock()
+	defer k.platformServicesMu.RUnlock()
+	return len(k.platformServices)
 }
