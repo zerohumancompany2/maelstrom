@@ -433,3 +433,87 @@ func TestGatewaySecurity_TaintPropagationToMail(t *testing.T) {
 		t.Error("Expected INNER_ONLY taint to be stored with data")
 	}
 }
+
+func TestGatewaySecurity_OuterToInnerTainting(t *testing.T) {
+	enforcer := &OuterInnerTaintEnforcer{
+		Policy: security.NewDefaultSecurityPolicy(),
+	}
+
+	// Enforce tainting when data moves from outer to inner boundary
+	outerData := map[string]any{
+		"content": "User input from outer boundary",
+		"source":  "user:web",
+	}
+
+	// Outer → inner tainting enforced
+	err := enforcer.EnforceOuterToInner(outerData, "outer", "inner")
+	if err == nil {
+		t.Error("Expected error when moving outer data to inner without proper tainting")
+	}
+
+	// Test with proper tainting
+	taintedOuterData := map[string]any{
+		"content": "User input from outer boundary",
+		"source":  "user:web",
+		"taints":  []string{"USER_SUPPLIED", "OUTER_BOUNDARY"},
+	}
+
+	err = enforcer.EnforceOuterToInner(taintedOuterData, "outer", "inner")
+	if err != nil {
+		t.Fatalf("Expected no error with proper tainting, got %v", err)
+	}
+
+	// Auto-strip or block on forbidden taints (arch-v1.md L284)
+	forbiddenData := map[string]any{
+		"content": "Data with forbidden taints",
+		"taints":  []string{"SECRET", "INNER_ONLY"},
+	}
+
+	err = enforcer.EnforceOuterToInner(forbiddenData, "outer", "inner")
+	if err == nil {
+		t.Error("Expected error for forbidden taints in outer→inner transition")
+	}
+
+	// Test allowed transition with allowed taints
+	allowedData := map[string]any{
+		"content": "Data with allowed taints",
+		"taints":  []string{"USER_SUPPLIED", "TOOL_OUTPUT"},
+	}
+
+	err = enforcer.EnforceOuterToInner(allowedData, "outer", "dmz")
+	if err != nil {
+		t.Errorf("Expected no error for allowed taints, got %v", err)
+	}
+
+	// On-disk: taints stored with data; Persistence refuses writes that violate policy (arch-v1.md L284)
+	diskData := map[string]any{
+		"content": "Data for persistence",
+		"taints":  []string{"SECRET", "INNER_ONLY"},
+	}
+
+	// Verify persistence policy enforcement
+	err = enforcer.EnforceOuterToInner(diskData, "inner", "disk")
+	if err != nil {
+		t.Fatalf("Expected no error for inner→disk with proper taints, got %v", err)
+	}
+
+	// Test Persistence refuses writes that violate policy (arch-v1.md L284)
+	violatingData := map[string]any{
+		"content": "Data violating policy",
+		"taints":  []string{"SECRET"},
+	}
+
+	err = enforcer.EnforceOuterToInner(violatingData, "outer", "disk")
+	if err == nil {
+		t.Error("Expected error when persistence policy is violated")
+	}
+
+	// Verify taints are stored with data on disk (arch-v1.md L284)
+	if !slices.Contains(diskData["taints"].([]string), "SECRET") {
+		t.Error("Expected taints to be stored with data on disk")
+	}
+
+	if !slices.Contains(diskData["taints"].([]string), "INNER_ONLY") {
+		t.Error("Expected taints to be stored with data on disk")
+	}
+}

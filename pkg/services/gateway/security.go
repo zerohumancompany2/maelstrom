@@ -154,5 +154,56 @@ type OuterInnerTaintEnforcer struct {
 
 // EnforceOuterToInner enforces tainting when data moves from outer to inner
 func (oit *OuterInnerTaintEnforcer) EnforceOuterToInner(data any, fromBoundary string, toBoundary string) error {
-	return fmt.Errorf("not implemented")
+	if oit.Policy == nil {
+		oit.Policy = security.NewDefaultSecurityPolicy()
+	}
+
+	switch v := data.(type) {
+	case map[string]any:
+		taints, hasTaints := v["taints"].([]string)
+		if !hasTaints {
+			if fromBoundary == "outer" && toBoundary == "inner" {
+				return fmt.Errorf("data must have taints attached for outer→inner transition")
+			}
+			return nil
+		}
+
+		forbidden := getForbiddenTaintsForTransition(fromBoundary, toBoundary)
+		for _, t := range taints {
+			for _, f := range forbidden {
+				if t == f {
+					return fmt.Errorf("taint %s is forbidden for %s→%s transition", t, fromBoundary, toBoundary)
+				}
+			}
+		}
+
+		if toBoundary == "disk" {
+			if fromBoundary == "outer" {
+				for _, t := range taints {
+					if t == "SECRET" || t == "INNER_ONLY" {
+						return fmt.Errorf("persistence policy violation: taint %s not allowed on disk from outer", t)
+					}
+				}
+			}
+		}
+
+		return nil
+	default:
+		return nil
+	}
+}
+
+func getForbiddenTaintsForTransition(from, to string) []string {
+	switch {
+	case from == "outer" && to == "inner":
+		return []string{"PII", "SECRET", "INNER_ONLY"}
+	case from == "dmz" && to == "inner":
+		return []string{"SECRET"}
+	case from == "inner" && to == "outer":
+		return []string{"SECRET", "INNER_ONLY"}
+	case from == "inner" && to == "dmz":
+		return []string{"INNER_ONLY"}
+	default:
+		return nil
+	}
 }
