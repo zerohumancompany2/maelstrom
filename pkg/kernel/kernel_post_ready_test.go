@@ -86,9 +86,9 @@ func TestChartRegistry_postKernelReadyLoadsServices(t *testing.T) {
 		t.Error("KERNEL_READY should be emitted")
 	}
 
-	// Verify ChartRegistry is still not running (will be started after KERNEL_READY in future implementation)
-	if kernel.IsChartRegistryRunning() {
-		t.Error("ChartRegistry should NOT be running yet - it should be started after KERNEL_READY")
+	// Verify ChartRegistry IS running after KERNEL_READY
+	if !kernel.IsChartRegistryRunning() {
+		t.Error("ChartRegistry should be running after KERNEL_READY")
 	}
 
 	// Load services using ChartRegistry (simulating post-KERNEL_READY loading)

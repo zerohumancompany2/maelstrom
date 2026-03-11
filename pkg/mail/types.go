@@ -31,6 +31,7 @@ const (
 	MailTypeMailSend         MailType = "mail_send"
 	MailTypeContextBlock     MailType = "context_block"
 	MailTypeSnapshot         MailType = "snapshot"
+	MailTypeKernelReady      MailType = "kernel_ready"
 
 	// Aliases for backward compatibility
 	User             = MailTypeUser
@@ -47,6 +48,7 @@ const (
 	MailSend         = MailTypeMailSend
 	ContextBlock     = MailTypeContextBlock
 	Snapshot         = MailTypeSnapshot
+	KernelReady      = MailTypeKernelReady
 )
 
 type MailMetadata struct {

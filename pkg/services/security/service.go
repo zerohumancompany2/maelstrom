@@ -80,7 +80,7 @@ func (s *SecurityService) HandleMail(m *mail.Mail) *services.OutcomeEvent {
 		if m.Metadata.Taints == nil {
 			m.Metadata.Taints = []string{}
 		}
-		m.Metadata.Taints = append(m.Metadata.Taints, "EXTERNAL")
+		m.Metadata.Taints = append(m.Metadata.Taints, "OUTER_BOUNDARY", "EXTERNAL")
 		m.Metadata.Boundary = targetBoundary
 	}
 
@@ -171,86 +171,137 @@ func (s *SecurityService) HandleMail(m *mail.Mail) *services.OutcomeEvent {
 }
 
 func (s *SecurityService) ValidateBoundary(source, target mail.BoundaryType) error {
+	if source == target {
+		return nil
+	}
+
+	switch source {
+	case mail.InnerBoundary, mail.DMZBoundary, mail.OuterBoundary:
+	default:
+		return fmt.Errorf("invalid source boundary type: %q", source)
+	}
+
+	switch target {
+	case mail.InnerBoundary, mail.DMZBoundary, mail.OuterBoundary:
+	default:
+		return fmt.Errorf("invalid target boundary type: %q", target)
+	}
+
+	forbidden := s.getForbiddenTaints(source, target)
+	if len(forbidden) > 0 {
+		return fmt.Errorf("transition %s → %s has forbidden taint restrictions: %v", source, target, forbidden)
+	}
+
 	return nil
 }
 
+func (s *SecurityService) getForbiddenTaints(source, target mail.BoundaryType) []string {
+	switch {
+	case source == mail.OuterBoundary && target == mail.InnerBoundary:
+		return []string{"PII", "SECRET", "INNER_ONLY"}
+	case source == mail.DMZBoundary && target == mail.InnerBoundary:
+		return []string{"SECRET"}
+	default:
+		return nil
+	}
+}
+
 func (s *SecurityService) ValidateAndSanitize(m mail.Mail, sourceBoundary, targetBoundary mail.BoundaryType) (mail.Mail, error) {
+	if sourceBoundary == targetBoundary {
+		return m, nil
+	}
+
 	result := m
 	result.Metadata.Boundary = targetBoundary
 
+	forbidden := s.getForbiddenTaints(sourceBoundary, targetBoundary)
 	for _, taint := range m.Metadata.Taints {
-		if taint == "INNER_ONLY" && (sourceBoundary == mail.DMZBoundary || sourceBoundary == mail.InnerBoundary) {
-			if targetBoundary == mail.OuterBoundary {
-				violationMail := mail.Mail{
-					ID:        fmt.Sprintf("violation-%s", m.ID),
-					Type:      mail.MailTypeTaintViolation,
-					Source:    m.Source,
-					Target:    "sys:observability",
-					Content:   map[string]interface{}{"type": "taint_violation", "forbidden_taints": []string{"INNER_ONLY"}, "mail_id": m.ID},
-					CreatedAt: time.Now(),
-					Metadata: mail.MailMetadata{
-						Taints: m.Metadata.Taints,
-					},
-				}
-				if s.publisher != nil {
-					s.publisher.Publish(violationMail)
-				}
-				return result, fmt.Errorf("INNER_ONLY taint forbidden on outer boundary")
-			}
-		}
-		if taint == "SECRET" && (sourceBoundary == mail.DMZBoundary || sourceBoundary == mail.InnerBoundary) {
-			if targetBoundary == mail.OuterBoundary {
-				violationMail := mail.Mail{
-					ID:        fmt.Sprintf("violation-%s", m.ID),
-					Type:      mail.MailTypeTaintViolation,
-					Source:    m.Source,
-					Target:    "sys:observability",
-					Content:   map[string]interface{}{"type": "taint_violation", "forbidden_taints": []string{"SECRET"}, "mail_id": m.ID},
-					CreatedAt: time.Now(),
-					Metadata: mail.MailMetadata{
-						Taints: m.Metadata.Taints,
-					},
-				}
-				if s.publisher != nil {
-					s.publisher.Publish(violationMail)
-				}
-				return result, fmt.Errorf("SECRET taint forbidden on outer boundary")
-			}
-		}
-		if taint == "PII" {
-			if targetBoundary == mail.OuterBoundary {
-				violationMail := mail.Mail{
-					ID:        fmt.Sprintf("violation-%s", m.ID),
-					Type:      mail.MailTypeTaintViolation,
-					Source:    m.Source,
-					Target:    "sys:observability",
-					Content:   map[string]interface{}{"type": "taint_violation", "forbidden_taints": []string{"PII"}, "mail_id": m.ID},
-					CreatedAt: time.Now(),
-					Metadata: mail.MailMetadata{
-						Taints: m.Metadata.Taints,
-					},
-				}
-				if s.publisher != nil {
-					s.publisher.Publish(violationMail)
-				}
-				return result, fmt.Errorf("PII taint forbidden on outer boundary")
+		for _, f := range forbidden {
+			if taint == f {
+				return result, fmt.Errorf("taint %q is forbidden for transition %s → %s", taint, sourceBoundary, targetBoundary)
 			}
 		}
 	}
 
-	if sourceBoundary == mail.InnerBoundary && targetBoundary == mail.OuterBoundary {
-		return result, nil
+	for _, taint := range m.Metadata.Taints {
+		if taint == "INNER_ONLY" && targetBoundary == mail.OuterBoundary {
+			s.emitTaintViolation(m, "INNER_ONLY", "INNER_ONLY taint forbidden on outer boundary")
+			return result, fmt.Errorf("INNER_ONLY taint forbidden on outer boundary")
+		}
+		if taint == "SECRET" && targetBoundary == mail.OuterBoundary {
+			s.emitTaintViolation(m, "SECRET", "SECRET taint forbidden on outer boundary")
+			return result, fmt.Errorf("SECRET taint forbidden on outer boundary")
+		}
+		if taint == "PII" && targetBoundary == mail.OuterBoundary {
+			s.emitTaintViolation(m, "PII", "PII taint forbidden on outer boundary")
+			return result, fmt.Errorf("PII taint forbidden on outer boundary")
+		}
 	}
+
+	result.Metadata.Taints = s.sanitizeTaints(m.Metadata.Taints, sourceBoundary, targetBoundary)
 
 	if sourceBoundary == mail.OuterBoundary && targetBoundary == mail.InnerBoundary {
 		if result.Metadata.Taints == nil {
 			result.Metadata.Taints = []string{}
 		}
-		result.Metadata.Taints = append(result.Metadata.Taints, "OUTER_BOUNDARY")
+		result.Metadata.Taints = append(result.Metadata.Taints, "OUTER_BOUNDARY", "EXTERNAL")
 		return result, nil
 	}
 
 	return result, nil
+}
+
+func (s *SecurityService) sanitizeTaints(taints []string, source, target mail.BoundaryType) []string {
+	if taints == nil {
+		return nil
+	}
+
+	strip := s.getAutoStripTaints(source, target)
+	stripSet := make(map[string]bool)
+	for _, st := range strip {
+		stripSet[st] = true
+	}
+
+	result := make([]string, 0)
+	for _, t := range taints {
+		if !stripSet[t] {
+			result = append(result, t)
+		}
+	}
+
+	return result
+}
+
+func (s *SecurityService) getAutoStripTaints(source, target mail.BoundaryType) []string {
+	switch {
+	case source == mail.InnerBoundary && target == mail.DMZBoundary:
+		return []string{"INNER_ONLY", "PII"}
+	case source == mail.InnerBoundary && target == mail.OuterBoundary:
+		return []string{"SECRET", "PII", "TOOL_OUTPUT", "INNER_ONLY"}
+	case source == mail.OuterBoundary && target == mail.InnerBoundary:
+		return []string{}
+	case source == mail.DMZBoundary && target == mail.InnerBoundary:
+		return []string{}
+	default:
+		return nil
+	}
+}
+
+func (s *SecurityService) emitTaintViolation(m mail.Mail, taint, reason string) {
+	violationMail := mail.Mail{
+		ID:        fmt.Sprintf("violation-%s", m.ID),
+		Type:      mail.MailTypeTaintViolation,
+		Source:    m.Source,
+		Target:    "sys:observability",
+		Content:   map[string]interface{}{"type": "taint_violation", "forbidden_taints": []string{taint}, "mail_id": m.ID},
+		CreatedAt: time.Now(),
+		Metadata: mail.MailMetadata{
+			Taints: m.Metadata.Taints,
+		},
+	}
+	if s.publisher != nil {
+		s.publisher.Publish(violationMail)
+	}
 }
 
 func (s *SecurityService) TaintPropagate(obj any, newTaints []string) (any, error) {

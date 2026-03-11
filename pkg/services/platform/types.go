@@ -112,12 +112,30 @@ initialState: init
 
 // ChartRegistry loads PlatformService YAMLs from a directory.
 type ChartRegistry struct {
-	dir string
+	dir     string
+	running bool
 }
 
 // NewChartRegistry creates a new ChartRegistry for the given directory.
 func NewChartRegistry(dir string) *ChartRegistry {
 	return &ChartRegistry{dir: dir}
+}
+
+// Start begins loading platform services.
+func (cr *ChartRegistry) Start() error {
+	cr.running = true
+	return nil
+}
+
+// Stop stops the ChartRegistry.
+func (cr *ChartRegistry) Stop() error {
+	cr.running = false
+	return nil
+}
+
+// IsRunning returns true if the ChartRegistry is running.
+func (cr *ChartRegistry) IsRunning() bool {
+	return cr.running
 }
 
 // LoadPlatformServices loads all PlatformService YAMLs from the registry directory.

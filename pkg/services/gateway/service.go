@@ -1,8 +1,12 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
+	"sync"
 	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
@@ -107,12 +111,27 @@ type GatewayService interface {
 	ParseActionItem(message string) (*ActionItem, error)
 }
 
+// HTTPServerConfig holds HTTP server configuration
+type HTTPServerConfig struct {
+	Port int
+}
+
+// DefaultHTTPServerConfig returns default HTTP server configuration
+func DefaultHTTPServerConfig() HTTPServerConfig {
+	return HTTPServerConfig{
+		Port: 8080,
+	}
+}
+
 // gatewayService implements GatewayService
 type gatewayService struct {
 	adapters           map[string]ChannelAdapter
 	mailChan           chan GatewayMail
 	protectedEndpoints map[string]bool
 	authMiddleware     *AuthMiddleware
+	httpServer         *http.Server
+	httpConfig         HTTPServerConfig
+	mu                 sync.RWMutex
 }
 
 // NewGatewayService creates a new gateway service instance
@@ -122,6 +141,18 @@ func NewGatewayService() GatewayService {
 		mailChan:           make(chan GatewayMail, 100),
 		protectedEndpoints: make(map[string]bool),
 		authMiddleware:     NewAuthMiddleware(),
+		httpConfig:         DefaultHTTPServerConfig(),
+	}
+}
+
+// NewGatewayServiceWithConfig creates a new gateway service instance with custom HTTP config
+func NewGatewayServiceWithConfig(config HTTPServerConfig) GatewayService {
+	return &gatewayService{
+		adapters:           make(map[string]ChannelAdapter),
+		mailChan:           make(chan GatewayMail, 100),
+		protectedEndpoints: make(map[string]bool),
+		authMiddleware:     NewAuthMiddleware(),
+		httpConfig:         config,
 	}
 }
 
@@ -263,11 +294,44 @@ func (g *gatewayService) HandleMail(m mail.Mail) error {
 }
 
 func (g *gatewayService) Start() error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if g.httpServer != nil {
+		return errors.New("HTTP server already started")
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/mail", g.handleMail)
+	mux.HandleFunc("/health", g.handleHealth)
+	mux.HandleFunc("/status", g.handleStatus)
+
+	g.httpServer = &http.Server{
+		Addr:    fmt.Sprintf(":%d", g.httpConfig.Port),
+		Handler: mux,
+	}
+
+	go func() {
+		if err := g.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			return
+		}
+	}()
+
 	return nil
 }
 
 func (g *gatewayService) Stop() error {
-	return nil
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if g.httpServer == nil {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	return g.httpServer.Shutdown(ctx)
 }
 
 func (g *gatewayService) AssembleContextMap(agentID string) (*ContextMap, error) {
@@ -427,4 +491,105 @@ func (g *gatewayService) CanExpose(chart Chart) bool {
 		return false
 	}
 	return chart.Boundary == "dmz" || chart.Boundary == "outer"
+}
+
+// MailSubmissionRequest represents the HTTP request body for mail submission
+type MailSubmissionRequest struct {
+	From     string            `json:"from"`
+	To       []string          `json:"to"`
+	Subject  string            `json:"subject"`
+	Body     string            `json:"body"`
+	Taints   []string          `json:"taints,omitempty"`
+	Metadata map[string]string `json:"metadata,omitempty"`
+}
+
+// MailSubmissionResponse represents the HTTP response for mail submission
+type MailSubmissionResponse struct {
+	MessageID string `json:"messageId"`
+	Status    string `json:"status"`
+}
+
+// HealthResponse represents the health check response
+type HealthResponse struct {
+	Status string `json:"status"`
+}
+
+// StatusResponse represents the gateway status response
+type StatusResponse struct {
+	Status     string `json:"status"`
+	Registered int    `json:"registeredAdapters"`
+}
+
+func (g *gatewayService) handleMail(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Method not allowed"})
+		return
+	}
+
+	var req MailSubmissionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	mail := GatewayMail{
+		From:     req.From,
+		To:       req.To,
+		Subject:  req.Subject,
+		Body:     req.Body,
+		Taints:   req.Taints,
+		Metadata: req.Metadata,
+	}
+
+	ack, err := g.Publish(mail)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to publish mail"})
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(MailSubmissionResponse{
+		MessageID: ack.MessageID,
+		Status:    ack.Status,
+	})
+}
+
+func (g *gatewayService) handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Method not allowed"})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(HealthResponse{
+		Status: "healthy",
+	})
+}
+
+func (g *gatewayService) handleStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Method not allowed"})
+		return
+	}
+
+	g.mu.RLock()
+	adapterCount := len(g.adapters)
+	g.mu.RUnlock()
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(StatusResponse{
+		Status:     "running",
+		Registered: adapterCount,
+	})
 }

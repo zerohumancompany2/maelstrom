@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/maelstrom/v3/pkg/bootstrap"
+	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/runtime"
 	"github.com/maelstrom/v3/pkg/security"
 	"github.com/maelstrom/v3/pkg/services/communication"
@@ -104,6 +105,39 @@ func New() *Kernel {
 	k.serviceReady["sys:observability"] = true
 	k.serviceReady["sys:lifecycle"] = true
 	return k
+}
+
+// StartChartRegistry starts the ChartRegistry after KERNEL_READY.
+func (k *Kernel) StartChartRegistry(servicesDir string) error {
+	k.mu.Lock()
+	if k.chartRegistry != nil {
+		k.mu.Unlock()
+		return nil
+	}
+	k.chartRegistry = platform.NewChartRegistry(servicesDir)
+	k.mu.Unlock()
+
+	if err := k.chartRegistry.Start(); err != nil {
+		return fmt.Errorf("failed to start chart registry: %w", err)
+	}
+
+	k.SetChartRegistryRunning(true)
+	log.Println("[kernel] ChartRegistry started")
+
+	return nil
+}
+
+// LoadPlatformServices loads platform services via ChartRegistry.
+func (k *Kernel) LoadPlatformServices() ([]platform.PlatformService, error) {
+	k.mu.RLock()
+	registry := k.chartRegistry
+	k.mu.RUnlock()
+
+	if registry == nil {
+		return nil, fmt.Errorf("chart registry not started")
+	}
+
+	return registry.LoadPlatformServices()
 }
 
 // NewWithEngine creates a new Kernel with the given statechart engine.
@@ -208,6 +242,10 @@ func (k *Kernel) Start(ctx context.Context) error {
 		case <-k.readyChan:
 			log.Println("[kernel] Bootstrap complete, handing off to ChartRegistry")
 			k.onBootstrapComplete()
+
+			// Start ChartRegistry after KERNEL_READY is emitted
+			k.handleKernelReadyEvent()
+
 			return nil
 		case <-ctx.Done():
 			return ctx.Err()
@@ -363,6 +401,24 @@ func (k *Kernel) waitForKernelReady(ctx context.Context, bootstrapRTID statechar
 	}
 }
 
+// handleKernelReadyEvent handles the KERNEL_READY event by starting ChartRegistry.
+func (k *Kernel) handleKernelReadyEvent() {
+	log.Println("[kernel] Received KERNEL_READY event, starting ChartRegistry")
+
+	kernelConfig := k.config
+	servicesDir := kernelConfig.ChartsDir
+	if servicesDir == "" {
+		servicesDir = "var/maelstrom/services/"
+	}
+
+	if err := k.StartChartRegistry(servicesDir); err != nil {
+		log.Printf("[kernel] Failed to start ChartRegistry: %v", err)
+		return
+	}
+
+	log.Println("[kernel] ChartRegistry started, ready to load platform services")
+}
+
 func (k *Kernel) CaptureLog(msg string) {
 	k.logMu.Lock()
 	defer k.logMu.Unlock()
@@ -382,6 +438,29 @@ func (k *Kernel) onBootstrapComplete() {
 	k.CaptureLog(msg)
 	log.Println(msg)
 	k.onCompleteCalled.Store(true)
+
+	k.mu.RLock()
+	mailSystem := k.mailSystem
+	k.mu.RUnlock()
+
+	if mailSystem != nil {
+		kernelReadyMail := mail.Mail{
+			ID:        fmt.Sprintf("kernel-ready-%d", time.Now().UnixNano()),
+			Type:      mail.MailTypeKernelReady,
+			CreatedAt: time.Now(),
+			Source:    "sys:kernel",
+			Target:    "topic:events",
+			Content: map[string]interface{}{
+				"event":     "KERNEL_READY",
+				"timestamp": time.Now().UTC(),
+			},
+			Metadata: mail.MailMetadata{
+				Boundary: mail.InnerBoundary,
+			},
+		}
+		_, _ = mailSystem.Publish(kernelReadyMail)
+		log.Println("[kernel] Emitted KERNEL_READY event via mail system")
+	}
 }
 
 // GetCompletionStatus returns true if onComplete callback was called.
