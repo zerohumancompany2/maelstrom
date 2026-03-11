@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/maelstrom/v3/pkg/mail"
@@ -188,4 +190,56 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func TestStreamingPath_SSEChunkFormat(t *testing.T) {
+	svc := NewGatewayService()
+
+	// Create StreamChunk for SSE output
+	chunk := &mail.StreamChunk{
+		Chunk:    "Assistant response part 1",
+		Sequence: 1,
+		IsFinal:  false,
+		Taints:   []string{"USER_SUPPLIED"},
+	}
+
+	// Format as SSE chunk (arch-v1.md L696-701)
+	sseData, err := svc.FormatSSEChunk(chunk)
+	if err != nil {
+		t.Fatalf("Expected no error formatting SSE chunk, got %v", err)
+	}
+
+	// Verify SSE format: data: <json>\n\n
+	expectedPrefix := "data: "
+	if !strings.HasPrefix(sseData, expectedPrefix) {
+		t.Errorf("Expected SSE format starting with '%s', got '%s'", expectedPrefix, sseData[:min(20, len(sseData))])
+	}
+
+	// Verify JSON payload can be parsed
+	jsonStr := strings.TrimPrefix(sseData, "data: ")
+	var parsed map[string]any
+	err = json.Unmarshal([]byte(jsonStr), &parsed)
+	if err != nil {
+		t.Fatalf("Expected valid JSON in SSE data, got %v", err)
+	}
+
+	// Verify chunk field in JSON
+	if parsed["chunk"] != "Assistant response part 1" {
+		t.Error("Expected chunk field in SSE JSON")
+	}
+
+	// Verify sequence field in JSON
+	if parsed["sequence"].(float64) != 1 {
+		t.Error("Expected sequence field in SSE JSON")
+	}
+
+	// Verify isFinal field in JSON
+	if parsed["isFinal"] != false {
+		t.Error("Expected isFinal field in SSE JSON")
+	}
+
+	// Verify taints stripped from SSE output (arch-v1.md L696-701)
+	if _, exists := parsed["taints"]; exists {
+		t.Error("Expected taints to be stripped from SSE output")
+	}
 }

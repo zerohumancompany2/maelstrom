@@ -337,7 +337,16 @@ func (g *gatewayService) StripForbiddenTaints(chunk *mail.StreamChunk) (*mail.St
 }
 
 func (g *gatewayService) FormatSSEChunk(chunk *mail.StreamChunk) (string, error) {
-	return "", errors.New("not implemented")
+	output := map[string]any{
+		"chunk":    chunk.Chunk,
+		"sequence": chunk.Sequence,
+		"isFinal":  chunk.IsFinal,
+	}
+	jsonBytes, err := json.Marshal(output)
+	if err != nil {
+		return "", err
+	}
+	return "data: " + string(jsonBytes) + "\n\n", nil
 }
 
 func (g *gatewayService) FormatWebSocketChunk(chunk *mail.StreamChunk) ([]byte, error) {
