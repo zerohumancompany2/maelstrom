@@ -166,3 +166,76 @@ func TestGatewaySecurity_StreamSanitizationPerChunk(t *testing.T) {
 		t.Error("Expected chunk 2 to be sanitized independently")
 	}
 }
+
+func TestGatewaySecurity_SecurityStripsForbiddenTaints(t *testing.T) {
+	stripper := &ForbiddenTaintStripper{
+		AllowedOnExit: map[string]bool{
+			"USER_SUPPLIED": true,
+			"TOOL_OUTPUT":   true,
+			"PUBLIC":        true,
+		},
+	}
+
+	// Security strips forbidden taints before emission (arch-v1.md L681)
+	testData := map[string]any{
+		"content": "Response content",
+		"taints":  []string{"USER_SUPPLIED", "SECRET", "INNER_ONLY", "PII"},
+	}
+
+	strippedData, err := stripper.StripForbiddenTaints(testData, "outer")
+	if err != nil {
+		t.Fatalf("Expected no error stripping forbidden taints, got %v", err)
+	}
+
+	strippedMap := strippedData.(map[string]any)
+	remainingTaints := strippedMap["taints"].([]string)
+
+	// Uses allowedOnExit to determine what can leave runtime (arch-v1.md L700)
+	if !slices.Contains(remainingTaints, "USER_SUPPLIED") {
+		t.Error("Expected USER_SUPPLIED to remain (allowed on exit)")
+	}
+
+	if slices.Contains(remainingTaints, "SECRET") {
+		t.Error("Expected SECRET to be stripped (forbidden)")
+	}
+
+	if slices.Contains(remainingTaints, "INNER_ONLY") {
+		t.Error("Expected INNER_ONLY to be stripped (forbidden)")
+	}
+
+	if slices.Contains(remainingTaints, "PII") {
+		t.Error("Expected PII to be stripped (forbidden)")
+	}
+
+	// Inner → DMZ/outer: auto-strip or block on forbidden taints (arch-v1.md L681)
+	innerData := map[string]any{
+		"content": "Inner data",
+		"taints":  []string{"INNER_ONLY", "SECRET"},
+	}
+
+	_, err = stripper.StripForbiddenTaints(innerData, "outer")
+	if err == nil {
+		t.Error("Expected error when all taints are forbidden")
+	}
+
+	// Test Stream Chunk Format (arch-v1.md L700)
+	chunk := map[string]any{
+		"chunk":    "Response chunk",
+		"sequence": 1,
+		"isFinal":  false,
+		"taints":   []string{"USER_SUPPLIED", "SECRET"},
+	}
+
+	strippedChunk, _ := stripper.StripForbiddenTaints(chunk, "outer")
+	strippedChunkMap := strippedChunk.(map[string]any)
+
+	// Security strips before emission (arch-v1.md L700)
+	chunkTaints := strippedChunkMap["taints"].([]string)
+	if slices.Contains(chunkTaints, "SECRET") {
+		t.Error("Expected SECRET to be stripped from chunk before emission")
+	}
+
+	if !slices.Contains(chunkTaints, "USER_SUPPLIED") {
+		t.Error("Expected USER_SUPPLIED to remain in chunk")
+	}
+}

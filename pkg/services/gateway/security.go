@@ -69,7 +69,32 @@ type ForbiddenTaintStripper struct {
 
 // StripForbiddenTaints removes taints not allowed on exit
 func (fts *ForbiddenTaintStripper) StripForbiddenTaints(data any, boundary string) (any, error) {
-	return nil, fmt.Errorf("not implemented")
+	switch v := data.(type) {
+	case map[string]any:
+		result := make(map[string]any)
+		for k, val := range v {
+			result[k] = val
+		}
+
+		if taints, ok := v["taints"].([]string); ok {
+			allowed := make([]string, 0)
+			for _, t := range taints {
+				if fts.AllowedOnExit[t] {
+					allowed = append(allowed, t)
+				}
+			}
+
+			if len(allowed) == 0 && len(taints) > 0 {
+				return nil, fmt.Errorf("all taints are forbidden for boundary %s", boundary)
+			}
+
+			result["taints"] = allowed
+		}
+
+		return result, nil
+	default:
+		return data, nil
+	}
 }
 
 // BoundaryValidator validates mail on ingress
