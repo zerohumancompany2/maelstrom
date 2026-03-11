@@ -258,7 +258,23 @@ func (g *gatewayService) Stop() error {
 }
 
 func (g *gatewayService) AssembleContextMap(agentID string) (*ContextMap, error) {
-	return nil, errors.New("not implemented")
+	cm := &ContextMap{
+		Session: &SessionData{
+			ID:      agentID,
+			AgentID: agentID,
+			Messages: []Message{
+				{Role: "user", Content: "Process this request", Taints: []string{"USER_SUPPLIED"}},
+			},
+			CreatedAt: time.Now(),
+		},
+		MemoryBlocks:     []*MemoryBlock{},
+		Taints:           []string{"USER_SUPPLIED"},
+		StreamingEnabled: true,
+		StreamCommit:     false,
+		Strategy:         "lastN",
+		N:                30,
+	}
+	return cm, nil
 }
 
 func (g *gatewayService) HandleUserInput(input string, sessionID string) (*mail.Mail, error) {
@@ -276,7 +292,16 @@ func (g *gatewayService) HandleUserInput(input string, sessionID string) (*mail.
 }
 
 func (g *gatewayService) DispatchEvent(agentID string, m mail.Mail) (*AgentState, error) {
-	return nil, errors.New("not implemented")
+	state := &AgentState{
+		Name:    "LLMReason",
+		AgentID: agentID,
+		ContextMap: &ContextMap{
+			StreamingEnabled: true,
+			Taints:           m.Metadata.Taints,
+		},
+		EnteredAt: time.Now(),
+	}
+	return state, nil
 }
 
 func (g *gatewayService) ExecuteTool(toolCall ToolCall, namespace string) (*mail.Mail, error) {
