@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/maelstrom/v3/pkg/security"
@@ -95,5 +96,82 @@ func TestHumanChat_ReadOnlyContextMapSnapshot(t *testing.T) {
 	blocks[0].Content = "Modified content"
 	if len(snapshot.Blocks) != originalCount {
 		t.Error("Expected snapshot to be independent of original")
+	}
+}
+
+func TestHumanChat_LastNMessagesSanitized(t *testing.T) {
+	svc := NewGatewayService()
+	agentID := "agent:dmz"
+
+	// Setup: Create session with messages (arch-v1.md L731)
+	session, err := svc.CreateChatSession(agentID)
+	if err != nil {
+		t.Fatalf("Expected no error creating session, got %v", err)
+	}
+
+	// Add messages with various taints and boundaries (arch-v1.md L731)
+	messages := []ChatMessage{
+		{ID: "msg1", Content: "Normal message", Taints: []string{}, Boundary: "outer", Type: "user"},
+		{ID: "msg2", Content: "Secret message", Taints: []string{"SECRET"}, Boundary: "inner", Type: "assistant"},
+		{ID: "msg3", Content: "PII message", Taints: []string{"PII"}, Boundary: "dmz", Type: "user"},
+		{ID: "msg4", Content: "Tool output", Taints: []string{"TOOL_OUTPUT"}, Boundary: "outer", Type: "assistant"},
+		{ID: "msg5", Content: "Clean message", Taints: []string{}, Boundary: "outer", Type: "user"},
+	}
+
+	for _, msg := range messages {
+		session.Messages = append(session.Messages, msg)
+	}
+
+	// Get last N messages sanitized by boundary rules (arch-v1.md L731)
+	sanitized := session.GetLastNMessages(3)
+
+	// Verify only 3 messages returned (last N)
+	if len(sanitized) != 3 {
+		t.Errorf("Expected 3 messages, got %d", len(sanitized))
+	}
+
+	// Verify SECRET taint removed (arch-v1.md L731)
+	for _, msg := range sanitized {
+		if slices.Contains(msg.Taints, "SECRET") {
+			t.Error("Expected SECRET taint to be sanitized")
+		}
+	}
+
+	// Verify PII taint removed (arch-v1.md L731)
+	for _, msg := range sanitized {
+		if slices.Contains(msg.Taints, "PII") {
+			t.Error("Expected PII taint to be sanitized")
+		}
+	}
+
+	// Verify inner-boundary messages removed (arch-v1.md L731)
+	for _, msg := range sanitized {
+		if msg.Boundary == "inner" {
+			t.Error("Expected inner-boundary messages to be sanitized")
+		}
+	}
+
+	// Verify TOOL_OUTPUT taint preserved (allowed)
+	hasToolOutput := false
+	for _, msg := range sanitized {
+		if slices.Contains(msg.Taints, "TOOL_OUTPUT") {
+			hasToolOutput = true
+			break
+		}
+	}
+	if !hasToolOutput {
+		t.Error("Expected TOOL_OUTPUT taint to be preserved")
+	}
+
+	// Verify clean messages preserved
+	hasClean := false
+	for _, msg := range sanitized {
+		if msg.Content == "Clean message" {
+			hasClean = true
+			break
+		}
+	}
+	if !hasClean {
+		t.Error("Expected clean message to be preserved")
 	}
 }

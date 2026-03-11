@@ -60,7 +60,37 @@ func (g *gatewayService) GetChatPath(agentID string) string {
 
 // GetLastNMessages returns the last N messages sanitized by boundary rules
 func (s *ChatSession) GetLastNMessages(n int) []ChatMessage {
-	panic("not implemented")
+	forbiddenTaints := map[string]bool{
+		"SECRET": true,
+		"PII":    true,
+	}
+
+	if n > len(s.Messages) {
+		n = len(s.Messages)
+	}
+
+	startIdx := len(s.Messages) - n
+	lastN := s.Messages[startIdx:]
+
+	var sanitized []ChatMessage
+	for _, msg := range lastN {
+		if msg.Boundary == "inner" {
+			continue
+		}
+
+		var cleanTaints []string
+		for _, taint := range msg.Taints {
+			if !forbiddenTaints[taint] {
+				cleanTaints = append(cleanTaints, taint)
+			}
+		}
+
+		cleanMsg := msg
+		cleanMsg.Taints = cleanTaints
+		sanitized = append(sanitized, cleanMsg)
+	}
+
+	return sanitized
 }
 
 // SendHumanMessage sends a human message as mail_received
