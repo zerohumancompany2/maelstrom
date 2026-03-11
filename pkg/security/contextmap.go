@@ -19,9 +19,20 @@ type ContextMapSnapshot struct {
 func (cm *ContextMap) Snapshot() *ContextMapSnapshot {
 	blocksCopy := make([]*ContextBlock, len(cm.Blocks))
 	copy(blocksCopy, cm.Blocks)
+
+	tokenCount := cm.TokenCount
+	if tokenCount == 0 {
+		for _, block := range cm.Blocks {
+			tokenCount += block.MaxTokens
+			if tokenCount == 0 {
+				tokenCount += len(block.Content) / 4
+			}
+		}
+	}
+
 	return &ContextMapSnapshot{
 		Blocks:     blocksCopy,
-		TokenCount: cm.TokenCount,
+		TokenCount: tokenCount,
 		ReadOnly:   true,
 	}
 }
