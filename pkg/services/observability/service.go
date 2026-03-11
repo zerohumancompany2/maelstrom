@@ -32,8 +32,13 @@ func (o *ObservabilityService) Boundary() mail.BoundaryType {
 	return mail.InnerBoundary
 }
 
-func (o *ObservabilityService) HandleMail(mail mail.Mail) error {
-	return nil
+func (o *ObservabilityService) HandleMail(mail mail.Mail) *services.OutcomeEvent {
+	return &services.OutcomeEvent{
+		ServiceID: o.ID(),
+		MailID:    mail.ID,
+		Status:    "success",
+		Timestamp: time.Now(),
+	}
 }
 
 func (o *ObservabilityService) EmitTrace(trace services.Trace) error {

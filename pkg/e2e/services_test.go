@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"testing"
+	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/services"
@@ -181,7 +182,12 @@ func (w *serviceWrapper) ID() string {
 }
 
 func (w *serviceWrapper) HandleMail(mail mail.Mail) *services.OutcomeEvent {
-	return nil
+	return &services.OutcomeEvent{
+		ServiceID: w.ID(),
+		MailID:    mail.ID,
+		Status:    "success",
+		Timestamp: time.Now(),
+	}
 }
 
 func (w *serviceWrapper) Start() error {
@@ -309,20 +315,20 @@ func TestServicesE2E_FullWorkflow(t *testing.T) {
 
 	// Step 1: Gateway receives mail
 	gatewaySvc, _ := registry.Get("sys:gateway")
-	err := gatewaySvc.HandleMail(testMail)
-	require.NoError(t, err, "Gateway should handle mail")
+	outcome := gatewaySvc.HandleMail(testMail)
+	assert.Equal(t, "success", outcome.Status, "Gateway should handle mail")
 
 	// Step 2: Security service validates and sanitizes
-	err = svcSecurity.HandleMail(&testMail)
-	require.NoError(t, err, "Security service should handle mail")
+	outcome = svcSecurity.HandleMail(&testMail)
+	assert.Equal(t, "success", outcome.Status, "Security service should handle mail")
 
 	// Step 3: Lifecycle service processes the mail (creates/updates runtime)
-	err = svcLifecycle.HandleMail(testMail)
-	require.NoError(t, err, "Lifecycle service should handle mail")
+	outcome = svcLifecycle.HandleMail(testMail)
+	assert.Equal(t, "success", outcome.Status, "Lifecycle service should handle mail")
 
 	// Step 4: Observability service logs the event
-	err = svcObservability.HandleMail(testMail)
-	require.NoError(t, err, "Observability service should handle mail")
+	outcome = svcObservability.HandleMail(testMail)
+	assert.Equal(t, "success", outcome.Status, "Observability service should handle mail")
 
 	// Verify mail flowed through all services correctly
 	assert.Equal(t, "test-workflow-mail-001", testMail.ID)
@@ -367,8 +373,8 @@ func TestServicesE2E_FullWorkflow(t *testing.T) {
 		},
 	}
 
-	err = svcObservability.HandleMail(observabilityMail)
-	require.NoError(t, err, "Observability should handle event mail")
+	outcome = svcObservability.HandleMail(observabilityMail)
+	assert.Equal(t, "success", outcome.Status, "Observability should handle event mail")
 
 	// Verify final result: all services processed correctly
 	assert.True(t, true, "Full workflow completed successfully")

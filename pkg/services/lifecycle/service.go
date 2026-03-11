@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
+	"github.com/maelstrom/v3/pkg/services"
 	"github.com/maelstrom/v3/pkg/statechart"
 )
 
@@ -52,8 +53,13 @@ func (l *LifecycleService) Boundary() mail.BoundaryType {
 	return mail.InnerBoundary
 }
 
-func (l *LifecycleService) HandleMail(mail mail.Mail) error {
-	return nil
+func (l *LifecycleService) HandleMail(mail mail.Mail) *services.OutcomeEvent {
+	return &services.OutcomeEvent{
+		ServiceID: l.ID(),
+		MailID:    mail.ID,
+		Status:    "success",
+		Timestamp: time.Now(),
+	}
 }
 
 func (l *LifecycleService) Spawn(def statechart.ChartDefinition) (statechart.RuntimeID, error) {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/security"
+	"github.com/maelstrom/v3/pkg/services"
 )
 
 type SecurityService struct {
@@ -68,7 +69,7 @@ func (s *SecurityService) ID() string {
 	return "sys:security"
 }
 
-func (s *SecurityService) HandleMail(m *mail.Mail) error {
+func (s *SecurityService) HandleMail(m *mail.Mail) *services.OutcomeEvent {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -100,7 +101,13 @@ func (s *SecurityService) HandleMail(m *mail.Mail) error {
 				if s.publisher != nil {
 					s.publisher.Publish(violationMail)
 				}
-				return fmt.Errorf("INNER_ONLY taint forbidden on outer boundary")
+				return &services.OutcomeEvent{
+					ServiceID:    s.ID(),
+					MailID:       m.ID,
+					Status:       "error",
+					Timestamp:    time.Now(),
+					ErrorDetails: "INNER_ONLY taint forbidden on outer boundary",
+				}
 			}
 		}
 		if taint == "SECRET" && (sourceBoundary == mail.DMZBoundary || sourceBoundary == mail.InnerBoundary) {
@@ -119,7 +126,13 @@ func (s *SecurityService) HandleMail(m *mail.Mail) error {
 				if s.publisher != nil {
 					s.publisher.Publish(violationMail)
 				}
-				return fmt.Errorf("SECRET taint forbidden on outer boundary")
+				return &services.OutcomeEvent{
+					ServiceID:    s.ID(),
+					MailID:       m.ID,
+					Status:       "error",
+					Timestamp:    time.Now(),
+					ErrorDetails: "SECRET taint forbidden on outer boundary",
+				}
 			}
 		}
 		if taint == "PII" {
@@ -138,12 +151,23 @@ func (s *SecurityService) HandleMail(m *mail.Mail) error {
 				if s.publisher != nil {
 					s.publisher.Publish(violationMail)
 				}
-				return fmt.Errorf("PII taint forbidden on outer boundary")
+				return &services.OutcomeEvent{
+					ServiceID:    s.ID(),
+					MailID:       m.ID,
+					Status:       "error",
+					Timestamp:    time.Now(),
+					ErrorDetails: "PII taint forbidden on outer boundary",
+				}
 			}
 		}
 	}
 
-	return nil
+	return &services.OutcomeEvent{
+		ServiceID: s.ID(),
+		MailID:    m.ID,
+		Status:    "success",
+		Timestamp: time.Now(),
+	}
 }
 
 func (s *SecurityService) ValidateBoundary(source, target mail.BoundaryType) error {
