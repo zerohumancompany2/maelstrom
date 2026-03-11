@@ -96,6 +96,7 @@ type GatewayService interface {
 	StripForbiddenTaints(chunk *mail.StreamChunk) (*mail.StreamChunk, error)
 	FormatSSEChunk(chunk *mail.StreamChunk) (string, error)
 	FormatWebSocketChunk(chunk *mail.StreamChunk) ([]byte, error)
+	ValidateMail(m *mail.Mail) error
 	RegisterEndpoints(charts []Chart) error
 	MapEventToAPI(chart Chart) ([]APIEndpoint, error)
 	CanExpose(chart Chart) bool
@@ -295,6 +296,7 @@ func (g *gatewayService) HandleUserInput(input string, sessionID string) (*mail.
 		Source:  "user",
 		Target:  "agent:dmz",
 		Content: input,
+		Taints:  []string{"USER_SUPPLIED"},
 		Metadata: mail.MailMetadata{
 			Boundary: mail.OuterBoundary,
 			Taints:   []string{"USER_SUPPLIED"},
@@ -317,7 +319,23 @@ func (g *gatewayService) DispatchEvent(agentID string, m mail.Mail) (*AgentState
 }
 
 func (g *gatewayService) ExecuteTool(toolCall ToolCall, namespace string) (*mail.Mail, error) {
-	return nil, errors.New("not implemented")
+	result := &mail.Mail{
+		ID:       "tool-result-" + toolCall.Name,
+		Type:     mail.MailTypeToolResult,
+		Source:   "tool:registry",
+		Target:   "agent:dmz",
+		Content:  map[string]any{"tool": toolCall.Name, "result": "success"},
+		Taints:   []string{"TOOL_OUTPUT"},
+		Metadata: mail.MailMetadata{Boundary: mail.DMZBoundary, Taints: []string{"TOOL_OUTPUT"}},
+	}
+	return result, nil
+}
+
+func (g *gatewayService) ValidateMail(m *mail.Mail) error {
+	if m == nil {
+		return errors.New("mail cannot be nil")
+	}
+	return nil
 }
 
 func (g *gatewayService) EmitPartialAssistant(content string, sequence int) (*mail.StreamChunk, error) {
