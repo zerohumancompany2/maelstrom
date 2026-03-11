@@ -1130,3 +1130,194 @@ func TestHardcodedServices_SecurityTaintPropagation(t *testing.T) {
 		t.Error("Expected both EXISTING and NEW taints in merged result")
 	}
 }
+
+func TestTaintPropagation_MailChainResponse(t *testing.T) {
+	sourceMail := &mail.Mail{
+		ID:     "mail-001",
+		Source: "agent:user",
+		Target: "agent:assistant",
+		Content: map[string]any{
+			"message": "What is the weather?",
+		},
+		Metadata: mail.MailMetadata{
+			Taints:   []string{"USER_SUPPLIED"},
+			Boundary: mail.DMZBoundary,
+		},
+	}
+
+	responseMail := &mail.Mail{
+		ID:     "mail-002",
+		Source: "agent:assistant",
+		Target: "agent:user",
+		Content: map[string]any{
+			"message": "The weather is sunny.",
+		},
+		Metadata: mail.MailMetadata{
+			Taints:   []string{},
+			Boundary: mail.DMZBoundary,
+		},
+	}
+
+	mail.PropagateTaints(sourceMail, responseMail)
+
+	if !containsTaint(responseMail.GetTaints(), "USER_SUPPLIED") {
+		t.Error("Expected USER_SUPPLIED taint to propagate from source to response mail")
+	}
+}
+
+func TestTaintPropagation_ToolCallResult(t *testing.T) {
+	toolCallMail := &mail.Mail{
+		ID:     "tool-call-001",
+		Source: "agent:assistant",
+		Target: "sys:tools",
+		Type:   mail.MailTypeToolCall,
+		Content: map[string]any{
+			"tool": "get_weather",
+			"args": map[string]any{"location": "NYC"},
+		},
+		Metadata: mail.MailMetadata{
+			Taints:   []string{"USER_SUPPLIED"},
+			Boundary: mail.DMZBoundary,
+		},
+	}
+
+	toolResultMail := &mail.Mail{
+		ID:     "tool-result-001",
+		Source: "sys:tools",
+		Target: "agent:assistant",
+		Type:   mail.MailTypeToolResult,
+		Content: map[string]any{
+			"result": "Sunny, 72F",
+		},
+		Metadata: mail.MailMetadata{
+			Taints:   []string{},
+			Boundary: mail.DMZBoundary,
+		},
+	}
+
+	mail.PropagateTaints(toolCallMail, toolResultMail)
+
+	if !containsTaint(toolResultMail.GetTaints(), "USER_SUPPLIED") {
+		t.Error("Expected USER_SUPPLIED taint to propagate through tool call to result")
+	}
+}
+
+func TestTaintPropagation_BoundaryStrip(t *testing.T) {
+	svc := NewSecurityService()
+
+	innerMail := mail.Mail{
+		ID:     "inner-001",
+		Source: "agent:inner",
+		Target: "agent:outer",
+		Content: map[string]any{
+			"data": "sensitive",
+		},
+		Metadata: mail.MailMetadata{
+			Taints:   []string{"SECRET", "PII", "INTERNAL"},
+			Boundary: mail.InnerBoundary,
+		},
+	}
+
+	_, err := svc.ValidateAndSanitize(innerMail, mail.InnerBoundary, mail.OuterBoundary)
+
+	if err == nil {
+		t.Error("Expected error when SECRET/PII taints cross to outer boundary")
+	}
+}
+
+func TestTaintPropagation_ExternalAdd(t *testing.T) {
+	svc := NewSecurityService()
+
+	outerMail := mail.Mail{
+		ID:     "outer-001",
+		Source: "agent:external",
+		Target: "agent:inner",
+		Content: map[string]any{
+			"data": "external",
+		},
+		Metadata: mail.MailMetadata{
+			Taints:   []string{"USER_SUPPLIED"},
+			Boundary: mail.OuterBoundary,
+		},
+	}
+
+	sanitized, err := svc.ValidateAndSanitize(outerMail, mail.OuterBoundary, mail.InnerBoundary)
+
+	if err != nil {
+		t.Errorf("Expected no error for outer to inner transition, got %v", err)
+	}
+
+	hasExternal := false
+	hasOuterBoundary := false
+	for _, taint := range sanitized.Metadata.Taints {
+		if taint == "EXTERNAL" {
+			hasExternal = true
+		}
+		if taint == "OUTER_BOUNDARY" {
+			hasOuterBoundary = true
+		}
+	}
+
+	if !hasExternal {
+		t.Error("Expected EXTERNAL taint to be added for outbound to external systems")
+	}
+	if !hasOuterBoundary {
+		t.Error("Expected OUTER_BOUNDARY taint to be added for outer to inner transition")
+	}
+}
+
+func TestTaintPropagation_Deduplication(t *testing.T) {
+	sourceMail := &mail.Mail{
+		ID:     "mail-001",
+		Source: "agent:source",
+		Target: "agent:target",
+		Content: map[string]any{
+			"data": "source",
+		},
+		Taints: []string{"USER_SUPPLIED", "EXTERNAL"},
+	}
+
+	targetMail := &mail.Mail{
+		ID:     "mail-002",
+		Source: "agent:target",
+		Target: "agent:response",
+		Content: map[string]any{
+			"data": "target",
+		},
+		Taints: []string{"EXTERNAL", "INTERNAL"},
+	}
+
+	mail.PropagateTaints(sourceMail, targetMail)
+
+	taints := targetMail.GetTaints()
+
+	hasUserSupplied := false
+	hasExternal := false
+	hasInternal := false
+	externalCount := 0
+	for _, t := range taints {
+		if t == "USER_SUPPLIED" {
+			hasUserSupplied = true
+		}
+		if t == "EXTERNAL" {
+			hasExternal = true
+			externalCount++
+		}
+		if t == "INTERNAL" {
+			hasInternal = true
+		}
+	}
+
+	if !hasUserSupplied {
+		t.Error("Expected USER_SUPPLIED taint from source")
+	}
+	if !hasExternal {
+		t.Error("Expected EXTERNAL taint")
+	}
+	if !hasInternal {
+		t.Error("Expected INTERNAL taint from target")
+	}
+	if externalCount > 1 {
+		t.Errorf("Expected EXTERNAL taint to be deduplicated, found %d times", externalCount)
+	}
+}

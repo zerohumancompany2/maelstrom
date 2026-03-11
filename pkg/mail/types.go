@@ -119,6 +119,9 @@ func PropagateTaints(sourceMail *Mail, targetMail *Mail) {
 	for _, t := range targetMail.Taints {
 		seen[t] = true
 	}
+	for _, t := range targetMail.Metadata.Taints {
+		seen[t] = true
+	}
 
 	for _, t := range sourceTaints {
 		if !seen[t] {
