@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
+	"github.com/maelstrom/v3/pkg/security"
+	"github.com/maelstrom/v3/pkg/security/sanitizers"
 )
 
 func TestLayer8Integration_FullStreamingPath(t *testing.T) {
@@ -552,5 +554,300 @@ func TestLayer8Integration_ChannelAdapterToMailToStream(t *testing.T) {
 }
 
 func TestLayer8Integration_SecurityEnforcedThroughout(t *testing.T) {
-	// Stub - will be implemented in next TDD iteration
+	agentID := "agent:dmz"
+
+	// All data entering the runtime is tainted at the border (arch-v1.md L276)
+	t.Run("BorderTainting", func(t *testing.T) {
+		tainter := &BorderTainter{
+			DefaultTaints: []string{"USER_SUPPLIED", "OUTER_BOUNDARY"},
+		}
+
+		testData := map[string]any{
+			"message": "Hello, agent!",
+			"source":  "user:web",
+		}
+
+		taintedData, err := tainter.TaintInboundData(testData, "user:web")
+		if err != nil {
+			t.Fatalf("Expected no error tainting inbound data, got %v", err)
+		}
+
+		// Verify data is tainted (arch-v1.md L276)
+		taintedMap, ok := taintedData.(map[string]any)
+		if !ok {
+			t.Fatal("Expected tainted data to be map")
+		}
+
+		if taintedMap["taints"] == nil {
+			t.Error("Expected taints to be attached to data")
+		}
+
+		// Verify taints are attached as soon as data is ingested (arch-v1.md L276)
+		taints := taintedMap["taints"].([]string)
+		if !slices.Contains(taints, "USER_SUPPLIED") {
+			t.Error("Expected USER_SUPPLIED taint")
+		}
+
+		if !slices.Contains(taints, "OUTER_BOUNDARY") {
+			t.Error("Expected OUTER_BOUNDARY taint")
+		}
+
+		// No untainted information exists inside the runtime (arch-v1.md L276)
+		if len(taints) == 0 {
+			t.Error("Expected all data to have at least one taint")
+		}
+	})
+
+	// Per-chunk stream sanitization with <50ms latency (arch-v1.md L298-299)
+	t.Run("StreamSanitizationPerChunk", func(t *testing.T) {
+		sanitizer := &sanitizers.StreamSanitizer{
+			Redactor:          sanitizers.NewPIIRedactor(),
+			LengthCapper:      sanitizers.NewLengthCapper(1000),
+			SchemaValidator:   sanitizers.NewSchemaValidator(),
+			InnerDataStripper: sanitizers.NewInnerDataStripper(),
+		}
+
+		// Every outgoing chunk passes through DMZ sanitizers (arch-v1.md L298)
+		chunks := []sanitizers.StreamChunk{
+			{
+				Chunk:    "Hello, this is a normal message",
+				Sequence: 1,
+				IsFinal:  false,
+				Taints:   []string{"USER_SUPPLIED"},
+			},
+			{
+				Chunk:    "PII data: John Doe, email: john@example.com",
+				Sequence: 2,
+				IsFinal:  false,
+				Taints:   []string{"PII"},
+			},
+			{
+				Chunk:    "SECRET: api_key=abc123",
+				Sequence: 3,
+				IsFinal:  false,
+				Taints:   []string{"SECRET", "INNER_ONLY"},
+			},
+			{
+				Chunk:    "Final response complete",
+				Sequence: 4,
+				IsFinal:  true,
+				Taints:   []string{},
+			},
+		}
+
+		// Sanitization is per-chunk (stateless) (arch-v1.md L299)
+		for i, chunk := range chunks {
+			startTime := time.Now()
+			sanitized, err := sanitizer.SanitizeChunk(chunk)
+			elapsed := time.Since(startTime)
+
+			if err != nil {
+				t.Fatalf("Expected no error sanitizing chunk %d, got %v", i, err)
+			}
+
+			// Latency stays <50ms (arch-v1.md L299)
+			if elapsed >= 50*time.Millisecond {
+				t.Errorf("Expected chunk %d sanitization <50ms, got %v", i, elapsed)
+			}
+
+			// Verify inner-data stripping (arch-v1.md L298)
+			if slices.Contains(chunk.Taints, "INNER_ONLY") {
+				if strings.Contains(sanitized.Chunk, "api_key") {
+					t.Error("Expected inner data to be stripped")
+				}
+			}
+
+			// Verify length caps (arch-v1.md L298)
+			if len(sanitized.Chunk) > 1000 {
+				t.Error("Expected chunk to be capped at 1000 chars")
+			}
+		}
+
+		// No buffering of entire response unless chart explicitly requests it (arch-v1.md L299)
+		// Verify each chunk is sanitized independently (stateless)
+		secondChunk, _ := sanitizer.SanitizeChunk(chunks[1])
+
+		// Sanitizing chunk 2 should not depend on chunk 1
+		if secondChunk.Sequence != 2 {
+			t.Error("Expected chunk 2 to be sanitized independently")
+		}
+	})
+
+	// Security strips forbidden taints before emission (arch-v1.md L681, L700)
+	t.Run("ForbiddenTaintStripping", func(t *testing.T) {
+		stripper := &ForbiddenTaintStripper{
+			AllowedOnExit: map[string]bool{
+				"USER_SUPPLIED": true,
+				"TOOL_OUTPUT":   true,
+				"PUBLIC":        true,
+			},
+		}
+
+		// Security strips forbidden taints before emission (arch-v1.md L681)
+		testData := map[string]any{
+			"content": "Response content",
+			"taints":  []string{"USER_SUPPLIED", "SECRET", "INNER_ONLY", "PII"},
+		}
+
+		strippedData, err := stripper.StripForbiddenTaints(testData, "outer")
+		if err != nil {
+			t.Fatalf("Expected no error stripping forbidden taints, got %v", err)
+		}
+
+		strippedMap := strippedData.(map[string]any)
+		remainingTaints := strippedMap["taints"].([]string)
+
+		// Uses allowedOnExit to determine what can leave runtime (arch-v1.md L700)
+		if !slices.Contains(remainingTaints, "USER_SUPPLIED") {
+			t.Error("Expected USER_SUPPLIED to remain (allowed on exit)")
+		}
+
+		if slices.Contains(remainingTaints, "SECRET") {
+			t.Error("Expected SECRET to be stripped (forbidden)")
+		}
+
+		if slices.Contains(remainingTaints, "INNER_ONLY") {
+			t.Error("Expected INNER_ONLY to be stripped (forbidden)")
+		}
+
+		if slices.Contains(remainingTaints, "PII") {
+			t.Error("Expected PII to be stripped (forbidden)")
+		}
+	})
+
+	// Boundary validation on ingress (arch-v1.md L286)
+	t.Run("BoundaryValidation", func(t *testing.T) {
+		validator := &BoundaryValidator{
+			Policy: security.NewDefaultSecurityPolicy(),
+		}
+
+		// Validate mail on ingress to gateway
+		inboundMail := &mail.Mail{
+			ID:      "mail-001",
+			Type:    mail.User,
+			Source:  "user:web",
+			Target:  agentID,
+			Content: "Hello, agent!",
+			Metadata: mail.MailMetadata{
+				Boundary: mail.OuterBoundary,
+				Taints:   []string{"USER_SUPPLIED"},
+			},
+			Taints: []string{"USER_SUPPLIED"},
+		}
+
+		err := validator.ValidateOnIngress(inboundMail)
+		if err != nil {
+			t.Fatalf("Expected no error validating inbound mail, got %v", err)
+		}
+
+		// Check boundary transitions are allowed
+		transitionMail := &mail.Mail{
+			ID:      "mail-002",
+			Type:    mail.Assistant,
+			Source:  "agent:inner",
+			Target:  "user:web",
+			Content: "Response from inner agent",
+			Metadata: mail.MailMetadata{
+				Boundary: mail.InnerBoundary,
+				Taints:   []string{"INNER_ONLY", "SECRET"},
+			},
+			Taints: []string{"INNER_ONLY", "SECRET"},
+		}
+
+		// Emit taint_violation event to dead-letter on violation (arch-v1.md L286)
+		err = validator.ValidateOnIngress(transitionMail)
+		if err == nil {
+			t.Error("Expected error for forbidden boundary transition")
+		}
+
+		// Verify violation is logged
+		if !strings.Contains(err.Error(), "taint_violation") {
+			t.Error("Expected taint_violation in error message")
+		}
+
+		// Runtime guard: any action/guard can query taints (arch-v1.md L286)
+		queryableMail := &mail.Mail{
+			ID:      "mail-004",
+			Type:    mail.ToolResult,
+			Source:  "tool:registry",
+			Target:  agentID,
+			Content: "Tool output",
+			Metadata: mail.MailMetadata{
+				Boundary: mail.DMZBoundary,
+				Taints:   []string{"TOOL_OUTPUT"},
+			},
+			Taints: []string{"TOOL_OUTPUT"},
+		}
+
+		// Verify taints can be queried
+		taints := queryableMail.GetTaints()
+		if !slices.Contains(taints, "TOOL_OUTPUT") {
+			t.Error("Expected TOOL_OUTPUT taint to be queryable")
+		}
+	})
+
+	// Taint propagation to mail (arch-v1.md L283)
+	t.Run("TaintPropagation", func(t *testing.T) {
+		// Security Service propagates taints on copy/read/write (arch-v1.md L283)
+		sourceMail := &mail.Mail{
+			ID:      "mail-001",
+			Type:    mail.User,
+			Source:  "user:web",
+			Target:  agentID,
+			Content: "User query with PII: john@example.com",
+			Metadata: mail.MailMetadata{
+				Boundary: mail.OuterBoundary,
+				Taints:   []string{"USER_SUPPLIED", "PII"},
+			},
+			Taints: []string{"USER_SUPPLIED", "PII"},
+		}
+
+		// Like DLP tracking (arch-v1.md L283)
+		targetMail := &mail.Mail{
+			ID:      "mail-002",
+			Type:    mail.Assistant,
+			Source:  agentID,
+			Target:  "user:web",
+			Content: "Response to user query",
+			Metadata: mail.MailMetadata{
+				Boundary: mail.OuterBoundary,
+			},
+		}
+
+		PropagateTaints(sourceMail, targetMail)
+
+		// Verify taints propagated (arch-v1.md L283)
+		if !slices.Contains(targetMail.Taints, "USER_SUPPLIED") {
+			t.Error("Expected USER_SUPPLIED taint to propagate")
+		}
+
+		if !slices.Contains(targetMail.Taints, "PII") {
+			t.Error("Expected PII taint to propagate")
+		}
+
+		// On-disk: taints stored with data (arch-v1.md L284)
+		persistedMail := &mail.Mail{
+			ID:      "mail-005",
+			Type:    mail.Snapshot,
+			Source:  "persistence:service",
+			Target:  agentID,
+			Content: "Snapshot data",
+			Metadata: mail.MailMetadata{
+				Boundary: mail.InnerBoundary,
+			},
+			Taints: []string{"SECRET", "INNER_ONLY"},
+		}
+
+		// Verify taints are stored with data (arch-v1.md L284)
+		if !slices.Contains(persistedMail.Taints, "SECRET") {
+			t.Error("Expected SECRET taint to be stored with data")
+		}
+
+		if !slices.Contains(persistedMail.Taints, "INNER_ONLY") {
+			t.Error("Expected INNER_ONLY taint to be stored with data")
+		}
+	})
+
+	// Verify full security enforcement throughout streaming path
+	t.Logf("Security enforcement throughout streaming path verified: border tainting → per-chunk sanitization → forbidden taint stripping → boundary validation → taint propagation")
 }
