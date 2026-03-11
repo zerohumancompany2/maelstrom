@@ -372,6 +372,21 @@ func (s *SecurityService) CheckTaintPolicy(data any, targetBoundary mail.Boundar
 		}
 	}
 
+	if policy.RedactMode == "redact" {
+		for _, taint := range taints {
+			if taint == "INNER_ONLY" || taint == "SECRET" {
+				if targetBoundary != mail.InnerBoundary {
+					return false, nil
+				}
+			}
+			if taint == "PII" {
+				if targetBoundary == mail.OuterBoundary || targetBoundary == mail.DMZBoundary {
+					return false, nil
+				}
+			}
+		}
+	}
+
 	allowedSet := make(map[security.BoundaryType]bool)
 	for _, b := range policy.AllowedForBoundary {
 		allowedSet[b] = true
