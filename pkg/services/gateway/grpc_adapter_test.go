@@ -68,3 +68,47 @@ func TestInternalGRPCAdapter_DirectRouting(t *testing.T) {
 		t.Errorf("Expected adapter name 'grpc', got %v", adapter.Name())
 	}
 }
+
+func TestChannelAdapter_GRPCInternalMesh(t *testing.T) {
+	adapter := &InternalGRPCAdapter{}
+
+	protobufMessage := map[string]any{
+		"service": "internal_service",
+		"method":  "ProcessRequest",
+		"payload": map[string]any{
+			"id":   "req-001",
+			"data": "test payload",
+		},
+	}
+
+	mailMsg, err := adapter.NormalizeInbound(protobufMessage)
+	if err != nil {
+		t.Fatalf("NormalizeInbound failed: %v", err)
+	}
+
+	if mailMsg.Type != mailpkg.MailReceived {
+		t.Errorf("Expected type mail_received, got %v", mailMsg.Type)
+	}
+
+	if mailMsg.Metadata.Adapter != "grpc" {
+		t.Errorf("Expected adapter 'grpc', got %v", mailMsg.Metadata.Adapter)
+	}
+
+	if adapter.Stream() {
+		t.Error("Expected Stream() to return false for grpc")
+	}
+
+	outboundMail := &mailpkg.Mail{
+		Type:    mailpkg.MailSend,
+		Content: map[string]any{"result": "processed"},
+	}
+
+	normalized, err := adapter.NormalizeOutbound(outboundMail)
+	if err != nil {
+		t.Fatalf("NormalizeOutbound failed: %v", err)
+	}
+
+	if normalized == nil {
+		t.Error("Expected normalized gRPC content")
+	}
+}
