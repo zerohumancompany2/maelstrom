@@ -61,3 +61,48 @@ func TestWebSocketAdapter_Bidirectional(t *testing.T) {
 		t.Errorf("Expected WebSocketAdapter to stream, got false")
 	}
 }
+
+func TestChannelAdapter_WebSocketBidirectional(t *testing.T) {
+	adapter := &WebSocketAdapter{}
+
+	inboundMessage := map[string]any{
+		"text":      "Hello from WebSocket client",
+		"timestamp": 1234567890,
+	}
+
+	mailMsg, err := adapter.NormalizeInbound(inboundMessage)
+	if err != nil {
+		t.Fatalf("NormalizeInbound failed: %v", err)
+	}
+
+	if mailMsg.Type != mailpkg.MailReceived {
+		t.Errorf("Expected type mail_received, got %v", mailMsg.Type)
+	}
+
+	if mailMsg.Metadata.Adapter != "websocket" {
+		t.Errorf("Expected adapter 'websocket', got %v", mailMsg.Metadata.Adapter)
+	}
+
+	if !adapter.Stream() {
+		t.Error("Expected Stream() to return true for websocket")
+	}
+
+	outboundMail := &mailpkg.Mail{
+		Type:    mailpkg.MailSend,
+		Content: map[string]any{"text": "Response from server"},
+	}
+
+	normalized, err := adapter.NormalizeOutbound(outboundMail)
+	if err != nil {
+		t.Fatalf("NormalizeOutbound failed: %v", err)
+	}
+
+	content, ok := normalized.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected normalized content to be map[string]any, got %T", normalized)
+	}
+
+	if content["text"] != "Response from server" {
+		t.Errorf("Expected text 'Response from server', got %v", content["text"])
+	}
+}
