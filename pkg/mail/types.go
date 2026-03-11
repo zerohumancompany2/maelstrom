@@ -78,6 +78,7 @@ const (
 )
 
 type StreamChunk struct {
+	Data        string   `json:"data"`
 	Chunk       string   `json:"chunk"`
 	Sequence    int      `json:"sequence"`
 	IsFinal     bool     `json:"isFinal"`

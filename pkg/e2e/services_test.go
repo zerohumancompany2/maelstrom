@@ -180,7 +180,7 @@ func (w *serviceWrapper) ID() string {
 	return ""
 }
 
-func (w *serviceWrapper) HandleMail(mail mail.Mail) error {
+func (w *serviceWrapper) HandleMail(mail mail.Mail) *services.OutcomeEvent {
 	return nil
 }
 
