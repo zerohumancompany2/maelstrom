@@ -29,6 +29,8 @@ const (
 	MailTypeSubagentDone     MailType = "subagent_done"
 	MailTypeTaintViolation   MailType = "taint_violation"
 	MailTypeMailSend         MailType = "mail_send"
+	MailTypeContextBlock     MailType = "context_block"
+	MailTypeSnapshot         MailType = "snapshot"
 
 	// Aliases for backward compatibility
 	User             = MailTypeUser
@@ -43,6 +45,8 @@ const (
 	SubagentDone     = MailTypeSubagentDone
 	TaintViolation   = MailTypeTaintViolation
 	MailSend         = MailTypeMailSend
+	ContextBlock     = MailTypeContextBlock
+	Snapshot         = MailTypeSnapshot
 )
 
 type MailMetadata struct {
@@ -95,6 +99,32 @@ func (m *Mail) GetTaints() []string {
 		return m.Taints
 	}
 	return m.Metadata.Taints
+}
+
+// PropagateTaints propagates taints from source mail to target mail (arch-v1.md L283)
+func PropagateTaints(sourceMail *Mail, targetMail *Mail) {
+	if sourceMail == nil || targetMail == nil {
+		return
+	}
+
+	sourceTaints := sourceMail.GetTaints()
+	if len(sourceTaints) == 0 {
+		return
+	}
+
+	seen := make(map[string]bool)
+	for _, t := range targetMail.Taints {
+		seen[t] = true
+	}
+
+	for _, t := range sourceTaints {
+		if !seen[t] {
+			targetMail.Taints = append(targetMail.Taints, t)
+			seen[t] = true
+		}
+	}
+
+	targetMail.Metadata.Taints = targetMail.Taints
 }
 
 func isValidAddress(address string) bool {

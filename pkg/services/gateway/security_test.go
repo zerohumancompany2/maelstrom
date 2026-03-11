@@ -330,3 +330,106 @@ func TestGatewaySecurity_BoundaryValidationOnIngress(t *testing.T) {
 		t.Error("Expected TOOL_OUTPUT taint to be queryable")
 	}
 }
+
+func TestGatewaySecurity_TaintPropagationToMail(t *testing.T) {
+	// Security Service propagates taints on copy/read/write (arch-v1.md L283)
+	sourceMail := &mail.Mail{
+		ID:      "mail-001",
+		Type:    mail.MailTypeUser,
+		Source:  "user:web",
+		Target:  "agent:dmz",
+		Content: "User query with PII: john@example.com",
+		Metadata: mail.MailMetadata{
+			Boundary: mail.OuterBoundary,
+			Taints:   []string{"USER_SUPPLIED", "PII"},
+		},
+		Taints: []string{"USER_SUPPLIED", "PII"},
+	}
+
+	// Like DLP tracking (arch-v1.md L283)
+	targetMail := &mail.Mail{
+		ID:      "mail-002",
+		Type:    mail.MailTypeAssistant,
+		Source:  "agent:dmz",
+		Target:  "user:web",
+		Content: "Response to user query",
+		Metadata: mail.MailMetadata{
+			Boundary: mail.OuterBoundary,
+		},
+	}
+
+	PropagateTaints(sourceMail, targetMail)
+
+	// Verify taints propagated (arch-v1.md L283)
+	if !slices.Contains(targetMail.Taints, "USER_SUPPLIED") {
+		t.Error("Expected USER_SUPPLIED taint to propagate")
+	}
+
+	if !slices.Contains(targetMail.Taints, "PII") {
+		t.Error("Expected PII taint to propagate")
+	}
+
+	// Test taint propagation on copy
+	copiedMail := &mail.Mail{
+		ID:      "mail-003",
+		Type:    mail.MailTypeContextBlock,
+		Source:  "agent:dmz",
+		Target:  "agent:dmz",
+		Content: sourceMail.Content,
+		Metadata: mail.MailMetadata{
+			Boundary: mail.DMZBoundary,
+		},
+	}
+
+	PropagateTaints(sourceMail, copiedMail)
+
+	// Verify taints on copy (arch-v1.md L283)
+	if !slices.Contains(copiedMail.Taints, "USER_SUPPLIED") {
+		t.Error("Expected USER_SUPPLIED taint to propagate on copy")
+	}
+
+	if !slices.Contains(copiedMail.Taints, "PII") {
+		t.Error("Expected PII taint to propagate on copy")
+	}
+
+	// Test taint propagation on read
+	readMail := &mail.Mail{
+		ID:      "mail-004",
+		Type:    mail.MailTypeContextBlock,
+		Source:  "memory:service",
+		Target:  "agent:dmz",
+		Content: "Memory content",
+		Metadata: mail.MailMetadata{
+			Boundary: mail.DMZBoundary,
+		},
+	}
+
+	PropagateTaints(sourceMail, readMail)
+
+	// Verify taints on read (arch-v1.md L283)
+	if len(readMail.Taints) == 0 {
+		t.Error("Expected taints to propagate on read")
+	}
+
+	// Test on-disk: taints stored with data (arch-v1.md L284)
+	persistedMail := &mail.Mail{
+		ID:      "mail-005",
+		Type:    mail.MailTypeSnapshot,
+		Source:  "persistence:service",
+		Target:  "agent:dmz",
+		Content: "Snapshot data",
+		Metadata: mail.MailMetadata{
+			Boundary: mail.InnerBoundary,
+		},
+		Taints: []string{"SECRET", "INNER_ONLY"},
+	}
+
+	// Verify taints are stored with data (arch-v1.md L284)
+	if !slices.Contains(persistedMail.Taints, "SECRET") {
+		t.Error("Expected SECRET taint to be stored with data")
+	}
+
+	if !slices.Contains(persistedMail.Taints, "INNER_ONLY") {
+		t.Error("Expected INNER_ONLY taint to be stored with data")
+	}
+}

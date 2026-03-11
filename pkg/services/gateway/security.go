@@ -63,6 +63,11 @@ func taintContains(slice []string, item string) bool {
 	return false
 }
 
+// PropagateTaints propagates taints from source mail to target mail
+func PropagateTaints(sourceMail *mail.Mail, targetMail *mail.Mail) {
+	mail.PropagateTaints(sourceMail, targetMail)
+}
+
 // ForbiddenTaintStripper strips forbidden taints before emission
 type ForbiddenTaintStripper struct {
 	AllowedOnExit map[string]bool
