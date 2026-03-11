@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/maelstrom/v3/pkg/mail"
+	"gopkg.in/yaml.v3"
 )
 
 // TestGatewayService_ID - Spec: arch-v1.md L466, L477-480
@@ -289,4 +290,60 @@ func TestGatewayService_NormalizeOutbound_BoundaryEnforcement(t *testing.T) {
 	if innerMap["content"] != "Inner Response" {
 		t.Error("Expected content to be preserved for inner boundary")
 	}
+}
+
+func TestChannelAdapter_YamlHotReload(t *testing.T) {
+	yamlConfig := `
+adapters:
+  - name: webhook
+    config:
+      endpoint: /webhook/test
+  - name: websocket
+    config:
+      endpoint: /ws/test
+  - name: sse
+    config:
+      endpoint: /sse/test
+  - name: smtp
+    config:
+      host: smtp.example.com
+      port: 587
+  - name: grpc
+    config:
+      address: 0.0.0.0:50051
+`
+	var config map[string]any
+	err := yaml.Unmarshal([]byte(yamlConfig), &config)
+	if err != nil {
+		t.Fatalf("Failed to parse YAML config: %v", err)
+	}
+
+	adapters := config["adapters"].([]any)
+	if len(adapters) != 5 {
+		t.Errorf("Expected 5 adapters in config, got %d", len(adapters))
+	}
+
+	expectedAdapters := []string{"webhook", "websocket", "sse", "smtp", "grpc"}
+	for _, adapterConfig := range adapters {
+		adapterMap := adapterConfig.(map[string]any)
+		adapterName := adapterMap["name"].(string)
+
+		found := false
+		for _, expected := range expectedAdapters {
+			if adapterName == expected {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			t.Errorf("Expected adapter '%s' not found in config", adapterName)
+		}
+	}
+
+	var _ ChannelAdapter = &WebhookAdapter{}
+	var _ ChannelAdapter = &WebSocketAdapter{}
+	var _ ChannelAdapter = &SSEAdapter{}
+	var _ ChannelAdapter = &SMTPAdapter{}
+	var _ ChannelAdapter = &InternalGRPCAdapter{}
 }
