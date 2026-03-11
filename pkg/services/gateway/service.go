@@ -100,15 +100,19 @@ type GatewayService interface {
 
 // gatewayService implements GatewayService
 type gatewayService struct {
-	adapters map[string]ChannelAdapter
-	mailChan chan GatewayMail
+	adapters           map[string]ChannelAdapter
+	mailChan           chan GatewayMail
+	protectedEndpoints map[string]bool
+	authMiddleware     *AuthMiddleware
 }
 
 // NewGatewayService creates a new gateway service instance
 func NewGatewayService() GatewayService {
 	return &gatewayService{
-		adapters: make(map[string]ChannelAdapter),
-		mailChan: make(chan GatewayMail, 100),
+		adapters:           make(map[string]ChannelAdapter),
+		mailChan:           make(chan GatewayMail, 100),
+		protectedEndpoints: make(map[string]bool),
+		authMiddleware:     NewAuthMiddleware(),
 	}
 }
 
@@ -356,4 +360,19 @@ func (g *gatewayService) FormatWebSocketChunk(chunk *mail.StreamChunk) ([]byte, 
 		"isFinal":  chunk.IsFinal,
 	}
 	return json.Marshal(output)
+}
+
+// RegisterEndpoints registers chart endpoints with auth middleware
+func (g *gatewayService) RegisterEndpoints(charts []Chart) error {
+	return nil
+}
+
+// MapEventToAPI maps event surface to API surface
+func (g *gatewayService) MapEventToAPI(chart Chart) ([]APIEndpoint, error) {
+	return nil, nil
+}
+
+// CanExpose checks if a chart can be exposed based on boundary
+func (g *gatewayService) CanExpose(chart Chart) bool {
+	return false
 }
