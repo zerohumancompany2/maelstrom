@@ -45,15 +45,23 @@ const (
 )
 
 type MailMetadata struct {
-	Tokens      int
-	Model       string
-	Cost        float64
-	Boundary    BoundaryType
-	Taints      []string
-	Stream      bool
-	StreamChunk *StreamChunk
-	IsFinal     bool
-	Adapter     string
+	Tokens            int
+	Model             string
+	Cost              float64
+	Boundary          BoundaryType
+	Taints            []string
+	Stream            bool
+	StreamChunk       *StreamChunk
+	IsFinal           bool
+	Adapter           string
+	ActionItem        ActionItem
+	HumanFeedbackType string
+}
+
+// ActionItem represents a parsed action item from chat input
+type ActionItem struct {
+	Type    string
+	Payload any
 }
 
 type BoundaryType string

@@ -99,6 +99,11 @@ type GatewayService interface {
 	RegisterEndpoints(charts []Chart) error
 	MapEventToAPI(chart Chart) ([]APIEndpoint, error)
 	CanExpose(chart Chart) bool
+	CreateChatSession(agentID string) (*ChatSession, error)
+	GetChatPath(agentID string) string
+	SendHumanMessage(agentID string, message string) (*mail.Mail, error)
+	RenderAgentReply(mail *mail.Mail) ChatMessage
+	ParseActionItem(message string) (*ActionItem, error)
 }
 
 // gatewayService implements GatewayService

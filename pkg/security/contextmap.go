@@ -8,6 +8,24 @@ type ContextMap struct {
 	Budget     int
 }
 
+// ContextMapSnapshot represents a read-only snapshot of a ContextMap
+type ContextMapSnapshot struct {
+	Blocks     []*ContextBlock
+	TokenCount int
+	ReadOnly   bool
+}
+
+// Snapshot creates a read-only snapshot of the ContextMap
+func (cm *ContextMap) Snapshot() *ContextMapSnapshot {
+	blocksCopy := make([]*ContextBlock, len(cm.Blocks))
+	copy(blocksCopy, cm.Blocks)
+	return &ContextMapSnapshot{
+		Blocks:     blocksCopy,
+		TokenCount: cm.TokenCount,
+		ReadOnly:   true,
+	}
+}
+
 func NewContextMap(blocks []*ContextBlock, budget int) *ContextMap {
 	return &ContextMap{
 		Blocks: blocks,
