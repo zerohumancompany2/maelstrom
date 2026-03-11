@@ -350,5 +350,10 @@ func (g *gatewayService) FormatSSEChunk(chunk *mail.StreamChunk) (string, error)
 }
 
 func (g *gatewayService) FormatWebSocketChunk(chunk *mail.StreamChunk) ([]byte, error) {
-	return nil, errors.New("not implemented")
+	output := map[string]any{
+		"chunk":    chunk.Chunk,
+		"sequence": chunk.Sequence,
+		"isFinal":  chunk.IsFinal,
+	}
+	return json.Marshal(output)
 }

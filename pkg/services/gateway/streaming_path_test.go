@@ -243,3 +243,67 @@ func TestStreamingPath_SSEChunkFormat(t *testing.T) {
 		t.Error("Expected taints to be stripped from SSE output")
 	}
 }
+
+func TestStreamingPath_WebSocketChunkFormat(t *testing.T) {
+	svc := NewGatewayService()
+
+	// Create StreamChunk for WebSocket output
+	chunk := &mail.StreamChunk{
+		Chunk:    "Assistant response part 1",
+		Sequence: 1,
+		IsFinal:  false,
+		Taints:   []string{"USER_SUPPLIED"},
+	}
+
+	// Format as WebSocket chunk (arch-v1.md L696-701)
+	wsData, err := svc.FormatWebSocketChunk(chunk)
+	if err != nil {
+		t.Fatalf("Expected no error formatting WebSocket chunk, got %v", err)
+	}
+
+	// Verify WebSocket format: raw JSON
+	var parsed map[string]any
+	err = json.Unmarshal(wsData, &parsed)
+	if err != nil {
+		t.Fatalf("Expected valid JSON in WebSocket data, got %v", err)
+	}
+
+	// Verify chunk field in JSON
+	if parsed["chunk"] != "Assistant response part 1" {
+		t.Error("Expected chunk field in WebSocket JSON")
+	}
+
+	// Verify sequence field in JSON
+	if parsed["sequence"].(float64) != 1 {
+		t.Error("Expected sequence field in WebSocket JSON")
+	}
+
+	// Verify isFinal field in JSON
+	if parsed["isFinal"] != false {
+		t.Error("Expected isFinal field in WebSocket JSON")
+	}
+
+	// Verify taints stripped from WebSocket output (arch-v1.md L696-701)
+	if _, exists := parsed["taints"]; exists {
+		t.Error("Expected taints to be stripped from WebSocket output")
+	}
+
+	// Test final chunk format
+	finalChunk := &mail.StreamChunk{
+		Chunk:    "Assistant response part 2 (final)",
+		Sequence: 2,
+		IsFinal:  true,
+		Taints:   []string{},
+	}
+
+	finalData, err := svc.FormatWebSocketChunk(finalChunk)
+	if err != nil {
+		t.Fatalf("Expected no error formatting final WebSocket chunk, got %v", err)
+	}
+
+	var finalParsed map[string]any
+	json.Unmarshal(finalData, &finalParsed)
+	if finalParsed["isFinal"] != true {
+		t.Error("Expected isFinal to be true for final chunk")
+	}
+}
