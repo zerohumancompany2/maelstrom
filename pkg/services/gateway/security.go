@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/security"
@@ -103,8 +104,42 @@ type BoundaryValidator struct {
 }
 
 // ValidateOnIngress validates mail entering the gateway
-func (bv *BoundaryValidator) ValidateOnIngress(mail *mail.Mail) error {
-	return fmt.Errorf("not implemented")
+func (bv *BoundaryValidator) ValidateOnIngress(m *mail.Mail) error {
+	if bv.Policy == nil {
+		bv.Policy = &security.TaintPolicyConfig{
+			Enforcement: security.EnforcementStrict,
+		}
+	}
+
+	taints := m.GetTaints()
+	if len(taints) == 0 {
+		return nil
+	}
+
+	switch m.Metadata.Boundary {
+	case mail.InnerBoundary:
+		for _, t := range taints {
+			if t == "INNER_ONLY" || t == "SECRET" {
+				if strings.Contains(m.Target, "user:") || strings.Contains(m.Target, "outer") {
+					return fmt.Errorf("taint_violation: forbidden taint %s on inner→outer transition", t)
+				}
+			}
+		}
+	case mail.DMZBoundary:
+		for _, t := range taints {
+			if t == "INNER_ONLY" || t == "SECRET" {
+				return fmt.Errorf("taint_violation: forbidden taint %s on DMZ boundary", t)
+			}
+		}
+	case mail.OuterBoundary:
+		for _, t := range taints {
+			if t == "PII" {
+				return fmt.Errorf("taint_violation: PII not allowed on outer boundary")
+			}
+		}
+	}
+
+	return nil
 }
 
 // OuterInnerTaintEnforcer enforces tainting on outer→inner transitions

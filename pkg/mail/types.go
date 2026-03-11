@@ -11,6 +11,7 @@ type Mail struct {
 	Target        string
 	Content       any
 	Metadata      MailMetadata
+	Taints        []string
 }
 
 type MailType string
@@ -86,6 +87,14 @@ type Ack struct {
 	DeliveredAt   time.Time
 	Success       bool
 	ErrorMessage  string
+}
+
+// GetTaints returns the taints associated with the mail
+func (m *Mail) GetTaints() []string {
+	if m.Taints != nil {
+		return m.Taints
+	}
+	return m.Metadata.Taints
 }
 
 func isValidAddress(address string) bool {

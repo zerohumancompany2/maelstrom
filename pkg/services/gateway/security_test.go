@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/maelstrom/v3/pkg/mail"
+	"github.com/maelstrom/v3/pkg/security"
 	"github.com/maelstrom/v3/pkg/security/sanitizers"
 )
 
@@ -237,5 +239,94 @@ func TestGatewaySecurity_SecurityStripsForbiddenTaints(t *testing.T) {
 
 	if !slices.Contains(chunkTaints, "USER_SUPPLIED") {
 		t.Error("Expected USER_SUPPLIED to remain in chunk")
+	}
+}
+
+func TestGatewaySecurity_BoundaryValidationOnIngress(t *testing.T) {
+	validator := &BoundaryValidator{
+		Policy: security.NewDefaultSecurityPolicy(),
+	}
+
+	// Validate mail on ingress to gateway
+	inboundMail := &mail.Mail{
+		ID:      "mail-001",
+		Type:    mail.MailTypeUser,
+		Source:  "user:web",
+		Target:  "agent:dmz",
+		Content: "Hello, agent!",
+		Metadata: mail.MailMetadata{
+			Boundary: mail.OuterBoundary,
+			Taints:   []string{"USER_SUPPLIED"},
+		},
+		Taints: []string{"USER_SUPPLIED"},
+	}
+
+	err := validator.ValidateOnIngress(inboundMail)
+	if err != nil {
+		t.Fatalf("Expected no error validating inbound mail, got %v", err)
+	}
+
+	// Check boundary transitions are allowed
+	transitionMail := &mail.Mail{
+		ID:      "mail-002",
+		Type:    mail.MailTypeAssistant,
+		Source:  "agent:inner",
+		Target:  "user:web",
+		Content: "Response from inner agent",
+		Metadata: mail.MailMetadata{
+			Boundary: mail.InnerBoundary,
+			Taints:   []string{"INNER_ONLY", "SECRET"},
+		},
+		Taints: []string{"INNER_ONLY", "SECRET"},
+	}
+
+	// Emit taint_violation event to dead-letter on violation (arch-v1.md L286)
+	err = validator.ValidateOnIngress(transitionMail)
+	if err == nil {
+		t.Error("Expected error for forbidden boundary transition")
+	}
+
+	// Verify violation is logged
+	if !strings.Contains(err.Error(), "taint_violation") {
+		t.Error("Expected taint_violation in error message")
+	}
+
+	// Test allowed boundary transition
+	allowedMail := &mail.Mail{
+		ID:      "mail-003",
+		Type:    mail.MailTypeAssistant,
+		Source:  "agent:dmz",
+		Target:  "user:web",
+		Content: "Response from DMZ agent",
+		Metadata: mail.MailMetadata{
+			Boundary: mail.DMZBoundary,
+			Taints:   []string{"TOOL_OUTPUT"},
+		},
+		Taints: []string{"TOOL_OUTPUT"},
+	}
+
+	err = validator.ValidateOnIngress(allowedMail)
+	if err != nil {
+		t.Errorf("Expected no error for allowed boundary transition, got %v", err)
+	}
+
+	// Test runtime guard: any action/guard can query taints (arch-v1.md L286)
+	queryableMail := &mail.Mail{
+		ID:      "mail-004",
+		Type:    mail.MailTypeToolResult,
+		Source:  "tool:registry",
+		Target:  "agent:dmz",
+		Content: "Tool output",
+		Metadata: mail.MailMetadata{
+			Boundary: mail.DMZBoundary,
+			Taints:   []string{"TOOL_OUTPUT"},
+		},
+		Taints: []string{"TOOL_OUTPUT"},
+	}
+
+	// Verify taints can be queried
+	taints := queryableMail.GetTaints()
+	if !slices.Contains(taints, "TOOL_OUTPUT") {
+		t.Error("Expected TOOL_OUTPUT taint to be queryable")
 	}
 }
