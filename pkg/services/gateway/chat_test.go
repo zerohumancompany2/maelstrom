@@ -4,6 +4,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/maelstrom/v3/pkg/mail"
 	"github.com/maelstrom/v3/pkg/security"
 )
 
@@ -173,5 +174,55 @@ func TestHumanChat_LastNMessagesSanitized(t *testing.T) {
 	}
 	if !hasClean {
 		t.Error("Expected clean message to be preserved")
+	}
+}
+
+func TestHumanChat_MessageBecomesMailReceived(t *testing.T) {
+	svc := NewGatewayService()
+	agentID := "agent:dmz"
+
+	// Human message sent (arch-v1.md L732)
+	humanMessage := "Hello, agent! How can you help me?"
+	m, err := svc.SendHumanMessage(agentID, humanMessage)
+	if err != nil {
+		t.Fatalf("Expected no error sending human message, got %v", err)
+	}
+
+	// Verify mail type is mail_received (arch-v1.md L732)
+	if m.Type != mail.MailReceived {
+		t.Errorf("Expected mail type 'mail_received', got '%s'", m.Type)
+	}
+
+	// Verify mail subtype is human_feedback (arch-v1.md L732)
+	if m.Metadata.HumanFeedbackType != "human_feedback" {
+		t.Errorf("Expected human_feedback type, got '%s'", m.Metadata.HumanFeedbackType)
+	}
+
+	// Verify delivered to Agent's inbox (arch-v1.md L732)
+	if m.Target != agentID {
+		t.Errorf("Expected target '%s', got '%s'", agentID, m.Target)
+	}
+
+	// Verify content matches human message
+	if m.Content != humanMessage {
+		t.Errorf("Expected content '%s', got '%s'", humanMessage, m.Content)
+	}
+
+	// Verify taints include USER_SUPPLIED
+	if !slices.Contains(m.Metadata.Taints, "USER_SUPPLIED") {
+		t.Error("Expected USER_SUPPLIED taint")
+	}
+
+	// Verify boundary is outer (human input)
+	if m.Metadata.Boundary != mail.OuterBoundary {
+		t.Errorf("Expected boundary 'outer', got '%s'", m.Metadata.Boundary)
+	}
+
+	// Verify mail has ID and timestamp
+	if m.ID == "" {
+		t.Error("Expected mail to have ID")
+	}
+	if m.CreatedAt.IsZero() {
+		t.Error("Expected mail to have timestamp")
 	}
 }

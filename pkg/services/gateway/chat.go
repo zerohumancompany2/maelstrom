@@ -95,7 +95,30 @@ func (s *ChatSession) GetLastNMessages(n int) []ChatMessage {
 
 // SendHumanMessage sends a human message as mail_received
 func (g *gatewayService) SendHumanMessage(agentID string, message string) (*mail.Mail, error) {
-	panic("not implemented")
+	actionItem, _ := g.ParseActionItem(message)
+
+	m := &mail.Mail{
+		ID:        fmt.Sprintf("mail-%d", time.Now().UnixNano()),
+		Type:      mail.MailReceived,
+		Source:    "user",
+		Target:    agentID,
+		Content:   message,
+		CreatedAt: time.Now(),
+		Metadata: mail.MailMetadata{
+			Boundary:          mail.OuterBoundary,
+			Taints:            []string{"USER_SUPPLIED"},
+			HumanFeedbackType: "human_feedback",
+		},
+	}
+
+	if actionItem != nil {
+		m.Metadata.ActionItem = mail.ActionItem{
+			Type:    actionItem.Type,
+			Payload: actionItem.Payload,
+		}
+	}
+
+	return m, nil
 }
 
 // RenderAgentReply renders an agent's mail reply as a chat message
@@ -105,5 +128,5 @@ func (g *gatewayService) RenderAgentReply(mail *mail.Mail) ChatMessage {
 
 // ParseActionItem parses action item shorthands from chat input
 func (g *gatewayService) ParseActionItem(message string) (*ActionItem, error) {
-	panic("not implemented")
+	return nil, nil
 }
