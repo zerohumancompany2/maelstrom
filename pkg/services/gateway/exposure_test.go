@@ -374,3 +374,101 @@ func TestHTTPExposure_InnerBoundaryNotExposed(t *testing.T) {
 		t.Errorf("Expected 0 paths in spec for inner chart, got %d", len(spec.Paths))
 	}
 }
+
+func TestHTTPExposure_DMZOuterOnlyExposed(t *testing.T) {
+	svc := NewGatewayService()
+	gen := NewOpenAPIGen()
+
+	// Setup: Charts with different boundaries (arch-v1.md L723)
+	charts := []Chart{
+		{
+			Name:     "agent:dmz",
+			Boundary: "dmz",
+			Expose: &Exposure{
+				HTTP: &HTTPExposure{
+					Path: "/api/v1/agents/{id}/",
+					Events: []HTTPEvent{
+						{Trigger: "user_query", Method: "POST"},
+					},
+				},
+			},
+		},
+		{
+			Name:     "gateway:outer",
+			Boundary: "outer",
+			Expose: &Exposure{
+				HTTP: &HTTPExposure{
+					Path: "/api/v1/gateway/",
+					Events: []HTTPEvent{
+						{Trigger: "health", Method: "GET"},
+					},
+				},
+			},
+		},
+		{
+			Name:     "orchestrator:inner",
+			Boundary: "inner",
+			Expose: &Exposure{
+				HTTP: &HTTPExposure{
+					Path: "/api/v1/orchestrator/",
+					Events: []HTTPEvent{
+						{Trigger: "execute", Method: "POST"},
+					},
+				},
+			},
+		},
+	}
+
+	// Only DMZ/outer ones are exposed (arch-v1.md L723)
+	err := svc.RegisterEndpoints(charts)
+	if err != nil {
+		t.Fatalf("Expected no error registering endpoints, got %v", err)
+	}
+
+	// Verify only 2 endpoints registered (dmz + outer, not inner)
+	gwSvc := svc.(*gatewayService)
+	if len(gwSvc.protectedEndpoints) != 2 {
+		t.Errorf("Expected 2 endpoints (dmz + outer), got %d", len(gwSvc.protectedEndpoints))
+	}
+
+	// Verify DMZ endpoint registered
+	if !gwSvc.protectedEndpoints["POST /api/v1/agents/{id}/"] {
+		t.Error("Expected DMZ endpoint to be registered")
+	}
+
+	// Verify outer endpoint registered
+	if !gwSvc.protectedEndpoints["GET /api/v1/gateway/"] {
+		t.Error("Expected outer endpoint to be registered")
+	}
+
+	// Verify inner endpoint NOT registered
+	if gwSvc.protectedEndpoints["POST /api/v1/orchestrator/"] {
+		t.Error("Expected inner endpoint NOT to be registered")
+	}
+
+	// Generate OpenAPI spec
+	spec, err := gen.GenerateSpec(charts)
+	if err != nil {
+		t.Fatalf("Expected no error generating spec, got %v", err)
+	}
+
+	// Verify spec contains only DMZ and outer paths (arch-v1.md L723)
+	if len(spec.Paths) != 2 {
+		t.Errorf("Expected 2 paths in spec (dmz + outer), got %d", len(spec.Paths))
+	}
+
+	// Verify DMZ path exists
+	if _, exists := spec.Paths["/api/v1/agents/{id}/"]; !exists {
+		t.Error("Expected DMZ path in spec")
+	}
+
+	// Verify outer path exists
+	if _, exists := spec.Paths["/api/v1/gateway/"]; !exists {
+		t.Error("Expected outer path in spec")
+	}
+
+	// Verify inner path NOT in spec
+	if _, exists := spec.Paths["/api/v1/orchestrator/"]; exists {
+		t.Error("Expected inner path NOT in spec")
+	}
+}
