@@ -568,3 +568,207 @@ func TestHardcodedServices_ObservabilityDeadLetter(t *testing.T) {
 		t.Error("Expected Logged timestamp to be set")
 	}
 }
+
+func TestObservabilityService_MetricsCollectionStateCounts(t *testing.T) {
+	svc := NewObservabilityService()
+
+	trace1 := services.Trace{
+		ID:        "trace-1",
+		RuntimeID: "runtime-1",
+		EventType: "transition",
+		StatePath: "root/observe",
+	}
+	trace2 := services.Trace{
+		ID:        "trace-2",
+		RuntimeID: "runtime-1",
+		EventType: "entry",
+		StatePath: "root/observe",
+	}
+	trace3 := services.Trace{
+		ID:        "trace-3",
+		RuntimeID: "runtime-2",
+		EventType: "transition",
+		StatePath: "root/orient",
+	}
+
+	svc.EmitTrace(trace1)
+	svc.EmitTrace(trace2)
+	svc.EmitTrace(trace3)
+
+	metrics := svc.GetMetrics()
+
+	if metrics.StateCounts["root/observe"] != 2 {
+		t.Errorf("Expected StateCounts['root/observe'] = 2, got %d", metrics.StateCounts["root/observe"])
+	}
+	if metrics.StateCounts["root/orient"] != 1 {
+		t.Errorf("Expected StateCounts['root/orient'] = 1, got %d", metrics.StateCounts["root/orient"])
+	}
+}
+
+func TestObservabilityService_MetricsCollectionTransitionRates(t *testing.T) {
+	svc := NewObservabilityService()
+
+	time.Sleep(10 * time.Millisecond)
+
+	svc.trackTransition("idle", "running")
+	svc.trackTransition("running", "processing")
+	svc.trackTransition("processing", "idle")
+
+	time.Sleep(10 * time.Millisecond)
+
+	metrics := svc.GetMetrics()
+
+	if metrics.TransitionRate != 3 {
+		t.Errorf("Expected TransitionRate 3, got %f", metrics.TransitionRate)
+	}
+}
+
+func TestObservabilityService_MetricsCollectionEventRates(t *testing.T) {
+	svc := NewObservabilityService()
+
+	svc.trackEvent("user_query")
+	svc.trackEvent("heartbeat")
+	svc.trackEvent("llm_decision")
+	svc.trackEvent("orchestration_complete")
+
+	metrics := svc.GetMetrics()
+
+	if metrics.EventRate != 4 {
+		t.Errorf("Expected EventRate 4, got %f", metrics.EventRate)
+	}
+}
+
+func TestObservabilityService_MetricsCollectionMailDelivery(t *testing.T) {
+	svc := NewObservabilityService()
+
+	mail1 := mail.Mail{ID: "mail-1", Source: "agent-1", Target: "agent-2", Type: mail.Assistant}
+	mail2 := mail.Mail{ID: "mail-2", Source: "agent-2", Target: "agent-3", Type: mail.User}
+
+	svc.HandleMail(mail1)
+	svc.TrackMailDelivered()
+	svc.TrackMailFailed()
+	svc.TrackMailRetried()
+	svc.HandleMail(mail2)
+
+	metrics := svc.GetMetrics()
+
+	if metrics.MailDelivered != 3 {
+		t.Errorf("Expected MailDelivered 3, got %d", metrics.MailDelivered)
+	}
+	if metrics.MailFailed != 1 {
+		t.Errorf("Expected MailFailed 1, got %d", metrics.MailFailed)
+	}
+	if metrics.MailRetried != 1 {
+		t.Errorf("Expected MailRetried 1, got %d", metrics.MailRetried)
+	}
+}
+
+func TestMetricsReporter_CollectReturnsMetrics(t *testing.T) {
+	reporter := NewMetricsReporter()
+
+	reporter.mu.Lock()
+	reporter.collected.TransitionRate = 10
+	reporter.collected.EventRate = 20
+	reporter.collected.MailDelivered = 100
+	reporter.collected.MailFailed = 5
+	reporter.collected.MailRetried = 2
+	reporter.mu.Unlock()
+
+	metrics := reporter.Collect()
+
+	if metrics.MailDelivered != 100 {
+		t.Errorf("Expected MailDelivered 100, got %d", metrics.MailDelivered)
+	}
+	if metrics.MailFailed != 5 {
+		t.Errorf("Expected MailFailed 5, got %d", metrics.MailFailed)
+	}
+	if metrics.MailRetried != 2 {
+		t.Errorf("Expected MailRetried 2, got %d", metrics.MailRetried)
+	}
+	if metrics.TransitionRate < 10 {
+		t.Errorf("Expected TransitionRate >= 10, got %f", metrics.TransitionRate)
+	}
+	if metrics.EventRate < 20 {
+		t.Errorf("Expected EventRate >= 20, got %f", metrics.EventRate)
+	}
+}
+
+func TestMetricsReporter_ReportJSON(t *testing.T) {
+	reporter := NewMetricsReporter()
+
+	reporter.mu.Lock()
+	reporter.collected.StateCounts["test/state"] = 5
+	reporter.collected.TransitionRate = 10
+	reporter.collected.EventRate = 20
+	reporter.collected.MailDelivered = 100
+	reporter.collected.MailFailed = 5
+	reporter.collected.MailRetried = 2
+	reporter.mu.Unlock()
+
+	err := reporter.Report("json")
+
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+}
+
+func TestMetricsReporter_ReportText(t *testing.T) {
+	reporter := NewMetricsReporter()
+
+	reporter.mu.Lock()
+	reporter.collected.StateCounts["test/state"] = 5
+	reporter.collected.TransitionRate = 10
+	reporter.collected.EventRate = 20
+	reporter.collected.MailDelivered = 100
+	reporter.collected.MailFailed = 5
+	reporter.collected.MailRetried = 2
+	reporter.mu.Unlock()
+
+	err := reporter.Report("text")
+
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
+}
+
+func TestMetricsReporter_ReportInvalidFormat(t *testing.T) {
+	reporter := NewMetricsReporter()
+
+	err := reporter.Report("invalid")
+
+	if err == nil {
+		t.Error("Expected error for invalid format, got nil")
+	}
+}
+
+func TestMetricsReporter_Reset(t *testing.T) {
+	reporter := NewMetricsReporter()
+
+	reporter.mu.Lock()
+	reporter.collected.TransitionRate = 100
+	reporter.collected.EventRate = 200
+	reporter.collected.MailDelivered = 1000
+	reporter.collected.MailFailed = 50
+	reporter.collected.MailRetried = 10
+	reporter.mu.Unlock()
+
+	reporter.Reset()
+
+	metrics := reporter.Collect()
+
+	if metrics.TransitionRate != 0 {
+		t.Errorf("Expected TransitionRate 0 after reset, got %f", metrics.TransitionRate)
+	}
+	if metrics.EventRate != 0 {
+		t.Errorf("Expected EventRate 0 after reset, got %f", metrics.EventRate)
+	}
+	if metrics.MailDelivered != 0 {
+		t.Errorf("Expected MailDelivered 0 after reset, got %d", metrics.MailDelivered)
+	}
+	if metrics.MailFailed != 0 {
+		t.Errorf("Expected MailFailed 0 after reset, got %d", metrics.MailFailed)
+	}
+	if metrics.MailRetried != 0 {
+		t.Errorf("Expected MailRetried 0 after reset, got %d", metrics.MailRetried)
+	}
+}

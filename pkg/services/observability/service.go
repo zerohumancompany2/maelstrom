@@ -9,10 +9,14 @@ import (
 )
 
 type ObservabilityService struct {
-	mu          sync.Mutex
-	traces      []services.Trace
-	deadLetters []DeadLetterEntry
-	metrics     services.MetricsCollector
+	mu            sync.Mutex
+	traces        []services.Trace
+	deadLetters   []DeadLetterEntry
+	metrics       services.MetricsCollector
+	reporter      *MetricsReporter
+	mailDelivered int64
+	mailFailed    int64
+	mailRetried   int64
 }
 
 func NewObservabilityService() *ObservabilityService {
@@ -21,6 +25,7 @@ func NewObservabilityService() *ObservabilityService {
 			StateCounts: make(map[string]int),
 			LastUpdate:  time.Now(),
 		},
+		reporter: NewMetricsReporter(),
 	}
 }
 
@@ -33,6 +38,10 @@ func (o *ObservabilityService) Boundary() mail.BoundaryType {
 }
 
 func (o *ObservabilityService) HandleMail(mail mail.Mail) *services.OutcomeEvent {
+	o.mu.Lock()
+	o.mailDelivered++
+	o.mu.Unlock()
+
 	return &services.OutcomeEvent{
 		ServiceID: o.ID(),
 		MailID:    mail.ID,
@@ -124,6 +133,9 @@ func (o *ObservabilityService) GetMetrics() services.MetricsCollector {
 	for k, v := range o.metrics.StateCounts {
 		result.StateCounts[k] = v
 	}
+	result.MailDelivered = o.mailDelivered
+	result.MailFailed = o.mailFailed
+	result.MailRetried = o.mailRetried
 	return result
 }
 
@@ -179,4 +191,26 @@ func (o *ObservabilityService) getMemoryUsage() uint64 {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	return uint64(len(o.deadLetters) * 100)
+}
+
+func (o *ObservabilityService) TrackMailDelivered() {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.mailDelivered++
+}
+
+func (o *ObservabilityService) TrackMailFailed() {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.mailFailed++
+}
+
+func (o *ObservabilityService) TrackMailRetried() {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.mailRetried++
+}
+
+func (o *ObservabilityService) GetMetricsReporter() *MetricsReporter {
+	return o.reporter
 }

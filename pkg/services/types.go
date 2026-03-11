@@ -33,4 +33,7 @@ type MetricsCollector struct {
 	TransitionRate float64
 	EventRate      float64
 	LastUpdate     time.Time
+	MailDelivered  int64
+	MailFailed     int64
+	MailRetried    int64
 }
