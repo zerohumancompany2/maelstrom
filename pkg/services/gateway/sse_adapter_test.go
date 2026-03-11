@@ -48,3 +48,43 @@ func TestSSEAdapter_FirewallFriendly(t *testing.T) {
 		t.Errorf("Expected adapter name 'sse', got %v", adapter.Name())
 	}
 }
+
+func TestChannelAdapter_SSEServerSentEvents(t *testing.T) {
+	adapter := &SSEAdapter{}
+
+	inboundMessage := map[string]any{
+		"event": "user_input",
+		"data":  "Hello",
+	}
+
+	mailMsg, err := adapter.NormalizeInbound(inboundMessage)
+	if err != nil {
+		t.Fatalf("NormalizeInbound failed: %v", err)
+	}
+
+	if mailMsg.Type != mailpkg.MailReceived {
+		t.Errorf("Expected type mail_received, got %v", mailMsg.Type)
+	}
+
+	if mailMsg.Metadata.Adapter != "sse" {
+		t.Errorf("Expected adapter 'sse', got %v", mailMsg.Metadata.Adapter)
+	}
+
+	if !adapter.Stream() {
+		t.Error("Expected Stream() to return true for sse")
+	}
+
+	outboundMail := &mailpkg.Mail{
+		Type:    mailpkg.MailSend,
+		Content: map[string]any{"text": "Server response"},
+	}
+
+	normalized, err := adapter.NormalizeOutbound(outboundMail)
+	if err != nil {
+		t.Fatalf("NormalizeOutbound failed: %v", err)
+	}
+
+	if normalized == nil {
+		t.Error("Expected normalized SSE content")
+	}
+}
