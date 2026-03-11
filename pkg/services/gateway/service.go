@@ -320,7 +320,20 @@ func (g *gatewayService) EmitPartialAssistant(content string, sequence int) (*ma
 }
 
 func (g *gatewayService) StripForbiddenTaints(chunk *mail.StreamChunk) (*mail.StreamChunk, error) {
-	return nil, errors.New("not implemented")
+	allowed := []string{"USER_SUPPLIED", "TOOL_OUTPUT"}
+	allowedMap := make(map[string]bool)
+	for _, a := range allowed {
+		allowedMap[a] = true
+	}
+
+	var filtered []string
+	for _, taint := range chunk.Taints {
+		if allowedMap[taint] {
+			filtered = append(filtered, taint)
+		}
+	}
+	chunk.Taints = filtered
+	return chunk, nil
 }
 
 func (g *gatewayService) FormatSSEChunk(chunk *mail.StreamChunk) (string, error) {

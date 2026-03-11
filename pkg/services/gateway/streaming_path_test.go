@@ -133,3 +133,59 @@ func TestStreamingPath_LLMAssistantToStreamChunk(t *testing.T) {
 		t.Errorf("Expected message type 'partial_assistant', got '%s'", chunk.MessageType)
 	}
 }
+
+func TestStreamingPath_StreamChunkTaintStripping(t *testing.T) {
+	svc := NewGatewayService()
+
+	// Create StreamChunk with forbidden taints
+	chunk := &mail.StreamChunk{
+		Chunk:    "This contains SECRET and PII data",
+		Sequence: 1,
+		IsFinal:  false,
+		Taints:   []string{"USER_SUPPLIED", "SECRET", "PII", "TOOL_OUTPUT"},
+	}
+
+	// Security.stripForbiddenTaints applied before emission (arch-v1.md L681)
+	strippedChunk, err := svc.StripForbiddenTaints(chunk)
+	if err != nil {
+		t.Fatalf("Expected no error stripping taints, got %v", err)
+	}
+
+	// Verify forbidden taints removed (arch-v1.md L681)
+	if contains(strippedChunk.Taints, "SECRET") {
+		t.Error("Expected SECRET taint to be stripped")
+	}
+	if contains(strippedChunk.Taints, "PII") {
+		t.Error("Expected PII taint to be stripped")
+	}
+
+	// Verify allowed taints preserved
+	if !contains(strippedChunk.Taints, "USER_SUPPLIED") {
+		t.Error("Expected USER_SUPPLIED taint to be preserved")
+	}
+	if !contains(strippedChunk.Taints, "TOOL_OUTPUT") {
+		t.Error("Expected TOOL_OUTPUT taint to be preserved")
+	}
+
+	// Verify chunk content unchanged (only taints stripped)
+	if strippedChunk.Chunk != chunk.Chunk {
+		t.Errorf("Expected chunk content unchanged, got '%s'", strippedChunk.Chunk)
+	}
+
+	// Verify sequence and isFinal preserved
+	if strippedChunk.Sequence != chunk.Sequence {
+		t.Errorf("Expected sequence %d, got %d", chunk.Sequence, strippedChunk.Sequence)
+	}
+	if strippedChunk.IsFinal != chunk.IsFinal {
+		t.Errorf("Expected isFinal %v, got %v", chunk.IsFinal, strippedChunk.IsFinal)
+	}
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
