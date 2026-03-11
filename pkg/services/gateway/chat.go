@@ -65,17 +65,18 @@ func (s *ChatSession) GetLastNMessages(n int) []ChatMessage {
 		"PII":    true,
 	}
 
-	if n > len(s.Messages) {
-		n = len(s.Messages)
-	}
-
-	startIdx := len(s.Messages) - n
-	lastN := s.Messages[startIdx:]
-
 	var sanitized []ChatMessage
-	for _, msg := range lastN {
+	count := 0
+
+	for i := len(s.Messages) - 1; i >= 0; i-- {
+		msg := s.Messages[i]
+
 		if msg.Boundary == "inner" {
 			continue
+		}
+
+		if count >= n {
+			break
 		}
 
 		var cleanTaints []string
@@ -88,6 +89,11 @@ func (s *ChatSession) GetLastNMessages(n int) []ChatMessage {
 		cleanMsg := msg
 		cleanMsg.Taints = cleanTaints
 		sanitized = append(sanitized, cleanMsg)
+		count++
+	}
+
+	for i := 0; i < len(sanitized)/2; i++ {
+		sanitized[i], sanitized[len(sanitized)-1-i] = sanitized[len(sanitized)-1-i], sanitized[i]
 	}
 
 	return sanitized

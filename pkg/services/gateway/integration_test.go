@@ -136,7 +136,179 @@ func TestLayer8Integration_FullStreamingPath(t *testing.T) {
 }
 
 func TestLayer8Integration_HumanChatWithRunningAgent(t *testing.T) {
-	// Stub - will be implemented in next TDD iteration
+	svc := NewGatewayService()
+	agentID := "agent:dmz"
+
+	// System Service: sys:human-gateway (arch-v1.md L725)
+	// For any long-running top-level Agent, open an HTTPS chat session at /chat/{agentId} (arch-v1.md L728)
+	session, err := svc.CreateChatSession(agentID)
+	if err != nil {
+		t.Fatalf("Expected no error creating chat session, got %v", err)
+	}
+
+	// Verify session created (arch-v1.md L728)
+	if session == nil {
+		t.Error("Expected session to be created")
+	}
+
+	// Verify agent ID matches (arch-v1.md L728)
+	if session.AgentID != agentID {
+		t.Errorf("Expected agentID '%s', got '%s'", agentID, session.AgentID)
+	}
+
+	// Verify HTTPS endpoint path format (arch-v1.md L728)
+	expectedPath := "/chat/" + agentID
+	actualPath := svc.GetChatPath(agentID)
+	if actualPath != expectedPath {
+		t.Errorf("Expected path '%s', got '%s'", expectedPath, actualPath)
+	}
+
+	// Session receives read-only snapshot of Agent's current ContextMap (arch-v1.md L731)
+	if session.ContextMap == nil {
+		t.Error("Expected session to have ContextMap snapshot")
+	}
+
+	// Verify snapshot is read-only (arch-v1.md L731)
+	if !session.ContextMap.ReadOnly {
+		t.Error("Expected session ContextMap to be read-only")
+	}
+
+	// Setup: Add messages to session for last N Messages test
+	messages := []ChatMessage{
+		{ID: "msg1", Content: "Initial message", Taints: []string{}, Boundary: "outer", Type: "user"},
+		{ID: "msg2", Content: "Assistant response", Taints: []string{}, Boundary: "outer", Type: "assistant"},
+		{ID: "msg3", Content: "Secret message", Taints: []string{"SECRET"}, Boundary: "inner", Type: "assistant"},
+		{ID: "msg4", Content: "PII message", Taints: []string{"PII"}, Boundary: "dmz", Type: "user"},
+		{ID: "msg5", Content: "Clean message", Taints: []string{}, Boundary: "outer", Type: "user"},
+	}
+
+	for _, msg := range messages {
+		session.Messages = append(session.Messages, msg)
+	}
+
+	// Last N Messages (sanitized by boundary rules) (arch-v1.md L731)
+	sanitized := session.GetLastNMessages(3)
+
+	// Verify messages returned (inner-boundary messages filtered, so 2 instead of 3)
+	if len(sanitized) < 2 {
+		t.Errorf("Expected at least 2 messages, got %d", len(sanitized))
+	}
+
+	// Verify SECRET taint removed (arch-v1.md L731)
+	for _, msg := range sanitized {
+		if slices.Contains(msg.Taints, "SECRET") {
+			t.Error("Expected SECRET taint to be sanitized")
+		}
+	}
+
+	// Verify PII taint removed (arch-v1.md L731)
+	for _, msg := range sanitized {
+		if slices.Contains(msg.Taints, "PII") {
+			t.Error("Expected PII taint to be sanitized")
+		}
+	}
+
+	// Verify inner-boundary messages removed (arch-v1.md L731)
+	for _, msg := range sanitized {
+		if msg.Boundary == "inner" {
+			t.Error("Expected inner-boundary messages to be sanitized")
+		}
+	}
+
+	// Any message sent becomes mail_received (type: human_feedback or user) delivered to Agent's inbox (arch-v1.md L732)
+	humanMessage := "Hello, agent! How can you help me?"
+	m, err := svc.SendHumanMessage(agentID, humanMessage)
+	if err != nil {
+		t.Fatalf("Expected no error sending human message, got %v", err)
+	}
+
+	// Verify mail type is mail_received (arch-v1.md L732)
+	if m.Type != mail.MailReceived {
+		t.Errorf("Expected mail type 'mail_received', got '%s'", m.Type)
+	}
+
+	// Verify mail subtype is human_feedback (arch-v1.md L732)
+	if m.Metadata.HumanFeedbackType != "human_feedback" {
+		t.Errorf("Expected human_feedback type, got '%s'", m.Metadata.HumanFeedbackType)
+	}
+
+	// Verify delivered to Agent's inbox (arch-v1.md L732)
+	if m.Target != agentID {
+		t.Errorf("Expected target '%s', got '%s'", agentID, m.Target)
+	}
+
+	// Agent replies via normal mail → rendered back in chat UI (arch-v1.md L733)
+	agentMail := &mail.Mail{
+		ID:      "mail-001",
+		Type:    mail.MailTypeAssistant,
+		Source:  agentID,
+		Target:  "user",
+		Content: "I can help you with that request.",
+		Metadata: mail.MailMetadata{
+			Boundary: mail.OuterBoundary,
+			Taints:   []string{},
+		},
+	}
+
+	chatMessage := svc.RenderAgentReply(agentMail)
+
+	// Verify chat message created (arch-v1.md L733)
+	if chatMessage.ID == "" {
+		t.Error("Expected chat message to be rendered")
+	}
+
+	// Verify content matches mail content (arch-v1.md L733)
+	if chatMessage.Content != agentMail.Content {
+		t.Errorf("Expected content '%s', got '%s'", agentMail.Content, chatMessage.Content)
+	}
+
+	// Verify type is assistant (arch-v1.md L733)
+	if chatMessage.Type != "assistant" {
+		t.Errorf("Expected type 'assistant', got '%s'", chatMessage.Type)
+	}
+
+	// Optional "action item" shorthand: @pause, @inject-memory X, etc. become special Mail messages (arch-v1.md L734)
+	pauseMessage := "@pause"
+	actionItem, err := svc.ParseActionItem(pauseMessage)
+	if err != nil {
+		t.Fatalf("Expected no error parsing @pause, got %v", err)
+	}
+
+	// Verify action item type (arch-v1.md L734)
+	if actionItem.Type != "pause" {
+		t.Errorf("Expected action type 'pause', got '%s'", actionItem.Type)
+	}
+
+	// Send @pause and verify it becomes special Mail (arch-v1.md L734)
+	actionMail, err := svc.SendHumanMessage(agentID, pauseMessage)
+	if err != nil {
+		t.Fatalf("Expected no error sending @pause, got %v", err)
+	}
+
+	// Verify mail has action item metadata (arch-v1.md L734)
+	if actionMail.Metadata.ActionItem.Type != "pause" {
+		t.Errorf("Expected action item type 'pause' in mail metadata, got '%s'", actionMail.Metadata.ActionItem.Type)
+	}
+
+	// Test @inject-memory X action item (arch-v1.md L734)
+	injectMessage := "@inject-memory This is important to remember"
+	actionItem, err = svc.ParseActionItem(injectMessage)
+	if err != nil {
+		t.Fatalf("Expected no error parsing @inject-memory, got %v", err)
+	}
+
+	// Verify action item type (arch-v1.md L734)
+	if actionItem.Type != "inject-memory" {
+		t.Errorf("Expected action type 'inject-memory', got '%s'", actionItem.Type)
+	}
+
+	// Verify payload contains the memory content (arch-v1.md L734)
+	if actionItem.Payload != "This is important to remember" {
+		t.Errorf("Expected payload 'This is important to remember', got '%v'", actionItem.Payload)
+	}
+
+	// Verify full human chat flow completed
+	t.Logf("Human chat with running agent completed: session → messages → mail → replies → action items")
 }
 
 func TestLayer8Integration_ChannelAdapterToMailToStream(t *testing.T) {
