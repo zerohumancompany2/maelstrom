@@ -142,5 +142,27 @@ func (g *gatewayService) RenderAgentReply(m *mail.Mail) ChatMessage {
 
 // ParseActionItem parses action item shorthands from chat input
 func (g *gatewayService) ParseActionItem(message string) (*ActionItem, error) {
+	if len(message) == 0 {
+		return nil, nil
+	}
+
+	if message == "@pause" {
+		return &ActionItem{
+			Type:    "pause",
+			Payload: nil,
+		}, nil
+	}
+
+	if len(message) > 15 && message[:15] == "@inject-memory " {
+		return &ActionItem{
+			Type:    "inject-memory",
+			Payload: message[15:],
+		}, nil
+	}
+
+	if len(message) > 0 && message[0] == '@' {
+		return nil, nil
+	}
+
 	return nil, nil
 }

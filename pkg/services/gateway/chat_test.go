@@ -302,3 +302,86 @@ func TestHumanChat_AgentRepliesViaMail(t *testing.T) {
 		t.Errorf("Expected 1 message in session, got %d", len(session.Messages))
 	}
 }
+
+func TestHumanChat_ActionItemShorthand(t *testing.T) {
+	svc := NewGatewayService()
+	agentID := "agent:dmz"
+
+	// Test @pause action item (arch-v1.md L734)
+	pauseMessage := "@pause"
+	actionItem, err := svc.ParseActionItem(pauseMessage)
+	if err != nil {
+		t.Fatalf("Expected no error parsing @pause, got %v", err)
+	}
+
+	// Verify action item type (arch-v1.md L734)
+	if actionItem.Type != "pause" {
+		t.Errorf("Expected action type 'pause', got '%s'", actionItem.Type)
+	}
+
+	// Send @pause and verify it becomes special Mail (arch-v1.md L734)
+	m, err := svc.SendHumanMessage(agentID, pauseMessage)
+	if err != nil {
+		t.Fatalf("Expected no error sending @pause, got %v", err)
+	}
+
+	// Verify mail has action item metadata (arch-v1.md L734)
+	if m.Metadata.ActionItem.Type != "pause" {
+		t.Errorf("Expected action item type 'pause' in mail metadata, got '%s'", m.Metadata.ActionItem.Type)
+	}
+
+	// Test @inject-memory X action item (arch-v1.md L734)
+	injectMessage := "@inject-memory This is important to remember"
+	actionItem, err = svc.ParseActionItem(injectMessage)
+	if err != nil {
+		t.Fatalf("Expected no error parsing @inject-memory, got %v", err)
+	}
+
+	// Verify action item type (arch-v1.md L734)
+	if actionItem.Type != "inject-memory" {
+		t.Errorf("Expected action type 'inject-memory', got '%s'", actionItem.Type)
+	}
+
+	// Verify payload contains the memory content (arch-v1.md L734)
+	if actionItem.Payload != "This is important to remember" {
+		t.Errorf("Expected payload 'This is important to remember', got '%v'", actionItem.Payload)
+	}
+
+	// Send @inject-memory and verify it becomes special Mail (arch-v1.md L734)
+	m, err = svc.SendHumanMessage(agentID, injectMessage)
+	if err != nil {
+		t.Fatalf("Expected no error sending @inject-memory, got %v", err)
+	}
+
+	// Verify mail has action item metadata (arch-v1.md L734)
+	if m.Metadata.ActionItem.Type != "inject-memory" {
+		t.Errorf("Expected action item type 'inject-memory', got '%s'", m.Metadata.ActionItem.Type)
+	}
+
+	if m.Metadata.ActionItem.Payload != "This is important to remember" {
+		t.Errorf("Expected action item payload preserved in mail")
+	}
+
+	// Test regular message (no action item)
+	regularMessage := "Just a regular message"
+	actionItem, err = svc.ParseActionItem(regularMessage)
+	if err != nil {
+		t.Fatalf("Expected no error parsing regular message, got %v", err)
+	}
+
+	// Verify no action item for regular message
+	if actionItem != nil {
+		t.Error("Expected nil action item for regular message")
+	}
+
+	// Test unknown action item (should be treated as regular message)
+	unknownAction := "@unknown-action test"
+	actionItem, err = svc.ParseActionItem(unknownAction)
+	if err != nil {
+		t.Fatalf("Expected no error parsing unknown action, got %v", err)
+	}
+
+	if actionItem != nil {
+		t.Error("Expected nil action item for unknown action")
+	}
+}
