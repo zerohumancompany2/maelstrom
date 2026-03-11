@@ -1,9 +1,11 @@
 package gateway
 
 import (
+	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/maelstrom/v3/pkg/mail"
 )
@@ -312,7 +314,241 @@ func TestLayer8Integration_HumanChatWithRunningAgent(t *testing.T) {
 }
 
 func TestLayer8Integration_ChannelAdapterToMailToStream(t *testing.T) {
-	// Stub - will be implemented in next TDD iteration
+	svc := NewGatewayService()
+
+	// Test WebhookAdapter (arch-v1.md L660)
+	t.Run("WebhookAdapter", func(t *testing.T) {
+		adapter := &WebhookAdapter{}
+
+		// Inbound normalization (arch-v1.md L670)
+		inboundMessage := map[string]any{
+			"from":    "sender@example.com",
+			"to":      []string{"recipient@example.com"},
+			"subject": "Test message",
+			"body":    "Hello, world!",
+		}
+
+		mailMsg, err := adapter.NormalizeInbound(inboundMessage)
+		if err != nil {
+			t.Fatalf("NormalizeInbound failed: %v", err)
+		}
+
+		// Verify mail type (arch-v1.md L670)
+		if mailMsg.Type != mail.MailReceived {
+			t.Errorf("Expected type mail_received, got %v", mailMsg.Type)
+		}
+
+		// Verify adapter metadata (arch-v1.md L660)
+		if mailMsg.Metadata.Adapter != "webhook" {
+			t.Errorf("Expected adapter 'webhook', got %v", mailMsg.Metadata.Adapter)
+		}
+
+		// Verify Stream() returns false for webhook (arch-v1.md L660)
+		if adapter.Stream() {
+			t.Error("Expected Stream() to return false for webhook")
+		}
+
+		// Outbound normalization (arch-v1.md L670)
+		outboundMail := &mail.Mail{
+			Type:    mail.MailSend,
+			Content: map[string]any{"response": "acknowledged"},
+		}
+
+		normalized, err := adapter.NormalizeOutbound(outboundMail)
+		if err != nil {
+			t.Fatalf("NormalizeOutbound failed: %v", err)
+		}
+
+		if normalized == nil {
+			t.Error("Expected normalized outbound content")
+		}
+	})
+
+	// Test WebSocketAdapter (arch-v1.md L661)
+	t.Run("WebSocketAdapter", func(t *testing.T) {
+		adapter := &WebSocketAdapter{}
+
+		// Inbound normalization (arch-v1.md L670)
+		inboundMessage := map[string]any{
+			"text":      "Hello from WebSocket client",
+			"timestamp": time.Now().Unix(),
+		}
+
+		mailMsg, err := adapter.NormalizeInbound(inboundMessage)
+		if err != nil {
+			t.Fatalf("NormalizeInbound failed: %v", err)
+		}
+
+		// Verify mail type (arch-v1.md L670)
+		if mailMsg.Type != mail.MailReceived {
+			t.Errorf("Expected type mail_received, got %v", mailMsg.Type)
+		}
+
+		// Verify adapter metadata (arch-v1.md L661)
+		if mailMsg.Metadata.Adapter != "websocket" {
+			t.Errorf("Expected adapter 'websocket', got %v", mailMsg.Metadata.Adapter)
+		}
+
+		// Verify Stream() returns true for websocket (arch-v1.md L661)
+		if !adapter.Stream() {
+			t.Error("Expected Stream() to return true for websocket")
+		}
+
+		// Full streaming path: WebSocket → mail → StreamChunk → WebSocket
+		chunk := &mail.StreamChunk{
+			Chunk:       "Assistant response",
+			Sequence:    1,
+			IsFinal:     true,
+			Taints:      []string{"USER_SUPPLIED"},
+			MessageType: "partial_assistant",
+		}
+
+		wsData, err := svc.FormatWebSocketChunk(chunk)
+		if err != nil {
+			t.Fatalf("Expected no error formatting WebSocket chunk, got %v", err)
+		}
+
+		// Verify WebSocket format: raw JSON (arch-v1.md L696-701)
+		var parsed map[string]any
+		err = json.Unmarshal(wsData, &parsed)
+		if err != nil {
+			t.Fatalf("Expected valid JSON in WebSocket data, got %v", err)
+		}
+
+		if parsed["chunk"] != "Assistant response" {
+			t.Error("Expected chunk field in WebSocket JSON")
+		}
+	})
+
+	// Test SSEAdapter (arch-v1.md L662)
+	t.Run("SSEAdapter", func(t *testing.T) {
+		adapter := &SSEAdapter{}
+
+		// Inbound normalization (arch-v1.md L670)
+		inboundMessage := map[string]any{
+			"event": "user_input",
+			"data":  "Hello",
+		}
+
+		mailMsg, err := adapter.NormalizeInbound(inboundMessage)
+		if err != nil {
+			t.Fatalf("NormalizeInbound failed: %v", err)
+		}
+
+		// Verify mail type (arch-v1.md L670)
+		if mailMsg.Type != mail.MailReceived {
+			t.Errorf("Expected type mail_received, got %v", mailMsg.Type)
+		}
+
+		// Verify adapter metadata (arch-v1.md L662)
+		if mailMsg.Metadata.Adapter != "sse" {
+			t.Errorf("Expected adapter 'sse', got %v", mailMsg.Metadata.Adapter)
+		}
+
+		// Verify Stream() returns true for sse (arch-v1.md L662)
+		if !adapter.Stream() {
+			t.Error("Expected Stream() to return true for sse")
+		}
+
+		// Full streaming path: SSE → mail → StreamChunk → SSE
+		chunk := &mail.StreamChunk{
+			Chunk:       "Assistant response",
+			Sequence:    1,
+			IsFinal:     true,
+			Taints:      []string{"USER_SUPPLIED"},
+			MessageType: "partial_assistant",
+		}
+
+		sseData, err := svc.FormatSSEChunk(chunk)
+		if err != nil {
+			t.Fatalf("Expected no error formatting SSE chunk, got %v", err)
+		}
+
+		// Verify SSE format: data: <json>\n\n (arch-v1.md L696-701)
+		if !strings.HasPrefix(sseData, "data: ") {
+			t.Errorf("Expected SSE format starting with 'data: ', got '%s'", sseData[:min(20, len(sseData))])
+		}
+	})
+
+	// Test SMTPAdapter (arch-v1.md L664)
+	t.Run("SMTPAdapter", func(t *testing.T) {
+		adapter := &SMTPAdapter{}
+
+		// Inbound normalization (arch-v1.md L670)
+		inboundEmail := map[string]any{
+			"from":    "sender@example.com",
+			"to":      []string{"recipient@example.com"},
+			"subject": "Test email",
+			"body":    "Email body content",
+		}
+
+		mailMsg, err := adapter.NormalizeInbound(inboundEmail)
+		if err != nil {
+			t.Fatalf("NormalizeInbound failed: %v", err)
+		}
+
+		// Verify mail type (arch-v1.md L670)
+		if mailMsg.Type != mail.MailReceived {
+			t.Errorf("Expected type mail_received, got %v", mailMsg.Type)
+		}
+
+		// Verify adapter metadata (arch-v1.md L664)
+		if mailMsg.Metadata.Adapter != "smtp" {
+			t.Errorf("Expected adapter 'smtp', got %v", mailMsg.Metadata.Adapter)
+		}
+
+		// Verify Stream() returns false for smtp (arch-v1.md L664)
+		if adapter.Stream() {
+			t.Error("Expected Stream() to return false for smtp")
+		}
+	})
+
+	// Test InternalGRPCAdapter (arch-v1.md L666)
+	t.Run("InternalGRPCAdapter", func(t *testing.T) {
+		adapter := &InternalGRPCAdapter{}
+
+		// Inbound normalization (arch-v1.md L670)
+		protobufMessage := map[string]any{
+			"service": "internal_service",
+			"method":  "ProcessRequest",
+			"payload": map[string]any{
+				"id":   "req-001",
+				"data": "test payload",
+			},
+		}
+
+		mailMsg, err := adapter.NormalizeInbound(protobufMessage)
+		if err != nil {
+			t.Fatalf("NormalizeInbound failed: %v", err)
+		}
+
+		// Verify mail type (arch-v1.md L670)
+		if mailMsg.Type != mail.MailReceived {
+			t.Errorf("Expected type mail_received, got %v", mailMsg.Type)
+		}
+
+		// Verify adapter metadata (arch-v1.md L666)
+		if mailMsg.Metadata.Adapter != "grpc" {
+			t.Errorf("Expected adapter 'grpc', got %v", mailMsg.Metadata.Adapter)
+		}
+
+		// Verify Stream() returns false for grpc (arch-v1.md L666)
+		if adapter.Stream() {
+			t.Error("Expected Stream() to return false for grpc")
+		}
+	})
+
+	// Verify all adapter types implement ChannelAdapter interface (arch-v1.md L659)
+	t.Run("ChannelAdapterInterface", func(t *testing.T) {
+		var _ ChannelAdapter = &WebhookAdapter{}
+		var _ ChannelAdapter = &WebSocketAdapter{}
+		var _ ChannelAdapter = &SSEAdapter{}
+		var _ ChannelAdapter = &SMTPAdapter{}
+		var _ ChannelAdapter = &InternalGRPCAdapter{}
+	})
+
+	// Verify full channel adapter → mail → streaming path completed
+	t.Logf("Channel adapter to mail to stream completed for all adapters")
 }
 
 func TestLayer8Integration_SecurityEnforcedThroughout(t *testing.T) {
