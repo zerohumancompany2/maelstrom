@@ -28,10 +28,10 @@ func TestLifecycleService_IDReturnsCorrectString(t *testing.T) {
 func TestLifecycleService_HandleMailReturnsNil(t *testing.T) {
 	svc := NewLifecycleServiceWithoutEngine()
 
-	err := svc.HandleMail(mail.Mail{})
+	outcome := svc.HandleMail(mail.Mail{})
 
-	if err != nil {
-		t.Errorf("Expected HandleMail to return nil, got %v", err)
+	if outcome.Status != "success" {
+		t.Errorf("Expected HandleMail to return success, got %s", outcome.Status)
 	}
 }
 

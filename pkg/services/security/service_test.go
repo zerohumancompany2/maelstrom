@@ -30,10 +30,10 @@ func TestSecurityService_HandleMailReturnsNil(t *testing.T) {
 	svc := NewSecurityService()
 
 	mail := mail.Mail{}
-	err := svc.HandleMail(&mail)
+	outcome := svc.HandleMail(&mail)
 
-	if err != nil {
-		t.Errorf("Expected HandleMail to return nil, got %v", err)
+	if outcome.Status != "success" {
+		t.Errorf("Expected HandleMail to return success, got %s", outcome.Status)
 	}
 }
 
@@ -86,9 +86,9 @@ func TestSecurityService_HandleMail(t *testing.T) {
 		Source: "test-source",
 		Target: "sys:security",
 	}
-	err := svc.HandleMail(&m)
-	if err != nil {
-		t.Errorf("HandleMail should return nil for Phase 1 pass-through, got: %v", err)
+	outcome := svc.HandleMail(&m)
+	if outcome.Status != "success" {
+		t.Errorf("HandleMail should return success for Phase 1 pass-through, got: %s", outcome.Status)
 	}
 }
 
@@ -640,10 +640,10 @@ func TestSecurityService_HandleMail_BoundaryTransition(t *testing.T) {
 		},
 	}
 
-	err := svc.HandleMail(&inputMail)
+	outcome := svc.HandleMail(&inputMail)
 
-	if err != nil {
-		t.Errorf("Expected HandleMail to return nil error, got %v", err)
+	if outcome.Status != "success" {
+		t.Errorf("Expected HandleMail to return success, got %s", outcome.Status)
 	}
 
 	hasUserSupplied := false

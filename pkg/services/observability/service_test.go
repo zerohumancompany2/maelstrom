@@ -30,10 +30,10 @@ func TestObservabilityService_IDReturnsCorrectString(t *testing.T) {
 func TestObservabilityService_HandleMailReturnsNil(t *testing.T) {
 	svc := NewObservabilityService()
 
-	err := svc.HandleMail(mail.Mail{})
+	outcome := svc.HandleMail(mail.Mail{})
 
-	if err != nil {
-		t.Errorf("Expected HandleMail to return nil, got %v", err)
+	if outcome.Status != "success" {
+		t.Errorf("Expected HandleMail to return success, got %s", outcome.Status)
 	}
 }
 
