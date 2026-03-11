@@ -21,7 +21,7 @@ func TestStreamUpgrade(t *testing.T) {
 
 	// Verify channel is buffered
 	select {
-	case ch <- StreamChunk{Data: "test", Sequence: 1}:
+	case ch <- StreamChunk{Chunk: "test", Sequence: 1}:
 		// Success
 	default:
 		t.Error("Expected channel to accept chunk without blocking")
@@ -30,14 +30,14 @@ func TestStreamUpgrade(t *testing.T) {
 
 func TestStreamChunkFormat(t *testing.T) {
 	chunk := StreamChunk{
-		Data:     "Hello, ",
+		Chunk:     "Hello, ",
 		Sequence: 1,
 		IsFinal:  false,
 		Taints:   []string{"USER_SUPPLIED"},
 	}
 
-	if chunk.Data != "Hello, " {
-		t.Errorf("Expected Data 'Hello, ', got '%s'", chunk.Data)
+	if chunk.Chunk != "Hello, " {
+		t.Errorf("Expected Data 'Hello, ', got '%s'", chunk.Chunk)
 	}
 	if chunk.Sequence != 1 {
 		t.Errorf("Expected Sequence 1, got %d", chunk.Sequence)
@@ -51,7 +51,7 @@ func TestStreamChunkFormat(t *testing.T) {
 
 	// Test final chunk
 	finalChunk := StreamChunk{
-		Data:     "world!",
+		Chunk:     "world!",
 		Sequence: 2,
 		IsFinal:  true,
 		Taints:   []string{},
@@ -67,7 +67,7 @@ func TestStreamChunkFormat(t *testing.T) {
 
 func TestTaintStripping(t *testing.T) {
 	chunk := StreamChunk{
-		Data:   "test data",
+		Chunk:   "test data",
 		Taints: []string{"USER_SUPPLIED", "TOOL_OUTPUT", "INNER_BOUNDARY"},
 	}
 
@@ -99,7 +99,7 @@ func TestTaintStripping(t *testing.T) {
 
 	// Test with empty allowed list (strip all)
 	chunk2 := StreamChunk{
-		Data:   "test data",
+		Chunk:   "test data",
 		Taints: []string{"USER_SUPPLIED"},
 	}
 	stripped2 := StripForbiddenTaints(chunk2, []string{})
@@ -111,9 +111,9 @@ func TestTaintStripping(t *testing.T) {
 func TestStreamChunk_IsFinal(t *testing.T) {
 	// Create a sequence of chunks
 	chunks := []StreamChunk{
-		{Data: "Part 1", Sequence: 1, IsFinal: false},
-		{Data: "Part 2", Sequence: 2, IsFinal: false},
-		{Data: "Part 3", Sequence: 3, IsFinal: true},
+		{Chunk: "Part 1", Sequence: 1, IsFinal: false},
+		{Chunk: "Part 2", Sequence: 2, IsFinal: false},
+		{Chunk: "Part 3", Sequence: 3, IsFinal: true},
 	}
 
 	// Verify only last chunk is final
@@ -140,9 +140,9 @@ func TestStreamChunk_IsFinal(t *testing.T) {
 func TestStreamChunk_Sequence(t *testing.T) {
 	// Test sequence uniqueness
 	chunks := []StreamChunk{
-		{Data: "A", Sequence: 1},
-		{Data: "B", Sequence: 2},
-		{Data: "C", Sequence: 3},
+		{Chunk: "A", Sequence: 1},
+		{Chunk: "B", Sequence: 2},
+		{Chunk: "C", Sequence: 3},
 	}
 
 	seen := make(map[int]bool)
@@ -168,7 +168,7 @@ func TestStreamChunk_Sequence(t *testing.T) {
 
 func TestStreamSession_Send(t *testing.T) {
 	session := NewStreamSession("test-session", nil)
-	chunk := StreamChunk{Data: "test data", Sequence: 1, IsFinal: false}
+	chunk := StreamChunk{Chunk: "test data", Sequence: 1, IsFinal: false}
 
 	err := session.Send(chunk)
 	if err != nil {
@@ -180,8 +180,8 @@ func TestStreamSession_Send(t *testing.T) {
 		t.Error("Expected channel to be open and contain chunk")
 	}
 
-	if received.Data != chunk.Data {
-		t.Errorf("Expected data 'test data', got '%s'", received.Data)
+	if received.Chunk != chunk.Chunk {
+		t.Errorf("Expected data 'test data', got '%s'", received.Chunk)
 	}
 	if received.Sequence != chunk.Sequence {
 		t.Errorf("Expected sequence 1, got %d", received.Sequence)
@@ -191,9 +191,9 @@ func TestStreamSession_Send(t *testing.T) {
 func TestStreamSession_SendMultiple(t *testing.T) {
 	session := NewStreamSession("test-session", nil)
 	chunks := []StreamChunk{
-		{Data: "Part 1", Sequence: 1, IsFinal: false},
-		{Data: "Part 2", Sequence: 2, IsFinal: false},
-		{Data: "Part 3", Sequence: 3, IsFinal: true},
+		{Chunk: "Part 1", Sequence: 1, IsFinal: false},
+		{Chunk: "Part 2", Sequence: 2, IsFinal: false},
+		{Chunk: "Part 3", Sequence: 3, IsFinal: true},
 	}
 
 	for _, chunk := range chunks {
@@ -218,8 +218,8 @@ func TestStreamSession_SendMultiple(t *testing.T) {
 	}
 
 	for i, chunk := range chunks {
-		if received[i].Data != chunk.Data {
-			t.Errorf("Chunk %d: Expected data '%s', got '%s'", i+1, chunk.Data, received[i].Data)
+		if received[i].Chunk != chunk.Chunk {
+			t.Errorf("Chunk %d: Expected data '%s', got '%s'", i+1, chunk.Chunk, received[i].Chunk)
 		}
 		if received[i].Sequence != chunk.Sequence {
 			t.Errorf("Chunk %d: Expected sequence %d, got %d", i+1, chunk.Sequence, received[i].Sequence)
@@ -256,8 +256,8 @@ func TestStreamSession_CloseAfterSend(t *testing.T) {
 	session := NewStreamSession("test-session", nil)
 
 	chunks := []StreamChunk{
-		{Data: "Part 1", Sequence: 1, IsFinal: false},
-		{Data: "Part 2", Sequence: 2, IsFinal: true},
+		{Chunk: "Part 1", Sequence: 1, IsFinal: false},
+		{Chunk: "Part 2", Sequence: 2, IsFinal: true},
 	}
 
 	for _, chunk := range chunks {
@@ -285,7 +285,7 @@ func TestStreamSession_CloseAfterSend(t *testing.T) {
 		t.Errorf("Expected 2 chunks before close, got %d", len(received))
 	}
 
-	err = session.Send(StreamChunk{Data: "after close", Sequence: 3})
+	err = session.Send(StreamChunk{Chunk: "after close", Sequence: 3})
 	if err == nil {
 		t.Error("Expected error when sending to closed session")
 	}
@@ -294,7 +294,7 @@ func TestStreamSession_CloseAfterSend(t *testing.T) {
 func TestMailStream_TaintStripping(t *testing.T) {
 	session := NewStreamSession("test-session", nil)
 	chunk := StreamChunk{
-		Data:     "test data",
+		Chunk:     "test data",
 		Sequence: 1,
 		Taints:   []string{"USER_SUPPLIED", "TOOL_OUTPUT", "INNER_BOUNDARY"},
 	}
@@ -336,7 +336,7 @@ func TestMailStream_TaintPropagation(t *testing.T) {
 	session := NewStreamSession("test-session", nil)
 
 	inputChunk := StreamChunk{
-		Data:     "test data",
+		Chunk:     "test data",
 		Sequence: 1,
 		Taints:   []string{"USER_SUPPLIED"},
 	}

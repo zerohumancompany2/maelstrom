@@ -4,14 +4,14 @@ import "testing"
 
 func TestMail_StreamChunkHasRequiredFields(t *testing.T) {
 	chunk := StreamChunk{
-		Data:     "test",
+		Chunk:     "test",
 		Sequence: 42,
 		IsFinal:  true,
 		Taints:   []string{"test"},
 	}
 
-	if chunk.Data != "test" {
-		t.Errorf("expected Data to be 'test', got '%s'", chunk.Data)
+	if chunk.Chunk != "test" {
+		t.Errorf("expected Data to be 'test', got '%s'", chunk.Chunk)
 	}
 	if chunk.Sequence != 42 {
 		t.Errorf("expected Sequence to be 42, got %d", chunk.Sequence)
@@ -39,12 +39,12 @@ func TestMailMetadata_StreamBool(t *testing.T) {
 func TestMail_StreamChunkMigrationComplete(t *testing.T) {
 	// Test 1: mail.StreamChunk type exists and is usable
 	chunk := StreamChunk{
-		Data:     "test",
+		Chunk:     "test",
 		Sequence: 1,
 		IsFinal:  false,
 		Taints:   []string{"test-taint"},
 	}
-	if chunk.Data != "test" {
+	if chunk.Chunk != "test" {
 		t.Error("mail.StreamChunk should be usable")
 	}
 
@@ -62,8 +62,8 @@ func TestMail_StreamChunkMigrationComplete(t *testing.T) {
 	}
 
 	// Test 4: Verify StreamChunk field is pointer type by checking assignment works
-	metadata.StreamChunk = &StreamChunk{Data: "final", Sequence: 2, IsFinal: true}
-	if metadata.StreamChunk.Data != "final" {
+	metadata.StreamChunk = &StreamChunk{Chunk: "final", Sequence: 2, IsFinal: true}
+	if metadata.StreamChunk.Chunk != "final" {
 		t.Error("MailMetadata.StreamChunk should be *StreamChunk type")
 	}
 }
@@ -76,7 +76,7 @@ func TestMailMetadata_TypeAlignment(t *testing.T) {
 		Boundary:    InnerBoundary,
 		Taints:      []string{"TEST"},
 		Stream:      true,
-		StreamChunk: &StreamChunk{Data: "chunk", Sequence: 1},
+		StreamChunk: &StreamChunk{Chunk: "chunk", Sequence: 1},
 		IsFinal:     false,
 	}
 
@@ -98,7 +98,7 @@ func TestMailMetadata_TypeAlignment(t *testing.T) {
 	if !metadata.Stream {
 		t.Error("Stream field mismatch")
 	}
-	if metadata.StreamChunk.Data != "chunk" {
+	if metadata.StreamChunk.Chunk != "chunk" {
 		t.Error("StreamChunk field mismatch")
 	}
 	if metadata.IsFinal {

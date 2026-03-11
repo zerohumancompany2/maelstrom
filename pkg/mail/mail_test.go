@@ -226,7 +226,7 @@ func TestMail_MailTypes(t *testing.T) {
 
 func TestMail_MetadataStructure(t *testing.T) {
 	streamChunk := &StreamChunk{
-		Data:     "test-stream",
+		Chunk:     "test-stream",
 		Sequence: 1,
 		IsFinal:  false,
 		Taints:   []string{"test"},
